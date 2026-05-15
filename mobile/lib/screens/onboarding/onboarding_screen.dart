@@ -9,7 +9,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/api_client.dart';
 import '../../strings.dart';
-import '../receptionists/create_receptionist_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -19,7 +18,8 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  bool get _isPhoneDevice => !kIsWeb &&
+  bool get _isPhoneDevice =>
+      !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.android);
 
@@ -28,8 +28,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _hasReceptionist = false;
   String? _testCallNumber;
   bool _isSubscribed = false;
-  String? _calendarId;
-  String? _phone;
+  String? _error;
   bool _loading = true;
 
   @override
@@ -39,35 +38,44 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _load() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
-
-    final supabase = Supabase.instance.client;
-    final profileRes = await supabase
-        .from('users')
-        .select('calendar_id, phone, subscription_status, onboarding_completed_at')
-        .eq('id', user.id)
-        .maybeSingle();
-
-    final recsRes = await supabase
-        .from('receptionists')
-        .select('inbound_phone_number')
-        .eq('user_id', user.id)
-        .limit(1);
-
     setState(() {
-      _calendarId = profileRes?['calendar_id'] as String?;
-      _phone = profileRes?['phone'] as String?;
-      _hasCalendar = (_calendarId ?? '').trim().isNotEmpty;
-      _hasPhone = (_phone ?? '').trim().isNotEmpty;
-      _isSubscribed = (profileRes?['subscription_status'] ?? '') == 'active';
-      _hasReceptionist = (recsRes as List).isNotEmpty;
-      _testCallNumber = (recsRes.isNotEmpty
-              ? (recsRes.first as Map<String, dynamic>)['inbound_phone_number']
-              : null)
-          as String?;
-      _loading = false;
+      _loading = true;
+      _error = null;
     });
+    try {
+      final res = await ApiClient.get('/api/mobile/onboarding-status');
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        final data = _parseJson(res.body);
+        throw Exception(data['error'] as String? ?? 'Could not load setup');
+      }
+      final data = _parseJson(res.body);
+      final phone = data['phoneNumber'] as String?;
+      if (!mounted) return;
+      setState(() {
+        _hasCalendar = data['hasCalendar'] == true;
+        _hasPhone = data['hasBusinessPhoneNumber'] == true;
+        _isSubscribed = data['hasActiveSubscription'] == true;
+        _hasReceptionist = data['hasReceptionist'] == true;
+        _testCallNumber = phone;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Map<String, dynamic> _parseJson(String body) {
+    try {
+      return body.isNotEmpty
+          ? jsonDecode(body) as Map<String, dynamic>
+          : <String, dynamic>{};
+    } catch (_) {
+      return <String, dynamic>{};
+    }
   }
 
   Future<void> _connectCalendar() async {
@@ -95,10 +103,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _completeOnboarding() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
-    await Supabase.instance.client.from('users').update({
-      'onboarding_completed_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-    }).eq('id', user.id).isFilter('onboarding_completed_at', null);
+    await Supabase.instance.client
+        .from('users')
+        .update({
+          'onboarding_completed_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', user.id)
+        .isFilter('onboarding_completed_at', null);
     if (mounted) context.go('/dashboard');
   }
 
@@ -110,19 +122,41 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
     }
 
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Finish setup')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(_error!, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _load,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final currentStep = !_hasCalendar
         ? 1
-        : !_hasPhone
+        : !_hasReceptionist
             ? 2
-            : !_hasReceptionist
+            : !_hasPhone
                 ? 3
                 : 4;
 
     const steps = [
       ('Connect Calendar', Icons.calendar_today),
-      ('Add Phone', Icons.phone),
       ('Create Receptionist', Icons.person_add),
       ('Test Call', Icons.phone_in_talk),
+      ('Done', Icons.check_circle),
     ];
 
     return Scaffold(
@@ -149,8 +183,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           _buildStepper(steps, currentStep),
           const SizedBox(height: 24),
           if (currentStep == 1) _buildStep1(),
-          if (currentStep == 2) _buildStep2(),
-          if (currentStep == 3) _buildStep3(context),
+          if (currentStep == 2) _buildStep3(context),
+          if (currentStep == 3) _buildStep4(context),
           if (currentStep == 4) _buildStep4(context),
           const SizedBox(height: 24),
           TextButton(
@@ -226,39 +260,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildStep2() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('2. Set your default phone'),
-            const SizedBox(height: 8),
-            const Text(
-              'Used when creating new receptionists. Set in Settings → Integrations.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            if (_hasPhone)
-              const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green),
-                  SizedBox(width: 8),
-                  Text('Phone saved'),
-                ],
-              )
-            else
-              FilledButton(
-                onPressed: () => context.push('/settings'),
-                child: const Text('Go to Settings'),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildStep3(BuildContext context) {
     return Card(
       child: Padding(
@@ -266,10 +267,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('3. Create your first receptionist'),
+            const Text('2. Create your first receptionist'),
             const SizedBox(height: 8),
             const Text(
-              'Each receptionist gets a dedicated phone number.',
+              'Set up the assistant that will answer your business number.',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 16),
@@ -284,7 +285,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             else if (_isSubscribed)
               FilledButton(
                 onPressed: () async {
-                  final created = await context.push<bool>('/receptionists/create');
+                  final created =
+                      await context.push<bool>('/receptionists/create');
                   if (created == true) _load();
                 },
                 child: const Text('Create Receptionist'),
@@ -312,7 +314,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('4. Test call'),
+            const Text('3. Test call'),
             const SizedBox(height: 8),
             const Text(
               'Call your AI receptionist to hear it in action.',

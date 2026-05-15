@@ -29,7 +29,8 @@ class CreateReceptionistScreen extends StatefulWidget {
 }
 
 class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
-  bool get _isPhoneDevice => !kIsWeb &&
+  bool get _isPhoneDevice =>
+      !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.android);
 
@@ -89,7 +90,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
       final res = await ApiClient.get(path);
       if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
         await _previewPlayer.stop();
-        await _previewPlayer.setSource(BytesSource(res.bodyBytes, mimeType: 'audio/mpeg'));
+        await _previewPlayer
+            .setSource(BytesSource(res.bodyBytes, mimeType: 'audio/mpeg'));
         await _previewPlayer.resume();
         _previewPlayer.onPlayerComplete.listen((_) {
           if (mounted) setState(() => _previewPlayingKey = null);
@@ -144,7 +146,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           return false;
         }
         if (!RegExp(r'^\+\d{10,15}$').hasMatch(phone)) {
-          setState(() => _error = 'Enter phone in E.164 format (e.g. +15551234567)');
+          setState(
+              () => _error = 'Enter phone in E.164 format (e.g. +15551234567)');
           return false;
         }
       }
@@ -262,25 +265,24 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                       const SizedBox(),
                     if (_step == 4 || _step == 5)
                       TextButton(
-                        onPressed: () =>
-                            setState(() => _step++),
+                        onPressed: () => setState(() => _step++),
                         child: const Text('Skip'),
                       ),
                     FilledButton(
                       onPressed: _loading
                           ? null
                           : () async {
-                                  if (_step < 6) {
-                                    if (_validateStep()) {
-                                      setState(() {
-                                        _step++;
-                                        _error = null;
-                                      });
-                                    }
-                                  } else {
-                                    await _submit();
-                                  }
-                                },
+                              if (_step < 6) {
+                                if (_validateStep()) {
+                                  setState(() {
+                                    _step++;
+                                    _error = null;
+                                  });
+                                }
+                              } else {
+                                await _submit();
+                              }
+                            },
                       child: _loading
                           ? const SizedBox(
                               height: 20,
@@ -308,7 +310,9 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
             children: [
               for (var i = 0; i < _steps.length; i++) ...[
                 GestureDetector(
-                  onTap: i + 1 < _step ? () => setState(() => _step = i + 1) : null,
+                  onTap: i + 1 < _step
+                      ? () => setState(() => _step = i + 1)
+                      : null,
                   child: CircleAvatar(
                     radius: 18,
                     backgroundColor: _step > i + 1
@@ -319,7 +323,9 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                     child: Text(
                       _step > i + 1 ? '✓' : '${i + 1}',
                       style: TextStyle(
-                        color: _step >= i + 1 ? Colors.white : Colors.grey.shade700,
+                        color: _step >= i + 1
+                            ? Colors.white
+                            : Colors.grey.shade700,
                         fontSize: 12,
                       ),
                     ),
@@ -330,7 +336,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                     child: Container(
                       height: 2,
                       margin: const EdgeInsets.symmetric(horizontal: 4),
-                      color: _step > i + 1 ? Colors.green : Colors.grey.shade300,
+                      color:
+                          _step > i + 1 ? Colors.green : Colors.grey.shade300,
                     ),
                   ),
               ],
@@ -346,6 +353,24 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
     );
   }
 
+  Widget _selectableOption({
+    required String title,
+    required String subtitle,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(
+        selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+        color: selected ? Theme.of(context).colorScheme.primary : null,
+      ),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      onTap: onTap,
+      contentPadding: EdgeInsets.zero,
+    );
+  }
+
   Widget _buildStep1() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,19 +380,17 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        RadioListTile<String>(
-          title: const Text('Personal / Solo'),
-          subtitle: const Text('Book time directly on my own calendar'),
-          value: 'personal',
-          groupValue: _formData.mode,
-          onChanged: (v) => setState(() => _formData.mode = v ?? 'personal'),
+        _selectableOption(
+          title: 'Personal / Solo',
+          subtitle: 'Book time directly on my own calendar',
+          selected: _formData.mode == 'personal',
+          onTap: () => setState(() => _formData.mode = 'personal'),
         ),
-        RadioListTile<String>(
-          title: const Text('Business / Team'),
-          subtitle: const Text('Use staff, services, and locations'),
-          value: 'business',
-          groupValue: _formData.mode,
-          onChanged: (v) => setState(() => _formData.mode = v ?? 'business'),
+        _selectableOption(
+          title: 'Business / Team',
+          subtitle: 'Use staff, services, and locations',
+          selected: _formData.mode == 'business',
+          onTap: () => setState(() => _formData.mode = 'business'),
         ),
         const SizedBox(height: 16),
         TextFormField(
@@ -381,13 +404,14 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
-          value: _formData.country,
+          initialValue: _formData.country,
           decoration: const InputDecoration(
             labelText: 'Country',
             border: OutlineInputBorder(),
           ),
           items: countryOptions
-              .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))
+              .map(
+                  (o) => DropdownMenuItem(value: o.value, child: Text(o.label)))
               .toList(),
           onChanged: (v) => setState(() => _formData.country = v ?? 'US'),
         ),
@@ -399,7 +423,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
             hintText: 'primary or email@example.com',
             border: OutlineInputBorder(),
           ),
-          onChanged: (v) => _formData.calendarId = v ?? '',
+          onChanged: (v) => _formData.calendarId = v,
         ),
       ],
     );
@@ -411,38 +435,35 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
       children: [
         const Text('How do you want to set up your business phone line?'),
         const SizedBox(height: 16),
-        RadioListTile<String>(
-          title: const Text('Get a new business number'),
-          subtitle: const Text(
-            "We'll provision a US line for your business through Telnyx (~\$1–2/month). Assistants use this shared line.",
-          ),
-          value: 'new',
-          groupValue: _formData.phoneStrategy,
-          onChanged: (v) => setState(() => _formData.phoneStrategy = v ?? 'new'),
+        _selectableOption(
+          title: 'Get a new business number',
+          subtitle:
+              "We'll provision a US line for your business through Telnyx (~\$1–2/month). Assistants use this shared line.",
+          selected: _formData.phoneStrategy == 'new',
+          onTap: () => setState(() => _formData.phoneStrategy = 'new'),
         ),
         if (_formData.phoneStrategy == 'new')
           Padding(
             padding: const EdgeInsets.only(left: 16, top: 8),
             child: DropdownButtonFormField<String>(
-              value: _formData.areaCode ?? '212',
+              initialValue: _formData.areaCode ?? '212',
               decoration: const InputDecoration(
                 labelText: 'Preferred area code',
                 border: OutlineInputBorder(),
               ),
               items: areaCodes
-                  .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))
+                  .map((o) =>
+                      DropdownMenuItem(value: o.value, child: Text(o.label)))
                   .toList(),
               onChanged: (v) => setState(() => _formData.areaCode = v ?? '212'),
             ),
           ),
-        RadioListTile<String>(
-          title: const Text('Use a number I already own'),
-          subtitle: const Text(
-            'Link a number you already control (Telnyx, carrier, etc.) as your shared business line.',
-          ),
-          value: 'own',
-          groupValue: _formData.phoneStrategy,
-          onChanged: (v) => setState(() => _formData.phoneStrategy = v ?? 'own'),
+        _selectableOption(
+          title: 'Use a number I already own',
+          subtitle:
+              'Link a number you already control (Telnyx, carrier, etc.) as your shared business line.',
+          selected: _formData.phoneStrategy == 'own',
+          onTap: () => setState(() => _formData.phoneStrategy = 'own'),
         ),
         if (_formData.phoneStrategy == 'own')
           Padding(
@@ -495,14 +516,15 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
             border: OutlineInputBorder(),
           ),
           maxLines: 8,
-          onChanged: (v) => _formData.systemPrompt = v ?? '',
+          onChanged: (v) => _formData.systemPrompt = v,
         ),
         const SizedBox(height: 16),
         TextFormField(
           initialValue: _formData.greeting,
           decoration: const InputDecoration(
             labelText: 'Greeting (optional)',
-            hintText: "e.g. Hello! Thanks for calling. I'm Eve. How can I help you today?",
+            hintText:
+                "e.g. Hello! Thanks for calling. I'm Eve. How can I help you today?",
             border: OutlineInputBorder(),
           ),
           maxLines: 2,
@@ -567,7 +589,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                           ),
                           onChanged: (v) {
                             _formData.services[i] = ServiceItem(
-                              name: v ?? '',
+                              name: v,
                               description: s.description,
                               durationMinutes: s.durationMinutes,
                               priceCents: s.priceCents,
@@ -589,7 +611,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                           onChanged: (v) {
                             _formData.services[i] = ServiceItem(
                               name: s.name,
-                              description: v ?? '',
+                              description: v,
                               durationMinutes: s.durationMinutes,
                               priceCents: s.priceCents,
                               requiresLocation: s.requiresLocation,
@@ -600,7 +622,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete),
-                        onPressed: () => setState(() => _formData.services.removeAt(i)),
+                        onPressed: () =>
+                            setState(() => _formData.services.removeAt(i)),
                       ),
                     ],
                   ),
@@ -610,7 +633,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                       SizedBox(
                         width: 180,
                         child: CheckboxListTile(
-                          title: const Text('Requires location', style: TextStyle(fontSize: 14)),
+                          title: const Text('Requires location',
+                              style: TextStyle(fontSize: 14)),
                           value: s.requiresLocation,
                           onChanged: (v) {
                             _formData.services[i] = ServiceItem(
@@ -632,7 +656,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: s.defaultLocationType ?? 'customer_address',
+                            initialValue:
+                                s.defaultLocationType ?? 'customer_address',
                             decoration: const InputDecoration(
                               labelText: 'Location type',
                               border: OutlineInputBorder(),
@@ -641,7 +666,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                             isExpanded: true,
                             items: locationTypeOptions
                                 .where((o) => o.value != 'no_location')
-                                .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))
+                                .map((o) => DropdownMenuItem(
+                                    value: o.value, child: Text(o.label)))
                                 .toList(),
                             onChanged: (v) {
                               _formData.services[i] = ServiceItem(
@@ -665,7 +691,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           }),
           if (_formData.services.isNotEmpty) ...[
             const SizedBox(height: 12),
-            const Text('Defaults (optional)', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Defaults (optional)',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             const Text(
               'You can edit duration, price, and location settings later from the Services screen.',
@@ -707,7 +734,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                     border: OutlineInputBorder(),
                   ),
                   onChanged: (v) => _formData.staff[i] =
-                      StaffItem(name: v ?? '', description: s.description),
+                      StaffItem(name: v, description: s.description),
                 ),
               ),
               const SizedBox(width: 8),
@@ -719,7 +746,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                     border: OutlineInputBorder(),
                   ),
                   onChanged: (v) => _formData.staff[i] =
-                      StaffItem(name: s.name, description: v ?? ''),
+                      StaffItem(name: s.name, description: v),
                 ),
               ),
               IconButton(
@@ -810,12 +837,15 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Radio<String>(
-                        value: key,
-                        groupValue: _formData.voicePresetKey ?? 'friendly_warm',
-                        onChanged: (v) =>
-                            setState(() => _formData.voicePresetKey = v ?? key),
+                      Icon(
+                        selected
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color: selected
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
                       ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -860,7 +890,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           onChanged: (v) {
-            final n = int.tryParse(v ?? '');
+            final n = int.tryParse(v);
             _formData.maxCallDurationMinutes = n;
           },
         ),
@@ -956,7 +986,9 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                       Text(
                         'Customers call this number; your assistant answers on your business’s behalf.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                         textAlign: TextAlign.center,
                       ),
@@ -1007,7 +1039,13 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 OutlinedButton(
-                  onPressed: () => context.go('/receptionists'),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop(true);
+                    } else {
+                      context.go('/receptionists');
+                    }
+                  },
                   child: const Text('Done'),
                 ),
                 const SizedBox(width: 8),

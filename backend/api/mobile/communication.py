@@ -6,7 +6,11 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from api.auth import get_user_from_request
-from communication.ensure import resolve_business_for_communication
+from communication.ensure import (
+    ensure_business_communication,
+    resolve_business_for_communication,
+    resolve_target_business_for_new_receptionist,
+)
 from communication.setup_summary import build_setup_summary
 from communication.sms_onboarding import activate_sms, merge_registration_profile, retry_sms, submit_sms_registration
 from communication.whatsapp_onboarding import connect_whatsapp, continue_whatsapp_setup, retry_whatsapp
@@ -38,10 +42,15 @@ async def get_communication_setup(request: Request):
 
     biz, is_default = _resolve_business(request, supabase, user["id"])
     if not biz:
-        return JSONResponse(
-            {"error": "No business record yet. Complete assistant setup first."},
-            status_code=404,
-        )
+        try:
+            biz = resolve_target_business_for_new_receptionist(supabase, user["id"], None)
+            ensure_business_communication(supabase, str(biz["id"]))
+            biz, is_default = _resolve_business(request, supabase, user["id"])
+        except Exception:
+            return JSONResponse(
+                {"error": "No business record yet. Complete assistant setup first."},
+                status_code=404,
+            )
 
     bid = biz["id"]
     phone = (

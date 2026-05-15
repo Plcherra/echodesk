@@ -17,13 +17,15 @@ from supabase_client import create_service_role_client
 
 logger = logging.getLogger(__name__)
 
-SUCCESS_HTML = """<!DOCTYPE html>
+def _mobile_success_html(deep_link: str) -> str:
+    safe = deep_link.replace('"', "%22").replace("<", "%3C").replace(">", "%3E")
+    return f"""<!DOCTYPE html>
 <html>
 <head>
   <title>Calendar Connected</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body {
+    body {{
       font-family: system-ui, -apple-system, sans-serif;
       background: #111;
       color: white;
@@ -33,28 +35,40 @@ SUCCESS_HTML = """<!DOCTYPE html>
       height: 100vh;
       margin: 0;
       text-align: center;
-    }
-    .box {
+    }}
+    .box {{
       max-width: 420px;
       padding: 32px;
       background: #1c1c1c;
       border-radius: 12px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.45);
-    }
-    h2 { margin: 0 0 12px; }
-    p { margin: 10px 0; opacity: 0.92; }
-    .muted { opacity: 0.75; font-size: 14px; }
+    }}
+    h2 {{ margin: 0 0 12px; }}
+    p {{ margin: 10px 0; opacity: 0.92; }}
+    a {{
+      display: inline-block;
+      margin-top: 18px;
+      padding: 10px 14px;
+      color: white;
+      background: #4f46e5;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+    }}
+    .muted {{ opacity: 0.75; font-size: 14px; }}
   </style>
 </head>
 <body>
   <div class="box">
     <h2>Calendar Connected</h2>
     <p>Your Google Calendar is now linked to Echodesk.</p>
-    <p class="muted">You can safely close this page.</p>
+    <p class="muted">Returning to the app...</p>
+    <a href="{safe}">Open Echodesk</a>
   </div>
 
   <script>
-    setTimeout(() => { window.close(); }, 1200);
+    window.location.href = "{safe}";
+    setTimeout(() => {{ window.close(); }}, 1800);
   </script>
 </body>
 </html>
@@ -215,8 +229,8 @@ async def google_callback_get(request: Request):
         scheme = settings.mobile_redirect_scheme
         is_mobile = return_to in ("mobile", "settings")
         if is_mobile:
-            # Mobile flow: show a friendly close-tab page (optionally the browser will close).
-            return HTMLResponse(SUCCESS_HTML)
+            deep_link = f"{scheme}://google-callback?success=1"
+            return HTMLResponse(_mobile_success_html(deep_link))
         app_url = settings.get_app_url()
         path = "/onboarding" if return_to == "onboarding" else ("/receptionists" if return_to == "receptionists" else "/dashboard")
         return RedirectResponse(url=f"{app_url}{path}?calendar=connected")

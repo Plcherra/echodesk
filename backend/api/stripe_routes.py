@@ -10,11 +10,32 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from config import settings
-from billing.stripe_sync import mark_subscription_canceled, upsert_subscription_from_stripe
+from billing.stripe_sync import (
+    mark_subscription_canceled,
+    stripe_subscription_status_to_db_status,
+    upsert_subscription_from_stripe,
+)
 from stripe_plans import plan_from_subscription
 from supabase_client import create_service_role_client
 
 logger = logging.getLogger(__name__)
+
+
+def _stripe_metadata_to_dict(metadata) -> dict:
+    if not metadata:
+        return {}
+    if isinstance(metadata, dict):
+        return metadata
+    try:
+        return dict(metadata)
+    except Exception:
+        to_dict = getattr(metadata, "to_dict", None)
+        if callable(to_dict):
+            try:
+                return to_dict()
+            except Exception:
+                return {}
+    return {}
 
 
 async def stripe_webhook_post(request: Request):
@@ -45,8 +66,9 @@ async def stripe_webhook_post(request: Request):
 
     if event.type == "checkout.session.completed":
         session = event.data.object
-        user_id = (session.metadata or {}).get("userId") or session.client_reference_id
-        email = (session.metadata or {}).get("email") or session.customer_email or (session.customer_details.email if session.customer_details else None)
+        metadata = _stripe_metadata_to_dict(getattr(session, "metadata", None))
+        user_id = metadata.get("userId") or session.client_reference_id
+        email = metadata.get("email") or session.customer_email or (session.customer_details.email if session.customer_details else None)
         customer_id = session.customer if isinstance(session.customer, str) else (session.customer.id if session.customer else None)
 
         if not customer_id:
@@ -61,13 +83,16 @@ async def stripe_webhook_post(request: Request):
                 "id": user_id,
                 "email": email,
                 "stripe_customer_id": customer_id,
-                "subscription_status": "active",
+                "subscription_status": "past_due",
                 "updated_at": ts,
             }
             sub_id = session.subscription
             if sub_id:
                 sub_obj = sub_id if hasattr(sub_id, "id") else stripe.Subscription.retrieve(sub_id, expand=["items.data.price"])
                 updates["stripe_subscription_id"] = sub_obj.id if hasattr(sub_obj, "id") else str(sub_id)
+                updates["subscription_status"] = stripe_subscription_status_to_db_status(
+                    getattr(sub_obj, "status", None)
+                )
                 plan = plan_from_subscription(sub_obj)
                 if plan:
                     updates["billing_plan"] = plan["billing_plan"]
@@ -86,7 +111,7 @@ async def stripe_webhook_post(request: Request):
             user = r.data[0]
             plan = plan_from_subscription(subscription)
             update = {
-                "subscription_status": subscription.status,
+                "subscription_status": stripe_subscription_status_to_db_status(subscription.status),
                 "stripe_subscription_id": subscription.id,
                 "updated_at": ts,
             }

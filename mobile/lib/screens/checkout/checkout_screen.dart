@@ -6,6 +6,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../models/plan.dart';
 import '../../services/api_client.dart';
+import '../../services/pending_plan_service.dart';
 import '../../strings.dart';
 
 /// Opens Stripe Checkout in WebView. User returns via deep link (echodesk://checkout?session_id=...).
@@ -27,14 +28,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.planId != null) {
+    if (widget.planId != null &&
+        PendingPlanService.isValidPlanId(widget.planId)) {
       _loadCheckoutUrl(widget.planId!);
     } else {
+      if (widget.planId != null) {
+        PendingPlanService.clear();
+      }
       _loading = false;
     }
   }
 
   Future<void> _loadCheckoutUrl(String planId) async {
+    if (!PendingPlanService.isValidPlanId(planId)) {
+      await PendingPlanService.clear();
+      setState(() {
+        _loading = false;
+        _error = null;
+        _checkoutUrl = null;
+        _currentPlanId = null;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -42,6 +57,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _currentPlanId = planId;
     });
     try {
+      await PendingPlanService.clear();
       final res = await ApiClient.post(
         '/api/mobile/checkout',
         body: {'plan_id': planId, 'return_scheme': 'echodesk'},

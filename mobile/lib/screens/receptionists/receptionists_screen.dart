@@ -47,7 +47,9 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
           .eq('id', user.id)
           .maybeSingle();
 
-      _isSubscribed = (profileRes?['subscription_status'] ?? '') == 'active';
+      final subscriptionStatus = profileRes?['subscription_status'] ?? '';
+      _isSubscribed =
+          subscriptionStatus == 'active' || subscriptionStatus == 'trialing';
       _calendarId = profileRes?['calendar_id'] as String?;
       _hasCalendar = (_calendarId ?? '').trim().isNotEmpty;
 
@@ -132,7 +134,8 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
                 } catch (_) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text(AppStrings.couldNotStartCall)),
+                      const SnackBar(
+                          content: Text(AppStrings.couldNotStartCall)),
                     );
                   }
                 }
@@ -182,43 +185,50 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
                     : RefreshIndicator(
                         onRefresh: _load,
                         child: ListView(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                        children: [
-                          _buildCreateStepper(),
-                          const SizedBox(height: 24),
-                          if (_receptionists.isEmpty)
-                            _buildEmptyState()
-                          else
-                            ..._receptionists.map(
-                              (r) => Card(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                child: ListTile(
-                                  title: Text(r.name),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'Uses business line',
-                                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                            ),
-                                      ),
-                                      Text(r.displayPhone),
-                                    ],
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 16),
+                          children: [
+                            _buildCreateStepper(),
+                            const SizedBox(height: 24),
+                            if (_receptionists.isEmpty)
+                              _buildEmptyState()
+                            else
+                              ..._receptionists.map(
+                                (r) => Card(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  child: ListTile(
+                                    title: Text(r.name),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'Uses business line',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelSmall
+                                              ?.copyWith(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                        ),
+                                        Text(r.displayPhone),
+                                      ],
+                                    ),
+                                    isThreeLine: true,
+                                    trailing: const Icon(Icons.chevron_right),
+                                    onTap: () =>
+                                        context.push('/receptionists/${r.id}'),
+                                    onLongPress: () =>
+                                        _showOutboundCallSheet(context, r),
                                   ),
-                                  isThreeLine: true,
-                                  trailing: const Icon(Icons.chevron_right),
-                                  onTap: () =>
-                                      context.push('/receptionists/${r.id}'),
-                                  onLongPress: () =>
-                                      _showOutboundCallSheet(context, r),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
       ),
     );
   }
@@ -272,7 +282,8 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
                 Expanded(
                   child: Container(
                     height: 2,
-                    color: currentStep > 1 ? Colors.green : Colors.grey.shade300,
+                    color:
+                        currentStep > 1 ? Colors.green : Colors.grey.shade300,
                   ),
                 ),
                 _StepCircle(
@@ -287,7 +298,8 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Connect Calendar', style: TextStyle(fontSize: 10)),
-                const Text('Create Receptionist', style: TextStyle(fontSize: 10)),
+                const Text('Create Receptionist',
+                    style: TextStyle(fontSize: 10)),
               ],
             ),
             const SizedBox(height: 16),

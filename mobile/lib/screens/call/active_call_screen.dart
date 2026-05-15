@@ -26,7 +26,6 @@ class ActiveCallScreen extends StatefulWidget {
 class _ActiveCallScreenState extends State<ActiveCallScreen> {
   WebSocketChannel? _channel;
   String _status = 'Connecting...';
-  bool _streamConnected = false;
 
   @override
   void initState() {
@@ -39,7 +38,6 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
     if (wsBase.isEmpty) {
       setState(() {
         _status = 'Call in progress with AI receptionist';
-        _streamConnected = false;
       });
       return;
     }
@@ -53,7 +51,6 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
 
       setState(() {
         _status = 'Connecting to call stream...';
-        _streamConnected = true;
       });
 
       channel.stream.listen(
@@ -65,20 +62,17 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
         onError: (e) {
           setState(() {
             _status = 'Stream disconnected';
-            _streamConnected = false;
           });
         },
         onDone: () {
           setState(() {
             _status = 'Call ended';
-            _streamConnected = false;
           });
         },
       );
     } catch (e) {
       setState(() {
         _status = 'Call in progress (stream unavailable)';
-        _streamConnected = false;
       });
     }
   }

@@ -25,6 +25,20 @@ def _plan_code_from_plan_dict(plan: dict[str, Any]) -> str | None:
     return None
 
 
+def stripe_subscription_status_to_db_status(status: Any) -> str:
+    raw = str(status or "").strip().lower()
+    st_map = {
+        "trialing": "trialing",
+        "active": "active",
+        "past_due": "past_due",
+        "canceled": "canceled",
+        "incomplete": "past_due",
+        "incomplete_expired": "canceled",
+        "unpaid": "past_due",
+    }
+    return st_map.get(raw, "past_due")
+
+
 def upsert_subscription_from_stripe(
     supabase: Any,
     *,
@@ -38,15 +52,7 @@ def upsert_subscription_from_stripe(
     code = _plan_code_from_plan_dict(plan)
     plan_id = get_plan_id_for_code(supabase, code) if code else None
 
-    status = str(getattr(stripe_subscription, "status", "") or "")
-    st_map = {
-        "trialing": "trialing",
-        "active": "active",
-        "past_due": "past_due",
-        "canceled": "canceled",
-        "unpaid": "past_due",
-    }
-    db_status = st_map.get(status, "active")
+    db_status = stripe_subscription_status_to_db_status(getattr(stripe_subscription, "status", None))
 
     cust = stripe_subscription.customer
     customer_id = cust if isinstance(cust, str) else getattr(cust, "id", None)

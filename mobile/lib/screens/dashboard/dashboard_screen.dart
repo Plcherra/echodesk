@@ -35,7 +35,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _needsReviewCount = 0;
   Map<String, String> _receptionistNames = {};
   int? _remainingMinutes;
-  bool _isPayg = false;
   bool _loading = true;
   String? _error;
 
@@ -91,7 +90,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _includedMinutes = data.includedMinutes;
         _overageMinutes = data.overageMinutes;
         _remainingMinutes = data.remainingMinutes;
-        _isPayg = data.isPayg;
         _totalCalls = data.totalCalls;
         _totalCallMinutes = data.totalCallMinutes;
         _recentCalls = data.recentCalls;
@@ -129,7 +127,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Welcome to Echodesk'),
         content: const Text(
-          'Create your first receptionist to get a dedicated phone number. '
+          'Create your first receptionist to answer your business number. '
           'Your AI will answer calls and book appointments into your calendar.',
         ),
         actions: [
@@ -549,7 +547,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: Icons.support_agent,
             title: 'No receptionists yet',
             subtitle:
-                'Create your first AI receptionist to get a dedicated phone number.',
+                'Create your first AI receptionist to answer your business number.',
             action: TextButton(
               onPressed: () => context.push('/receptionists/create'),
               child: const Text('Add one'),

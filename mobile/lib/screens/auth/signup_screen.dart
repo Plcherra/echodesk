@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/env.dart';
+import '../../services/pending_plan_service.dart';
 
 class SignupScreen extends StatefulWidget {
   final String? planId;
@@ -20,6 +21,22 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _isLoading = false;
   String? _error;
 
+  String? get _validPlanId {
+    final planId = widget.planId?.trim();
+    return PendingPlanService.isValidPlanId(planId) ? planId : null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final planId = _validPlanId;
+    if (planId != null) {
+      PendingPlanService.save(planId);
+    } else if (widget.planId != null) {
+      PendingPlanService.clear();
+    }
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -34,15 +51,27 @@ class _SignupScreenState extends State<SignupScreen> {
       _isLoading = true;
     });
     try {
-      await Supabase.instance.client.auth.signUp(
+      final planId = _validPlanId;
+      if (planId != null) {
+        await PendingPlanService.save(planId);
+      }
+      final authRes = await Supabase.instance.client.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Check your email to confirm signup')),
-        );
-        context.go('/dashboard');
+        if (authRes.session != null) {
+          if (planId != null) {
+            context.go('/checkout?plan=${Uri.encodeComponent(planId)}');
+          } else {
+            context.go('/dashboard');
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Check your email to confirm signup')),
+          );
+          context.go('/login');
+        }
       }
     } on AuthException catch (e) {
       setState(() => _error = e.message);
@@ -57,6 +86,10 @@ class _SignupScreenState extends State<SignupScreen> {
       _isLoading = true;
     });
     try {
+      final planId = _validPlanId;
+      if (planId != null) {
+        await PendingPlanService.save(planId);
+      }
       final redirectUrl = '${Env.deepLinkScheme}://auth-callback';
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,

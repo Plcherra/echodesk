@@ -51,10 +51,11 @@ GoRouter createAppRouter() {
       if (isLoggedIn && state.matchedLocation == '/') {
         return '/dashboard';
       }
-      // Redirect to onboarding if not yet complete (allowlist: onboarding, settings, checkout, help, call)
+      // Redirect to onboarding if not yet complete.
       if (isLoggedIn) {
         final loc = state.matchedLocation;
         final allowlist = loc == '/onboarding' ||
+            loc == '/receptionists/create' ||
             loc.startsWith('/settings') ||
             loc.startsWith('/checkout') ||
             loc == '/help' ||

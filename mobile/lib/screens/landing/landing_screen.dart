@@ -2,7 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../models/plan.dart';
+import '../../services/pending_plan_service.dart';
 import '../../widgets/constrained_scaffold_body.dart';
+
+Future<void> _startSignup(BuildContext context, {String? planId}) async {
+  final validPlanId =
+      PendingPlanService.isValidPlanId(planId) ? planId?.trim() : null;
+  if (validPlanId == null) {
+    await PendingPlanService.clear();
+  } else {
+    await PendingPlanService.save(validPlanId);
+  }
+  if (!context.mounted) return;
+  final query = validPlanId == null ? '' : '?plan=$validPlanId';
+  context.go('/signup$query');
+}
 
 class LandingScreen extends StatelessWidget {
   const LandingScreen({super.key});
@@ -13,13 +27,13 @@ class LandingScreen extends StatelessWidget {
       body: constrainedScaffoldBody(
         child: CustomScrollView(
           slivers: [
-          _LandingHeader(),
-          const SliverToBoxAdapter(child: _HeroSection()),
-          const SliverToBoxAdapter(child: _PricingTeaser()),
-          const SliverToBoxAdapter(child: _DemoVideoSection()),
-          const SliverToBoxAdapter(child: _PricingSection()),
-          const SliverToBoxAdapter(child: _TestimonialsSection()),
-        ],
+            _LandingHeader(),
+            const SliverToBoxAdapter(child: _HeroSection()),
+            const SliverToBoxAdapter(child: _PricingTeaser()),
+            const SliverToBoxAdapter(child: _DemoVideoSection()),
+            const SliverToBoxAdapter(child: _PricingSection()),
+            const SliverToBoxAdapter(child: _TestimonialsSection()),
+          ],
         ),
       ),
     );
@@ -31,7 +45,8 @@ class _LandingHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverAppBar(
       floating: true,
-      backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.95),
+      backgroundColor:
+          Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
       title: const Text('AI Receptionist'),
       actions: [
         TextButton(
@@ -39,7 +54,7 @@ class _LandingHeader extends StatelessWidget {
           child: const Text('Log in'),
         ),
         FilledButton(
-          onPressed: () => context.go('/signup'),
+          onPressed: () => _startSignup(context),
           child: const Text('Get Started'),
         ),
         const SizedBox(width: 16),
@@ -82,7 +97,7 @@ class _HeroSection extends StatelessWidget {
             'Your AI answers calls, books appointments, and syncs with Google Calendar. '
             'For individuals and small businesses—salons, barbers, spas, handymen, and more.',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                 ),
             textAlign: TextAlign.center,
           ),
@@ -101,7 +116,7 @@ class _HeroSection extends StatelessWidget {
             alignment: WrapAlignment.center,
             children: [
               FilledButton(
-                onPressed: () => context.go('/signup'),
+                onPressed: () => _startSignup(context),
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.purple.shade700,
@@ -109,7 +124,7 @@ class _HeroSection extends StatelessWidget {
                 child: const Text('Get Started'),
               ),
               OutlinedButton(
-                onPressed: () => context.go('/signup?plan=starter'),
+                onPressed: () => _startSignup(context, planId: 'starter'),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Colors.white54),
                   foregroundColor: Colors.white,
@@ -170,9 +185,11 @@ class _PricingTeaser extends StatelessWidget {
                         const SizedBox(height: 16),
                         FilledButton(
                           onPressed: () =>
-                              context.go('/signup?plan=${plan.id}'),
+                              _startSignup(context, planId: plan.id),
                           child: Text(
-                            plan.priceCents == 0 ? 'Start free trial' : 'Get Started',
+                            plan.priceCents == 0
+                                ? 'Start free trial'
+                                : 'Get Started',
                           ),
                         ),
                       ],
@@ -268,7 +285,8 @@ class _PricingSection extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(plan.name, style: Theme.of(context).textTheme.titleMedium),
+                        Text(plan.name,
+                            style: Theme.of(context).textTheme.titleMedium),
                         Text(
                           '${plan.includedMinutes} minutes included',
                           style: Theme.of(context).textTheme.bodySmall,
@@ -281,11 +299,12 @@ class _PricingSection extends StatelessWidget {
                         const SizedBox(height: 24),
                         _checkItem('AI answers 24/7'),
                         _checkItem('Books into Google Calendar'),
-                        _checkItem('Your dedicated phone number'),
+                        _checkItem('Your business phone number'),
                         _checkItem('Cancel anytime'),
                         const SizedBox(height: 24),
                         FilledButton(
-                          onPressed: () => context.go('/signup?plan=${plan.id}'),
+                          onPressed: () =>
+                              _startSignup(context, planId: plan.id),
                           child: const Text('Get Started'),
                         ),
                       ],
@@ -357,10 +376,13 @@ class _TestimonialsSection extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('"${t.$1}"', style: Theme.of(context).textTheme.bodyMedium),
+                        Text('"${t.$1}"',
+                            style: Theme.of(context).textTheme.bodyMedium),
                         const SizedBox(height: 16),
-                        Text(t.$2, style: Theme.of(context).textTheme.titleSmall),
-                        Text(t.$3, style: Theme.of(context).textTheme.bodySmall),
+                        Text(t.$2,
+                            style: Theme.of(context).textTheme.titleSmall),
+                        Text(t.$3,
+                            style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
                   ),

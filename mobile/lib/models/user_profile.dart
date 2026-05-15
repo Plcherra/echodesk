@@ -23,7 +23,8 @@ class UserProfile {
     return UserProfile(
       subscriptionStatus: json['subscription_status'] as String?,
       billingPlan: json['billing_plan'] as String?,
-      billingPlanMetadata: json['billing_plan_metadata'] as Map<String, dynamic>?,
+      billingPlanMetadata:
+          json['billing_plan_metadata'] as Map<String, dynamic>?,
       phone: json['phone'] as String?,
       calendarId: json['calendar_id'] as String?,
       businessName: json['business_name'] as String?,
@@ -32,7 +33,8 @@ class UserProfile {
     );
   }
 
-  bool get isActive => subscriptionStatus == 'active';
+  bool get isActive =>
+      subscriptionStatus == 'active' || subscriptionStatus == 'trialing';
   bool get hasCalendar => (calendarId ?? '').trim().isNotEmpty;
   bool get hasPhone => (phone ?? '').trim().isNotEmpty;
   bool get onboardingComplete =>

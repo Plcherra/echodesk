@@ -31,6 +31,11 @@ from config import settings
 from google_oauth_scopes import SCOPES
 from prompts.fetch import _build_from_supabase_sync
 from quota import check_outbound_quota
+from billing.stripe_sync import (
+    stripe_subscription_status_to_db_status,
+    upsert_subscription_from_stripe,
+)
+from billing.subscriptions import get_billing_access_state
 from stripe_plans import get_price_id_for_plan_id, plan_from_subscription
 from supabase_client import create_service_role_client
 from telnyx import provision as telnyx_provision
@@ -39,6 +44,7 @@ from utils.phone import normalize_to_e164, phones_match
 from communication.ensure import (
     ensure_business_communication,
     ensure_communication_for_user_after_receptionist_change,
+    get_default_business_for_owner,
     list_active_receptionists_for_business,
     refresh_business_after_primary_receptionist_removed,
     resolve_target_business_for_new_receptionist,
@@ -57,6 +63,62 @@ from api.mobile.businesses import router as businesses_router
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/mobile", tags=["mobile"])
+
+
+def _stripe_metadata_to_dict(metadata) -> dict:
+    if not metadata:
+        return {}
+    if isinstance(metadata, dict):
+        return metadata
+    try:
+        return dict(metadata)
+    except Exception:
+        to_dict = getattr(metadata, "to_dict", None)
+        if callable(to_dict):
+            try:
+                return to_dict()
+            except Exception:
+                return {}
+    return {}
+
+
+def _sync_user_plan_from_billing_plan(supabase, user_id: str, plan: dict) -> None:
+    meta = plan.get("billing_plan_metadata") or {}
+    included = int(meta.get("included_minutes") or 0)
+    overage_cents = int(meta.get("overage_rate_cents") or 8)
+    try:
+        existing = (
+            supabase.table("user_plans")
+            .select("inbound_percent, outbound_percent")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        inbound_pct = 80
+        outbound_pct = 20
+        if existing.data and len(existing.data) > 0:
+            inbound_pct = existing.data[0].get("inbound_percent") or inbound_pct
+            outbound_pct = existing.data[0].get("outbound_percent") or outbound_pct
+
+        is_payg = plan.get("billing_plan") == "subscription_payg"
+        alloc_in = int((included * inbound_pct) / 100) if not is_payg else None
+        alloc_out = (included - alloc_in) if alloc_in is not None else None
+        supabase.table("user_plans").upsert(
+            {
+                "user_id": user_id,
+                "billing_plan": plan["billing_plan"],
+                "allocated_inbound_minutes": alloc_in,
+                "allocated_outbound_minutes": alloc_out,
+                "inbound_percent": inbound_pct,
+                "outbound_percent": outbound_pct,
+                "overage_rate_cents": overage_cents,
+                "payg_rate_cents": int(meta.get("payg_rate_cents") or 20),
+                "updated_at": datetime.utcnow().isoformat() + "Z",
+            },
+            on_conflict="user_id",
+        ).execute()
+    except Exception as e:
+        logger.warning("[sync-session] user_plans sync failed: %s", e)
 
 # appointments: base columns (020, 023) vs optional from 030
 APPOINTMENTS_BASE_SELECT = (
@@ -83,6 +145,201 @@ def _require_auth(request: Request) -> tuple[dict | None, Any]:
     if not user or not supabase:
         return (None, None)
     return (user, supabase)
+
+
+def _ensure_user_profile(supabase, user: dict) -> dict:
+    """Create or repair the public.users row for the authenticated Supabase user."""
+    user_id = str(user.get("id") or "").strip()
+    if not user_id:
+        raise ValueError("Missing authenticated user id")
+
+    email = (user.get("email") or "").strip() or None
+    now = datetime.utcnow().isoformat() + "Z"
+
+    existing = (
+        supabase.table("users")
+        .select("id, email, created_at, onboarding_completed_at, subscription_status, billing_plan")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        row = existing.data[0]
+        if email and row.get("email") != email:
+            updated = (
+                supabase.table("users")
+                .update({"email": email, "updated_at": now})
+                .eq("id", user_id)
+                .execute()
+            )
+            if updated.data:
+                row = updated.data[0]
+            else:
+                row = {**row, "email": email, "updated_at": now}
+        return {"created": False, "profile": row}
+
+    insert_row = {
+        "id": user_id,
+        "email": email,
+        "updated_at": now,
+    }
+    created = (
+        supabase.table("users")
+        .upsert(insert_row, on_conflict="id")
+        .execute()
+    )
+    profile = created.data[0] if created.data else insert_row
+    return {"created": True, "profile": profile}
+
+
+@router.post("/profile/ensure")
+async def ensure_profile(request: Request):
+    user, supabase = _require_auth(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    try:
+        result = _ensure_user_profile(supabase, user)
+        profile = result["profile"] or {}
+        return {
+            "ok": True,
+            "created": bool(result["created"]),
+            "user": {
+                "id": profile.get("id") or user["id"],
+                "email": profile.get("email") or user.get("email"),
+                "subscription_status": profile.get("subscription_status"),
+                "billing_plan": profile.get("billing_plan"),
+                "onboarding_completed_at": profile.get("onboarding_completed_at"),
+            },
+        }
+    except Exception as e:
+        logger.exception("[profile/ensure] %s", e)
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.get("/onboarding-status")
+async def onboarding_status(request: Request):
+    user, supabase = _require_auth(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    try:
+        profile_result = _ensure_user_profile(supabase, user)
+        profile = profile_result["profile"] or {}
+        profile_row = (
+            supabase.table("users")
+            .select(
+                "id, email, calendar_id, phone, subscription_status, "
+                "billing_plan, onboarding_completed_at, active_business_id"
+            )
+            .eq("id", user["id"])
+            .limit(1)
+            .execute()
+        )
+        if profile_row.data:
+            profile = profile_row.data[0]
+
+        business = None
+        business_created = False
+        try:
+            had_business = get_default_business_for_owner(supabase, user["id"]) is not None
+            business = resolve_target_business_for_new_receptionist(
+                supabase,
+                user["id"],
+                None,
+            )
+            business_created = bool(not had_business and business)
+        except Exception as e:
+            logger.warning("[onboarding-status] business repair failed: %s", e)
+
+        business_id = str(business["id"]) if business and business.get("id") else None
+        phone_row = None
+        if business_id:
+            try:
+                ensure_business_communication(supabase, business_id)
+            except Exception as e:
+                logger.warning("[onboarding-status] communication repair failed: %s", e)
+            phone_res = (
+                supabase.table("business_phone_numbers")
+                .select("phone_number_e164, status, telnyx_number_id")
+                .eq("business_id", business_id)
+                .limit(1)
+                .execute()
+            )
+            if phone_res.data:
+                phone_row = phone_res.data[0]
+
+        recs_res = (
+            supabase.table("receptionists")
+            .select("id, inbound_phone_number, phone_number, status, active, created_at")
+            .eq("user_id", user["id"])
+            .order("created_at")
+            .limit(1)
+            .execute()
+        )
+        rec = (recs_res.data or [None])[0]
+
+        calendar_id = (profile.get("calendar_id") or "").strip() or None
+        billing_state = get_billing_access_state(
+            supabase,
+            user["id"],
+            profile=profile,
+        )
+        subscription_status = billing_state.get("status")
+        business_phone = None
+        phone_status = None
+        if phone_row:
+            business_phone = (phone_row.get("phone_number_e164") or "").strip() or None
+            phone_status = (phone_row.get("status") or "").strip() or None
+        receptionist_phone = None
+        if rec:
+            receptionist_phone = (
+                (rec.get("inbound_phone_number") or "").strip()
+                or (rec.get("phone_number") or "").strip()
+                or None
+            )
+        phone = business_phone or receptionist_phone or ((profile.get("phone") or "").strip() or None)
+
+        has_calendar = bool(calendar_id)
+        has_active_subscription = bool(billing_state["has_active_subscription"])
+        has_receptionist = bool(rec)
+        has_business = bool(business_id)
+        has_business_phone_number = bool(phone)
+
+        if not has_calendar:
+            current_step = "connect_calendar"
+        elif not has_active_subscription:
+            current_step = "subscribe"
+        elif not has_receptionist:
+            current_step = "create_receptionist"
+        elif not has_business_phone_number:
+            current_step = "test_call"
+        else:
+            current_step = "done"
+
+        return {
+            "hasProfile": True,
+            "profileCreated": bool(profile_result["created"]),
+            "hasActiveSubscription": has_active_subscription,
+            "subscriptionStatus": subscription_status or None,
+            "subscriptionSource": billing_state.get("source"),
+            "billingPlan": profile.get("billing_plan"),
+            "hasCalendar": has_calendar,
+            "calendarId": calendar_id,
+            "hasBusiness": has_business,
+            "businessCreated": business_created,
+            "businessId": business_id,
+            "hasReceptionist": has_receptionist,
+            "receptionistId": rec.get("id") if rec else None,
+            "hasBusinessPhoneNumber": has_business_phone_number,
+            "phoneNumber": phone,
+            "phoneStatus": phone_status,
+            "onboardingCompletedAt": profile.get("onboarding_completed_at"),
+            "currentStep": current_step,
+        }
+    except Exception as e:
+        logger.exception("[onboarding-status] %s", e)
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 # --- Push token ---
@@ -171,24 +428,35 @@ async def _sync_subscription_from_session(session_id: str, user_id: str) -> dict
         if session.payment_status != "paid" and session.status != "complete":
             return {"synced": False}
         customer_id = session.customer if isinstance(session.customer, str) else (session.customer.id if session.customer else None)
-        meta_user_id = (session.metadata or {}).get("userId") or session.client_reference_id
+        metadata = _stripe_metadata_to_dict(getattr(session, "metadata", None))
+        meta_user_id = metadata.get("userId") or session.client_reference_id
         if not meta_user_id or str(meta_user_id) != str(user_id):
             return {"synced": False}
         updates = {
             "id": user_id,
             "stripe_customer_id": customer_id,
-            "subscription_status": "active",
+            "subscription_status": "past_due",
             "updated_at": datetime.utcnow().isoformat() + "Z",
         }
         sub_id = session.subscription
+        sub_obj = None
+        plan = None
         if sub_id:
             sub_obj = sub_id if hasattr(sub_id, "id") else stripe.Subscription.retrieve(sub_id, expand=["items.data.price"])
             updates["stripe_subscription_id"] = sub_obj.id if hasattr(sub_obj, "id") else str(sub_id)
+            updates["subscription_status"] = stripe_subscription_status_to_db_status(
+                getattr(sub_obj, "status", None)
+            )
             plan = plan_from_subscription(sub_obj)
             if plan:
                 updates["billing_plan"] = plan["billing_plan"]
                 updates["billing_plan_metadata"] = plan.get("billing_plan_metadata")
         supabase = create_service_role_client()
+        if sub_id and plan:
+            upsert_subscription_from_stripe(
+                supabase, user_id=user_id, stripe_subscription=sub_obj, plan=plan
+            )
+            _sync_user_plan_from_billing_plan(supabase, user_id, plan)
         supabase.table("users").upsert(updates, on_conflict="id").execute()
         return {"synced": True}
     except Exception as e:
@@ -383,7 +651,8 @@ async def create_receptionist(request: Request):
 
     profile = supabase.table("users").select("subscription_status, calendar_refresh_token").eq("id", user["id"]).single().execute()
     p = (profile.data or {}) if profile.data else {}
-    if p.get("subscription_status") != "active":
+    billing_state = get_billing_access_state(supabase, user["id"], profile=p)
+    if not billing_state["has_active_subscription"]:
         return JSONResponse({"error": "Active subscription required."}, status_code=400)
     if not p.get("calendar_refresh_token"):
         return JSONResponse({"error": "Please connect Google Calendar first. Go to Settings → Integrations."}, status_code=400)

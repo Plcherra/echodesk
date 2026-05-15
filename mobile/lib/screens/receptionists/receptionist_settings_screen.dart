@@ -1,12 +1,10 @@
 import 'dart:convert';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../services/api_client.dart';
-import '../../strings.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 import 'settings_tabs/calendar_tab.dart';
 import 'settings_tabs/staff_tab.dart';
@@ -87,8 +85,10 @@ class _ReceptionistSettingsScreenState extends State<ReceptionistSettingsScreen>
     TabController? nextController;
     TabController? oldController;
     if (_tabController.length != tabs.length) {
-      final nextIndex = _tabController.index.clamp(0, (tabs.length - 1).clamp(0, 1 << 20));
-      nextController = TabController(length: tabs.length, vsync: this, initialIndex: nextIndex);
+      final nextIndex =
+          _tabController.index.clamp(0, (tabs.length - 1).clamp(0, 1 << 20));
+      nextController = TabController(
+          length: tabs.length, vsync: this, initialIndex: nextIndex);
       oldController = _tabController;
     }
 
@@ -125,7 +125,8 @@ class _ReceptionistSettingsScreenState extends State<ReceptionistSettingsScreen>
         title: Text(_receptionistName ?? 'Settings'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/receptionists/${widget.receptionistId}'),
+          onPressed: () =>
+              context.go('/receptionists/${widget.receptionistId}'),
         ),
         bottom: TabBar(
           controller: _tabController,
@@ -151,7 +152,9 @@ class _ReceptionistSettingsScreenState extends State<ReceptionistSettingsScreen>
         '/api/mobile/receptionists/${widget.receptionistId}/calendar-status',
       );
       Map<String, dynamic>? decoded;
-      if (res.statusCode >= 200 && res.statusCode < 300 && res.body.trim().isNotEmpty) {
+      if (res.statusCode >= 200 &&
+          res.statusCode < 300 &&
+          res.body.trim().isNotEmpty) {
         try {
           final data = jsonDecode(res.body);
           if (data is Map<String, dynamic>) {
@@ -185,7 +188,8 @@ class _ReceptionistSettingsScreenState extends State<ReceptionistSettingsScreen>
           ));
           break;
         case 'Staff':
-          views.add(ReceptionistStaffTab(receptionistId: widget.receptionistId));
+          views
+              .add(ReceptionistStaffTab(receptionistId: widget.receptionistId));
           break;
         case 'Services':
           views.add(_ServicesTab(receptionistId: widget.receptionistId));
@@ -197,10 +201,12 @@ class _ReceptionistSettingsScreenState extends State<ReceptionistSettingsScreen>
           views.add(_PromosTab(receptionistId: widget.receptionistId));
           break;
         case 'Website':
-          views.add(ReceptionistWebsiteTab(receptionistId: widget.receptionistId));
+          views.add(
+              ReceptionistWebsiteTab(receptionistId: widget.receptionistId));
           break;
         case 'Instructions':
-          views.add(ReceptionistInstructionsTab(receptionistId: widget.receptionistId));
+          views.add(ReceptionistInstructionsTab(
+              receptionistId: widget.receptionistId));
           break;
         default:
           views.add(const SizedBox.shrink());
@@ -232,7 +238,8 @@ class _ServicesTabState extends State<_ServicesTab> {
   Future<void> _load() async {
     final res = await Supabase.instance.client
         .from('services')
-        .select('id, name, description, price_cents, duration_minutes, requires_location, default_location_type, followup_mode, followup_message_template, payment_link, meeting_instructions, owner_selected_platform, internal_followup_notes')
+        .select(
+            'id, name, description, price_cents, duration_minutes, requires_location, default_location_type, followup_mode, followup_message_template, payment_link, meeting_instructions, owner_selected_platform, internal_followup_notes')
         .eq('receptionist_id', widget.receptionistId)
         .order('name');
     setState(() {
@@ -242,7 +249,8 @@ class _ServicesTabState extends State<_ServicesTab> {
   }
 
   Future<void> _openServiceEditor({Map<String, dynamic>? service}) async {
-    final nameController = TextEditingController(text: (service?['name'] as String?) ?? '');
+    final nameController =
+        TextEditingController(text: (service?['name'] as String?) ?? '');
     final descriptionController =
         TextEditingController(text: (service?['description'] as String?) ?? '');
     final durationController = TextEditingController(
@@ -253,7 +261,8 @@ class _ServicesTabState extends State<_ServicesTab> {
           ? (((service?['price_cents'] as int) / 100).toStringAsFixed(2))
           : '',
     );
-    String followupMode = ((service?['followup_mode'] as String?) ?? 'under_review');
+    String followupMode =
+        ((service?['followup_mode'] as String?) ?? 'under_review');
     if (!['none', 'under_review', 'send_payment_link', 'send_custom_message']
         .contains(followupMode)) {
       followupMode = 'under_review';
@@ -274,13 +283,14 @@ class _ServicesTabState extends State<_ServicesTab> {
       text: (service?['internal_followup_notes'] as String?) ?? '',
     );
     bool requiresLocation = (service?['requires_location'] as bool?) ?? false;
-    String locationType = ((service?['default_location_type'] as String?) ?? 'customer_address');
+    String locationType =
+        ((service?['default_location_type'] as String?) ?? 'customer_address');
     if (locationType == 'no_location') locationType = 'customer_address';
 
     final createdOrUpdated = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (modalContext, setModalState) => AlertDialog(
           title: Text(service == null ? 'Add service' : 'Edit service'),
           content: SingleChildScrollView(
             child: Column(
@@ -324,16 +334,19 @@ class _ServicesTabState extends State<_ServicesTab> {
                           labelText: r'Price ($)',
                           border: OutlineInputBorder(),
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 CheckboxListTile(
-                  title: const Text('Requires location', style: TextStyle(fontSize: 14)),
+                  title: const Text('Requires location',
+                      style: TextStyle(fontSize: 14)),
                   value: requiresLocation,
-                  onChanged: (v) => setModalState(() => requiresLocation = v ?? false),
+                  onChanged: (v) =>
+                      setModalState(() => requiresLocation = v ?? false),
                   controlAffinity: ListTileControlAffinity.leading,
                   contentPadding: EdgeInsets.zero,
                   dense: true,
@@ -354,9 +367,12 @@ class _ServicesTabState extends State<_ServicesTab> {
                         value: 'customer_address',
                         child: Text('Customer address'),
                       ),
-                      DropdownMenuItem(value: 'phone_call', child: Text('Phone call')),
-                      DropdownMenuItem(value: 'video_meeting', child: Text('Video meeting')),
-                      DropdownMenuItem(value: 'custom', child: Text('Custom text')),
+                      DropdownMenuItem(
+                          value: 'phone_call', child: Text('Phone call')),
+                      DropdownMenuItem(
+                          value: 'video_meeting', child: Text('Video meeting')),
+                      DropdownMenuItem(
+                          value: 'custom', child: Text('Custom text')),
                     ],
                     onChanged: (v) => setModalState(
                       () => locationType = v ?? 'customer_address',
@@ -375,7 +391,7 @@ class _ServicesTabState extends State<_ServicesTab> {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: followupMode,
+                  initialValue: followupMode,
                   decoration: const InputDecoration(
                     labelText: 'Follow-up mode',
                     border: OutlineInputBorder(),
@@ -384,11 +400,17 @@ class _ServicesTabState extends State<_ServicesTab> {
                   isExpanded: true,
                   items: const [
                     DropdownMenuItem(value: 'none', child: Text('None')),
-                    DropdownMenuItem(value: 'under_review', child: Text('Under review')),
-                    DropdownMenuItem(value: 'send_payment_link', child: Text('Send payment link')),
-                    DropdownMenuItem(value: 'send_custom_message', child: Text('Send custom message')),
+                    DropdownMenuItem(
+                        value: 'under_review', child: Text('Under review')),
+                    DropdownMenuItem(
+                        value: 'send_payment_link',
+                        child: Text('Send payment link')),
+                    DropdownMenuItem(
+                        value: 'send_custom_message',
+                        child: Text('Send custom message')),
                   ],
-                  onChanged: (v) => setModalState(() => followupMode = v ?? 'under_review'),
+                  onChanged: (v) =>
+                      setModalState(() => followupMode = v ?? 'under_review'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -438,7 +460,7 @@ class _ServicesTabState extends State<_ServicesTab> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
+              onPressed: () => Navigator.of(modalContext).pop(false),
               child: const Text('Cancel'),
             ),
             FilledButton(
@@ -447,30 +469,37 @@ class _ServicesTabState extends State<_ServicesTab> {
                 if (name.isEmpty) return;
 
                 final duration = int.tryParse(durationController.text.trim());
-                final priceDollars = double.tryParse(priceController.text.trim());
-                final priceCents = priceDollars != null ? (priceDollars * 100).round() : null;
+                final priceDollars =
+                    double.tryParse(priceController.text.trim());
+                final priceCents =
+                    priceDollars != null ? (priceDollars * 100).round() : null;
 
                 final payload = <String, dynamic>{
                   'name': name,
                   'description': descriptionController.text.trim(),
                   'requires_location': requiresLocation,
-                  'default_location_type': requiresLocation ? locationType : null,
+                  'default_location_type':
+                      requiresLocation ? locationType : null,
                   'followup_mode': followupMode,
-                  'followup_message_template': followupTemplateController.text.trim().isEmpty
-                      ? null
-                      : followupTemplateController.text.trim(),
+                  'followup_message_template':
+                      followupTemplateController.text.trim().isEmpty
+                          ? null
+                          : followupTemplateController.text.trim(),
                   'payment_link': paymentLinkController.text.trim().isEmpty
                       ? null
                       : paymentLinkController.text.trim(),
-                  'meeting_instructions': meetingInstructionsController.text.trim().isEmpty
-                      ? null
-                      : meetingInstructionsController.text.trim(),
-                  'owner_selected_platform': ownerSelectedPlatformController.text.trim().isEmpty
-                      ? null
-                      : ownerSelectedPlatformController.text.trim(),
-                  'internal_followup_notes': internalFollowupNotesController.text.trim().isEmpty
-                      ? null
-                      : internalFollowupNotesController.text.trim(),
+                  'meeting_instructions':
+                      meetingInstructionsController.text.trim().isEmpty
+                          ? null
+                          : meetingInstructionsController.text.trim(),
+                  'owner_selected_platform':
+                      ownerSelectedPlatformController.text.trim().isEmpty
+                          ? null
+                          : ownerSelectedPlatformController.text.trim(),
+                  'internal_followup_notes':
+                      internalFollowupNotesController.text.trim().isEmpty
+                          ? null
+                          : internalFollowupNotesController.text.trim(),
                 };
                 if (duration != null) payload['duration_minutes'] = duration;
                 if (priceCents != null) payload['price_cents'] = priceCents;
@@ -488,10 +517,11 @@ class _ServicesTabState extends State<_ServicesTab> {
                         .eq('id', service['id'])
                         .eq('receptionist_id', widget.receptionistId);
                   }
-                  if (mounted) Navigator.of(ctx).pop(true);
+                  if (!modalContext.mounted) return;
+                  Navigator.of(modalContext).pop(true);
                 } catch (_) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  if (!modalContext.mounted) return;
+                  ScaffoldMessenger.of(modalContext).showSnackBar(
                     const SnackBar(content: Text('Could not save service')),
                   );
                 }
@@ -516,10 +546,16 @@ class _ServicesTabState extends State<_ServicesTab> {
     if (createdOrUpdated == true) _load();
   }
 
-  Future<void> _updateService(String id, {bool? requiresLocation, String? defaultLocationType}) async {
+  Future<void> _updateService(String id,
+      {bool? requiresLocation, String? defaultLocationType}) async {
     final updates = <String, dynamic>{};
-    if (requiresLocation != null) updates['requires_location'] = requiresLocation;
-    if (defaultLocationType != null) updates['default_location_type'] = defaultLocationType.isEmpty ? null : defaultLocationType;
+    if (requiresLocation != null) {
+      updates['requires_location'] = requiresLocation;
+    }
+    if (defaultLocationType != null) {
+      updates['default_location_type'] =
+          defaultLocationType.isEmpty ? null : defaultLocationType;
+    }
     if (updates.isEmpty) return;
     await Supabase.instance.client
         .from('services')
@@ -557,7 +593,8 @@ class _ServicesTabState extends State<_ServicesTab> {
         Row(
           children: [
             const Expanded(
-              child: Text('Service menu with pricing, duration, and optional location.'),
+              child: Text(
+                  'Service menu with pricing, duration, and optional location.'),
             ),
             FilledButton.tonal(
               onPressed: () => _openServiceEditor(),
@@ -569,7 +606,10 @@ class _ServicesTabState extends State<_ServicesTab> {
         ..._services.map((s) {
           final requiresLocation = (s['requires_location'] as bool?) ?? false;
           final rawType = s['default_location_type'] as String?;
-          final defaultLocationType = (rawType == null || rawType == 'no_location') ? 'customer_address' : rawType;
+          final defaultLocationType =
+              (rawType == null || rawType == 'no_location')
+                  ? 'customer_address'
+                  : rawType;
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             child: InkWell(
@@ -617,9 +657,8 @@ class _ServicesTabState extends State<_ServicesTab> {
                                     onPressed: () =>
                                         Navigator.of(ctx).pop(true),
                                     style: FilledButton.styleFrom(
-                                      backgroundColor: Theme.of(ctx)
-                                          .colorScheme
-                                          .error,
+                                      backgroundColor:
+                                          Theme.of(ctx).colorScheme.error,
                                     ),
                                     child: const Text('Delete'),
                                   ),
@@ -815,7 +854,7 @@ class _PromosTabState extends State<_PromosTab> {
 
     final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(promo == null ? 'Add promo' : 'Edit promo'),
         content: SingleChildScrollView(
           child: Column(
@@ -846,7 +885,7 @@ class _PromosTabState extends State<_PromosTab> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Cancel'),
           ),
           FilledButton(
@@ -871,10 +910,11 @@ class _PromosTabState extends State<_PromosTab> {
                       .eq('id', promo['id'])
                       .eq('receptionist_id', widget.receptionistId);
                 }
-                if (context.mounted) Navigator.of(ctx).pop(true);
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop(true);
               } catch (_) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
+                if (!dialogContext.mounted) return;
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
                   const SnackBar(content: Text('Could not save promo')),
                 );
               }

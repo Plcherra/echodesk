@@ -19,7 +19,7 @@ void main() {
       expect(find.byType(TextFormField), findsNWidgets(2));
       expect(find.text('Sign In'), findsOneWidget);
       expect(find.text("Don't have an account? Sign up"), findsOneWidget);
-      expect(find.text('Continue with Google'), findsOneWidget);
+      expect(find.text('Continue with Google'), findsNothing);
     });
 
     testWidgets('shows validation error when form is submitted empty',
@@ -51,7 +51,7 @@ void main() {
       expect(find.byType(TextFormField), findsNWidgets(2));
       expect(find.text('Sign Up'), findsOneWidget);
       expect(find.text('Already have an account? Log in'), findsOneWidget);
-      expect(find.text('Continue with Google'), findsOneWidget);
+      expect(find.text('Continue with Google'), findsNothing);
     });
 
     testWidgets('shows validation error when form is submitted empty',

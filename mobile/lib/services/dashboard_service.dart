@@ -49,7 +49,9 @@ class DashboardService {
         .eq('id', userId)
         .maybeSingle();
 
-    final isActive = (profileRes?['subscription_status'] ?? '') == 'active';
+    final subscriptionStatus = profileRes?['subscription_status'] ?? '';
+    final isActive =
+        subscriptionStatus == 'active' || subscriptionStatus == 'trialing';
 
     List<Receptionist> recs = [];
     int total = 0, active = 0;
@@ -64,8 +66,10 @@ class DashboardService {
           .map((e) => Receptionist.fromJson(e as Map<String, dynamic>))
           .toList();
 
-      final countRes =
-          await supabase.from('receptionists').select('id').eq('user_id', userId);
+      final countRes = await supabase
+          .from('receptionists')
+          .select('id')
+          .eq('user_id', userId);
       total = (countRes as List).length;
       active = recs.where((r) => r.status == 'active').length;
     }
@@ -83,20 +87,19 @@ class DashboardService {
 
     if (isActive) {
       final now = DateTime.now().toUtc();
-      final periodStart = '${now.year}-${(now.month).toString().padLeft(2, '0')}-01';
+      final periodStart =
+          '${now.year}-${(now.month).toString().padLeft(2, '0')}-01';
       final usageRes = await supabase
           .from('usage_snapshots')
           .select('total_seconds, overage_minutes')
           .eq('user_id', userId)
           .eq('period_start', periodStart);
 
-      final rows =
-          usageRes is List ? usageRes : ((usageRes as dynamic).data as List?) ?? [];
+      final rows = usageRes;
       int totalSeconds = 0;
       for (final r in rows) {
-        final row = r as Map<String, dynamic>;
-        totalSeconds += (row['total_seconds'] as int?) ?? 0;
-        overage += (row['overage_minutes'] as int?) ?? 0;
+        totalSeconds += (r['total_seconds'] as int?) ?? 0;
+        overage += (r['overage_minutes'] as int?) ?? 0;
       }
       usageMin = (totalSeconds / 60).ceil();
       if (included != null && !isPayg) {
@@ -115,9 +118,10 @@ class DashboardService {
           summaryRes.body.isNotEmpty) {
         final decoded = jsonDecode(summaryRes.body) as Map<String, dynamic>?;
         totalCalls = decoded?['total_calls'] as int? ?? 0;
-        totalCallMinutes = (decoded?['total_minutes'] as num?)?.toDouble() ?? 0.0;
-        recentCalls =
-            List<Map<String, dynamic>>.from((decoded?['recent_calls'] as List?) ?? []);
+        totalCallMinutes =
+            (decoded?['total_minutes'] as num?)?.toDouble() ?? 0.0;
+        recentCalls = List<Map<String, dynamic>>.from(
+            (decoded?['recent_calls'] as List?) ?? []);
         usageMinutesRealtime =
             (decoded?['usage_minutes_realtime'] as num?)?.toInt() ?? 0;
       }
@@ -152,4 +156,3 @@ class DashboardService {
     );
   }
 }
-

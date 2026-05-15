@@ -11,7 +11,7 @@ PLAN_DEFS = [
         "id": "starter",
         "env_key": "STRIPE_PRICE_STARTER",
         "included_minutes": 300,
-        "monthly_fee_cents": 2900,
+        "monthly_fee_cents": 6900,
         "overage_rate_cents": 8,
         "per_minute_cents": 8,
         "billing_plan_id": "subscription_starter",
@@ -29,7 +29,7 @@ PLAN_DEFS = [
         "id": "pro",
         "env_key": "STRIPE_PRICE_PRO",
         "included_minutes": 1800,
-        "monthly_fee_cents": 9900,
+        "monthly_fee_cents": 14900,
         "overage_rate_cents": 8,
         "per_minute_cents": 8,
         "billing_plan_id": "subscription_pro",
@@ -57,7 +57,7 @@ PLAN_DEFS = [
         "id": "dev_test",
         "env_key": "STRIPE_PRICE_DEV_TEST",
         "included_minutes": 50,
-        "monthly_fee_cents": 0,
+        "monthly_fee_cents": 100,
         "overage_rate_cents": 8,
         "per_minute_cents": 20,
         "billing_plan_id": "subscription_dev_test",
@@ -72,6 +72,23 @@ PLAN_DEFS = [
         "billing_plan_id": "subscription_payg",
     },
 ]
+
+
+def _stripe_metadata_to_dict(metadata: Any) -> dict[str, Any]:
+    if not metadata:
+        return {}
+    if isinstance(metadata, dict):
+        return metadata
+    try:
+        return dict(metadata)
+    except Exception:
+        to_dict = getattr(metadata, "to_dict", None)
+        if callable(to_dict):
+            try:
+                return to_dict()
+            except Exception:
+                return {}
+    return {}
 
 
 def _get_price_to_plan_map() -> dict[str, dict[str, Any]]:
@@ -109,7 +126,7 @@ def plan_from_subscription(subscription: Any) -> dict[str, Any] | None:
     if price_id in m:
         return m[price_id]
 
-    meta = getattr(price, "metadata", None) or {}
+    meta = _stripe_metadata_to_dict(getattr(price, "metadata", None))
     plan = meta.get("plan")
     if not plan:
         return None

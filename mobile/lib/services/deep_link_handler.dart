@@ -10,14 +10,17 @@ class DeepLinkHandler {
 
   StreamSubscription<Uri>? _subscription;
 
-  void init(void Function(String message) onMessage) {
+  void init(
+    void Function(String message) onMessage, {
+    Future<void> Function()? onGoogleCalendarConnected,
+  }) {
     _subscription = _appLinks.uriLinkStream.listen((uri) {
-      _handleUri(uri, onMessage);
+      _handleUri(uri, onMessage, onGoogleCalendarConnected);
     });
 
     // Handle cold start (app launched from link)
     _appLinks.getInitialLink().then((uri) {
-      if (uri != null) _handleUri(uri, onMessage);
+      if (uri != null) _handleUri(uri, onMessage, onGoogleCalendarConnected);
     });
   }
 
@@ -25,7 +28,11 @@ class DeepLinkHandler {
     _subscription?.cancel();
   }
 
-  Future<void> _handleUri(Uri uri, void Function(String) onMessage) async {
+  Future<void> _handleUri(
+    Uri uri,
+    void Function(String) onMessage,
+    Future<void> Function()? onGoogleCalendarConnected,
+  ) async {
     if (uri.host == 'checkout') {
       final sessionId = uri.queryParameters['session_id'];
       if (sessionId != null && sessionId.isNotEmpty) {
@@ -50,6 +57,7 @@ class DeepLinkHandler {
     } else if (uri.host == 'google-callback') {
       final success = uri.queryParameters['success'];
       if (success == '1') {
+        await onGoogleCalendarConnected?.call();
         onMessage('Google Calendar connected!');
       } else {
         final err = uri.queryParameters['error'] ?? 'Connection failed';

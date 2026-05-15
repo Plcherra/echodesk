@@ -23,8 +23,8 @@ class HelpScreen extends StatelessWidget {
           Text(
             'Guides and support for your AI receptionist.',
             style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 24),
           _HelpCard(
@@ -33,7 +33,7 @@ class HelpScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Complete onboarding: connect Google Calendar and add a default phone in Settings, then create your first receptionist from My Receptionists. Each receptionist gets a dedicated phone number for inbound calls.',
+                  'Complete onboarding: connect Google Calendar, choose a plan, then create your first receptionist from My Receptionists. Your receptionist answers calls on your business number.',
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 8),
