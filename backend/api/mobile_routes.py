@@ -66,6 +66,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/mobile", tags=["mobile"])
 
 
+def _has_recording_ai_consent(body: dict[str, Any]) -> bool:
+    """Require explicit owner consent acknowledgement before creating a receptionist."""
+    value = body.get("consent")
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "1", "yes", "y", "on"}
+    return False
+
+
 def _stripe_metadata_to_dict(metadata) -> dict:
     if not metadata:
         return {}
@@ -770,6 +780,16 @@ async def create_receptionist(request: Request):
         body = await request.json()
     except Exception:
         return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    if not _has_recording_ai_consent(body):
+        return JSONResponse(
+            {
+                "error": (
+                    "Consent confirmation is required before creating a receptionist."
+                )
+            },
+            status_code=400,
+        )
 
     webhook_base = (settings.telnyx_webhook_base_url or settings.get_app_url()).strip().rstrip("/")
     if not webhook_base or "localhost" in webhook_base or "placeholder" in webhook_base.lower():

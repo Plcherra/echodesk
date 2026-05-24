@@ -99,6 +99,7 @@ class WizardFormData {
       'mode': mode,
       'phone_strategy': phoneStrategy,
       'system_prompt': systemPrompt.trim(),
+      'consent': consent,
       'staff': staff.where((s) => s.name.trim().isNotEmpty).map((s) => s.toJson()).toList(),
     };
     if (greeting != null && greeting!.trim().isNotEmpty) body['greeting'] = greeting!.trim();

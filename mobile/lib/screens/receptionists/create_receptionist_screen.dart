@@ -269,7 +269,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                         child: const Text('Skip'),
                       ),
                     FilledButton(
-                      onPressed: _loading
+                      onPressed: _loading || (_step == 6 && !_formData.consent)
                           ? null
                           : () async {
                               if (_step < 6) {
@@ -943,7 +943,10 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
             'I confirm that I have obtained all necessary consents for call recording and AI interaction in my jurisdiction.',
           ),
           value: _formData.consent,
-          onChanged: (v) => setState(() => _formData.consent = v ?? false),
+          onChanged: (v) => setState(() {
+            _formData.consent = v ?? false;
+            if (_formData.consent) _error = null;
+          }),
           controlAffinity: ListTileControlAffinity.leading,
         ),
       ],
