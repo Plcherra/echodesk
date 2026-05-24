@@ -65,6 +65,104 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _showResetPasswordDialog() async {
+    final controller = TextEditingController(text: _emailController.text);
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        var isSending = false;
+        String? dialogError;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> sendResetEmail() async {
+              if (!formKey.currentState!.validate()) return;
+              final navigator = Navigator.of(dialogContext);
+              final messenger = ScaffoldMessenger.of(this.context);
+              setDialogState(() {
+                isSending = true;
+                dialogError = null;
+              });
+              try {
+                await Supabase.instance.client.auth.resetPasswordForEmail(
+                  controller.text.trim(),
+                  redirectTo: '${Env.deepLinkScheme}://auth-callback',
+                );
+                if (!dialogContext.mounted) return;
+                navigator.pop();
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Password reset email sent')),
+                );
+              } on AuthException catch (e) {
+                setDialogState(() => dialogError = e.message);
+              } catch (e) {
+                setDialogState(() => dialogError = e.toString());
+              } finally {
+                if (dialogContext.mounted) {
+                  setDialogState(() => isSending = false);
+                }
+              }
+            }
+
+            return AlertDialog(
+              title: const Text('Reset password'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
+                      controller: controller,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Required' : null,
+                      onFieldSubmitted: (_) => sendResetEmail(),
+                    ),
+                    if (dialogError != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        dialogError!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed:
+                      isSending ? null : () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isSending ? null : sendResetEmail,
+                  child: isSending
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Send'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -144,6 +242,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextButton(
                     onPressed: _isLoading ? null : () => context.go('/signup'),
                     child: const Text("Don't have an account? Sign up"),
+                  ),
+                  TextButton(
+                    onPressed: _isLoading ? null : _showResetPasswordDialog,
+                    child: const Text('Forgot password?'),
                   ),
                   if (Env.googleAuthEnabled) ...[
                     const SizedBox(height: 24),

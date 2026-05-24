@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/landing/landing_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/reset_password_screen.dart';
 import 'screens/auth/signup_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
@@ -38,6 +39,7 @@ GoRouter createAppRouter() {
       final isLoggedIn = session != null;
       final isLanding = state.matchedLocation == '/' ||
           state.matchedLocation.startsWith('/login') ||
+          state.matchedLocation.startsWith('/reset-password') ||
           state.matchedLocation.startsWith('/signup');
       final isAuthRoute = state.matchedLocation.startsWith('/login') ||
           state.matchedLocation.startsWith('/signup');
@@ -55,6 +57,7 @@ GoRouter createAppRouter() {
       if (isLoggedIn) {
         final loc = state.matchedLocation;
         final allowlist = loc == '/onboarding' ||
+            loc == '/reset-password' ||
             loc == '/receptionists/create' ||
             loc.startsWith('/settings') ||
             loc.startsWith('/checkout') ||
@@ -96,6 +99,10 @@ GoRouter createAppRouter() {
         builder: (context, state) => SignupScreen(
           planId: state.uri.queryParameters['plan'],
         ),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        builder: (context, state) => const ResetPasswordScreen(),
       ),
       GoRoute(
         path: '/onboarding',

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_router.dart';
 import 'services/account_bootstrap_service.dart';
@@ -18,6 +21,7 @@ class EchodeskApp extends StatefulWidget {
 class _EchodeskAppState extends State<EchodeskApp> {
   final DeepLinkHandler _deepLinkHandler = DeepLinkHandler();
   late final AccountBootstrapService _accountBootstrapService;
+  StreamSubscription<AuthState>? _authSubscription;
   final GlobalKey<ScaffoldMessengerState> _scaffoldKey =
       GlobalKey<ScaffoldMessengerState>();
   late final GoRouter _router;
@@ -31,6 +35,12 @@ class _EchodeskAppState extends State<EchodeskApp> {
       onProfileReady: _routePendingPlanIfNeeded,
     );
     _accountBootstrapService.init();
+    _authSubscription =
+        Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.passwordRecovery) {
+        _router.go('/reset-password');
+      }
+    });
     CallService().onCallAccepted = (callSid, receptionistId, caller) {
       final q = <String, String>{};
       if (receptionistId.isNotEmpty) q['receptionist_id'] = receptionistId;
@@ -73,6 +83,7 @@ class _EchodeskAppState extends State<EchodeskApp> {
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _deepLinkHandler.dispose();
     _accountBootstrapService.dispose();
     super.dispose();

@@ -4,7 +4,7 @@ import 'package:app_links/app_links.dart';
 
 import 'api_client.dart';
 
-/// Handles incoming deep links (echodesk://checkout, echodesk://google-callback).
+/// Handles incoming deep links (echodesk://checkout, echodesk://auth-callback).
 class DeepLinkHandler {
   final AppLinks _appLinks = AppLinks();
 
@@ -64,8 +64,11 @@ class DeepLinkHandler {
         onMessage('Calendar: $err');
       }
     } else if (uri.host == 'auth-callback') {
-      // Supabase OAuth redirect; session is recovered automatically by Supabase
-      onMessage('Signed in successfully');
+      // Supabase recovers the session from auth links; password recovery routing
+      // is handled by the auth state listener in the app shell.
+      if (uri.queryParameters['type'] != 'recovery') {
+        onMessage('Signed in successfully');
+      }
     } else if (uri.host == 'settings') {
       onMessage('Billing updated');
     }
