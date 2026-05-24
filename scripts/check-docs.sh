@@ -12,6 +12,7 @@ ALLOWED=(
   "docs/core/VOICE_PIPELINE.md"
   "docs/core/SMS_FLOW.md"
   "docs/core/ENV.md"
+  "docs/core/ACCOUNT_ONBOARDING_PHASES.md"
   "docs/ops/RUNBOOK.md"
   "docs/README.md"
 )
