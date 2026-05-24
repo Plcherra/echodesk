@@ -66,101 +66,17 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _showResetPasswordDialog() async {
-    final controller = TextEditingController(text: _emailController.text);
-    final formKey = GlobalKey<FormState>();
-
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        var isSending = false;
-        String? dialogError;
-
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            Future<void> sendResetEmail() async {
-              if (!formKey.currentState!.validate()) return;
-              final navigator = Navigator.of(dialogContext);
-              final messenger = ScaffoldMessenger.of(this.context);
-              setDialogState(() {
-                isSending = true;
-                dialogError = null;
-              });
-              try {
-                await Supabase.instance.client.auth.resetPasswordForEmail(
-                  controller.text.trim(),
-                  redirectTo: '${Env.deepLinkScheme}://auth-callback',
-                );
-                if (!dialogContext.mounted) return;
-                navigator.pop();
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Password reset email sent')),
-                );
-              } on AuthException catch (e) {
-                setDialogState(() => dialogError = e.message);
-              } catch (e) {
-                setDialogState(() => dialogError = e.toString());
-              } finally {
-                if (dialogContext.mounted) {
-                  setDialogState(() => isSending = false);
-                }
-              }
-            }
-
-            return AlertDialog(
-              title: const Text('Reset password'),
-              content: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: controller,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Required' : null,
-                      onFieldSubmitted: (_) => sendResetEmail(),
-                    ),
-                    if (dialogError != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        dialogError!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed:
-                      isSending ? null : () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: isSending ? null : sendResetEmail,
-                  child: isSending
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Send'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => _ResetPasswordDialog(
+        initialEmail: _emailController.text,
+        onSent: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Password reset email sent')),
+          );
+        },
+      ),
     );
-
-    controller.dispose();
   }
 
   @override
@@ -261,6 +177,112 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ResetPasswordDialog extends StatefulWidget {
+  const _ResetPasswordDialog({
+    required this.initialEmail,
+    required this.onSent,
+  });
+
+  final String initialEmail;
+  final VoidCallback onSent;
+
+  @override
+  State<_ResetPasswordDialog> createState() => _ResetPasswordDialogState();
+}
+
+class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _controller;
+  bool _isSending = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialEmail);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendResetEmail() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _isSending = true;
+      _error = null;
+    });
+
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        _controller.text.trim(),
+        redirectTo: '${Env.deepLinkScheme}://auth-callback',
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      widget.onSent();
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Reset password'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              controller: _controller,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Required' : null,
+              onFieldSubmitted: (_) => _sendResetEmail(),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSending ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isSending ? null : _sendResetEmail,
+          child: _isSending
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Send'),
+        ),
+      ],
     );
   }
 }
