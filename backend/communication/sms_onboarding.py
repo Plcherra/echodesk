@@ -57,20 +57,29 @@ def _default_registration_profile(
     profile.setdefault("usecase", (settings.telnyx_10dlc_default_usecase or "CUSTOMER_CARE").strip() or "CUSTOMER_CARE")
     if not (profile.get("description") or "").strip():
         profile["description"] = (
-            f"Customer care and appointment messages for {bn or 'the business'}. "
-            "Transactional updates and two-way support."
+            f"{bn or 'The business'} sends non-marketing customer care SMS to its own customers. "
+            "Messages are related to appointments and service requests, including booking confirmations, "
+            "reminders, rescheduling or cancellation updates, and customer support replies."
         )
     if not (profile.get("message_flow") or "").strip():
         profile["message_flow"] = (
-            "Customers opt in by texting the business number or providing their mobile number when booking. "
-            "They receive confirmations and reminders related to their appointments."
+            f"Customers opt in directly with {bn or 'the business'}, not with EchoDesk as a shared sender. "
+            "Primary opt-in is verbal during an inbound or outbound scheduling call: the customer calls the "
+            "business phone number or asks to book an appointment, and the receptionist asks, "
+            "\"Would you like a text confirmation and appointment updates from us? Message and data rates may "
+            "apply. Reply STOP to opt out or HELP for help.\" SMS is sent only after the customer agrees. "
+            "Customers may also opt in by texting the published business phone number first; that inbound SMS "
+            "starts a two-way appointment support conversation. Message frequency varies by appointment activity."
         )
     if not (profile.get("sample1") or "").strip():
         profile["sample1"] = (
-            f"Hi, this is {bn or 'our shop'} confirming your appointment. Reply STOP to opt out."
+            f"{bn or 'Business'}: Your appointment is confirmed for Monday at 2:00 PM. Reply STOP to opt out, HELP for help."
         )
     if not (profile.get("sample2") or "").strip():
-        profile["sample2"] = "Reminder: you have an appointment tomorrow. Reply HELP for help. Reply STOP to opt out."
+        profile["sample2"] = (
+            f"{bn or 'Business'}: Reminder, your appointment is tomorrow at 2:00 PM. "
+            "Reply STOP to opt out, HELP for help."
+        )
     profile.setdefault("optout_keywords", "STOP")
     profile.setdefault("help_keywords", "HELP")
     profile.setdefault(

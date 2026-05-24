@@ -52,6 +52,10 @@ Rows may be missing for messages sent before tracking existed — webhook logs *
 
 Sending SMS from **US long-code** numbers to US handsets generally requires **10DLC brand/campaign registration** with carriers (and provider-side setup in Telnyx). This is a **carrier and compliance dependency**, not enforced or automated in this repository. If delivery fails for long-code traffic, verify **10DLC registration**, number capabilities, and Telnyx messaging profile status in the provider console.
 
+EchoDesk is a platform, so customer-facing appointment SMS must be registered under the **business that owns the customer relationship**, not under one shared EchoDesk campaign. An EchoDesk-owned campaign can be used for EchoDesk-to-account-owner messages only, such as product, setup, billing, or support notifications to EchoDesk users.
+
+For appointment/customer SMS, each business should have its own 10DLC brand/campaign and message flow. The message flow should identify the exact opt-in path, such as verbal consent during a scheduling call or inbound SMS to the published business number, and include the required disclosure: message frequency varies, message and data rates may apply, reply STOP to opt out, and reply HELP for help.
+
 ## Other entry points
 
 **`api/appointment_followup.py`** can send follow-up SMS and also calls **`store_sms_sent`** when configured — same webhook and `sms_messages` pattern.
