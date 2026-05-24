@@ -6,6 +6,7 @@ and tool execution to tool_dispatch.
 
 import asyncio
 import logging
+import re
 import time
 from collections import deque
 from typing import Any, Callable, Awaitable, Optional
@@ -31,12 +32,15 @@ from voice.pipeline_templates import (
     deterministic_post_booking_reply,
     log_availability_guard,
     template_from_tool_result,
+    unavailable_requested_time_reply,
 )
 from voice.pipeline_transcript import (
     contains_clear_intent,
+    extract_time_hint,
     is_farewell_courtesy_intent,
     is_incomplete_transcript,
     is_whitelisted_short_utterance,
+    normalize_for_whitelist,
     passes_transcript_guard,
 )
 from voice.slot_selection import (
@@ -61,6 +65,24 @@ __all__ = [
     "PRE_TOOL_FILLER_PHRASE",
     "CALENDAR_TOOL_NAMES",
 ]
+
+
+def _deterministic_identity_reply(user_text: str, config: dict[str, Any]) -> str | None:
+    norm = normalize_for_whitelist(user_text)
+    if not norm:
+        return None
+    asks_name = (
+        re.search(r"\bwhat(?:'s| is)\s+your\s+name\b", norm)
+        or "who are you" in norm
+        or "who am i speaking with" in norm
+        or "who am i talking to" in norm
+    )
+    if not asks_name:
+        return None
+    identity = (config.get("assistant_identity") or "the receptionist").strip()
+    if identity.lower() in {"receptionist", "the receptionist"}:
+        return "I'm the receptionist. How can I help?"
+    return f"I'm {identity}. How can I help?"
 
 
 async def run_voice_pipeline(
@@ -157,6 +179,24 @@ async def run_voice_pipeline(
                 )
                 return
 
+            identity_reply = _deterministic_identity_reply(user_text, config)
+            if identity_reply:
+                history.append({"role": "user", "content": user_text})
+                history.append({"role": "assistant", "content": identity_reply})
+                logger.info(
+                    "[turn] TTS started commit_id=%s response_len=%d (identity_deterministic)",
+                    cid,
+                    len(identity_reply),
+                )
+                await generate_and_send_tts(
+                    identity_reply,
+                    config,
+                    on_audio,
+                    on_error,
+                    _tts_failure_logged=tts_failure_logged,
+                )
+                return
+
             use_calendar = bool(
                 config.get("receptionist_id")
                 and config.get("voice_server_api_key")
@@ -201,6 +241,37 @@ async def run_voice_pipeline(
                 and last_slot_resolution.slot_iso
                 and use_calendar
             )
+
+            requested_time_hint = extract_time_hint(user_text or "")
+            if (
+                use_calendar
+                and slot_pre_attempted
+                and last_slot_resolution
+                and not last_slot_resolution.ok
+                and not last_slot_resolution.ambiguous
+                and requested_time_hint
+            ):
+                reply = unavailable_requested_time_reply(requested_time_hint, offered_slots_state)
+                history.append({"role": "user", "content": user_text})
+                history.append({"role": "assistant", "content": reply})
+                logger.info(
+                    "[CALL_DIAG] unavailable_requested_time_reply commit_id=%s requested_time=%s",
+                    cid,
+                    requested_time_hint,
+                )
+                logger.info(
+                    "[turn] TTS started commit_id=%s response_len=%d (unavailable_time)",
+                    cid,
+                    len(reply),
+                )
+                await generate_and_send_tts(
+                    reply,
+                    config,
+                    on_audio,
+                    on_error,
+                    _tts_failure_logged=tts_failure_logged,
+                )
+                return
 
             if not slot_booking_bypass_guard:
                 if not user_text or not passes_transcript_guard(user_text):

@@ -11,8 +11,9 @@ from voice.constants import DEFAULT_GREETING
 
 logger = logging.getLogger(__name__)
 
-# In-memory prompt cache: call_control_id -> (prompt, greeting, voice_id | None, voice_preset_key | None, greeting_source)
-_prompt_cache: dict[str, tuple[str, str, Optional[str], Optional[str], str]] = {}
+# In-memory prompt cache:
+# call_control_id -> (prompt, greeting, voice_id | None, voice_preset_key | None, greeting_source, assistant_identity)
+_prompt_cache: dict[str, tuple[str, str, Optional[str], Optional[str], str, str]] = {}
 _MAX_PROMPT_CACHE = 1000
 
 DEFAULT = (
@@ -21,6 +22,7 @@ DEFAULT = (
     None,
     None,
     "fallback",
+    "Receptionist",
 )
 
 
@@ -31,6 +33,7 @@ def set_prompt(
     voice_id: Optional[str] = None,
     voice_preset_key: Optional[str] = None,
     greeting_source: str = "custom",
+    assistant_identity: str = "Receptionist",
 ) -> None:
     if call_control_id and len(_prompt_cache) >= _MAX_PROMPT_CACHE:
         try:
@@ -44,10 +47,17 @@ def set_prompt(
         except Exception:
             _prompt_cache.clear()
             logger.warning("[CALL_DIAG] prompt_cache_cleared size_limit=%s", _MAX_PROMPT_CACHE)
-    _prompt_cache[call_control_id] = (prompt, greeting, voice_id, voice_preset_key, greeting_source)
+    _prompt_cache[call_control_id] = (
+        prompt,
+        greeting,
+        voice_id,
+        voice_preset_key,
+        greeting_source,
+        assistant_identity or "Receptionist",
+    )
 
 
-def get_cached_prompt(call_control_id: str) -> tuple[str, str, Optional[str], Optional[str], str] | None:
+def get_cached_prompt(call_control_id: str) -> tuple[str, str, Optional[str], Optional[str], str, str] | None:
     return _prompt_cache.get(call_control_id)
 
 
@@ -58,14 +68,14 @@ def clear_cached_prompt(call_control_id: str) -> None:
     _prompt_cache.pop(call_control_id, None)
 
 
-async def fetch_prompt(receptionist_id: str, supabase) -> tuple[str, str, Optional[str], Optional[str], str]:
+async def fetch_prompt(receptionist_id: str, supabase) -> tuple[str, str, Optional[str], Optional[str], str, str]:
     """Fetch prompt for receptionist from Supabase. Returns (prompt, greeting, voice_id, voice_preset_key, greeting_source)."""
     if not receptionist_id or not receptionist_id.strip():
         return DEFAULT
     return await asyncio.to_thread(_build_from_supabase_sync, receptionist_id, supabase)
 
 
-def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str, Optional[str], Optional[str], str]:
+def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str, Optional[str], Optional[str], str, str]:
     default = DEFAULT
     if not receptionist_id or not receptionist_id.strip():
         return default
@@ -136,4 +146,4 @@ def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str,
         greeting_source,
         "custom" if voice_id else "env_default",
     )
-    return prompt, greeting, voice_id, voice_preset_key, greeting_source
+    return prompt, greeting, voice_id, voice_preset_key, greeting_source, identity

@@ -125,20 +125,26 @@ async def handle_voice_stream_connection(ws: WebSocket) -> None:
             if call_sid and active_by_call_sid.get(call_sid) != ws:
                 return
 
-            prompt, greeting, cached_voice_id, voice_preset_key, greeting_source = prompt_data
+            if len(prompt_data) >= 6:
+                prompt, greeting, cached_voice_id, voice_preset_key, greeting_source, assistant_identity = prompt_data
+            else:
+                prompt, greeting, cached_voice_id, voice_preset_key, greeting_source = prompt_data
+                assistant_identity = "Receptionist"
             resolved_tts_voice = resolve_tts_voice(voice_preset_key, cached_voice_id)
             logger.info(
-                "call_voice_setup receptionist_id=%s voice_preset_key=%s google_voice=%s greeting_source=%s",
+                "call_voice_setup receptionist_id=%s voice_preset_key=%s google_voice=%s greeting_source=%s assistant_identity=%s",
                 receptionist_id,
                 voice_preset_key,
                 resolved_tts_voice.google_voice_name,
                 greeting_source,
+                assistant_identity,
             )
             config = {
                 "deepgram_api_key": settings.deepgram_api_key,
                 "grok_api_key": settings.grok_api_key,
                 "system_prompt": prompt,
                 "greeting": greeting,
+                "assistant_identity": assistant_identity,
                 "tts_provider": "google",
                 "resolved_tts_voice": resolved_tts_voice,
             }

@@ -155,6 +155,21 @@ def contains_clear_intent(text: str) -> bool:
         return False
     if is_post_booking_followup_message(text):
         return True
+    if extract_time_hint(text) is not None and any(
+        h in norm
+        for h in (
+            "have",
+            "available",
+            "availability",
+            "opening",
+            "openings",
+            "slot",
+            "spot",
+            "book",
+            "schedule",
+        )
+    ):
+        return True
     if "?" in (text or "") and any(h in norm for h in INTENT_HINTS):
         return True
     return any(h in norm for h in INTENT_HINTS)

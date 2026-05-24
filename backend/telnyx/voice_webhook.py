@@ -345,8 +345,19 @@ async def handle_voice_webhook(body: dict[str, Any], raw_body: bytes, headers: d
 
     # Pre-fetch and cache prompt, greeting, voice_id (precedence applied in fetch)
     try:
-        prompt, greeting, voice_id, voice_preset_key, greeting_source = _build_from_supabase_sync(receptionist_id, supabase)
-        set_prompt(call_control_id, prompt, greeting, voice_id, voice_preset_key, greeting_source)
+        prompt, greeting, voice_id, voice_preset_key, greeting_source, assistant_identity = _build_from_supabase_sync(
+            receptionist_id,
+            supabase,
+        )
+        set_prompt(
+            call_control_id,
+            prompt,
+            greeting,
+            voice_id,
+            voice_preset_key,
+            greeting_source,
+            assistant_identity,
+        )
         logger.info("Prompt cached for call %s (voice_id=%s)", call_control_id, "custom" if voice_id else "env_default")
     except Exception as e:
         logger.warning("Prompt pre-fetch failed: %s", e)

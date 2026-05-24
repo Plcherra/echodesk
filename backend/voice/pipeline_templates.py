@@ -150,6 +150,24 @@ def _availability_reply_bucket_first(day_text: str, slots: list[str], periods_no
     return f"I found {slots_sentence(slots)} for {day_text}. Which works best?"
 
 
+def unavailable_requested_time_reply(
+    requested_time: str,
+    offered_slots_state: dict[str, Any],
+) -> str:
+    """Reply when caller asks for a concrete time that is not in the just-offered slots."""
+    time_text = (requested_time or "that time").strip() or "that time"
+    periods = offered_slots_state.get("summary_periods") if isinstance(offered_slots_state, dict) else []
+    periods_norm = [p.lower() for p in (periods or []) if isinstance(p, str)]
+    slots = []
+    if isinstance(offered_slots_state, dict):
+        slots = offered_slots_state.get("exact_slots") or offered_slots_state.get("suggested_slots") or []
+    if periods_norm:
+        return f"I don't see {time_text} in the openings I found. {_openings_line_from_summary_periods(periods_norm)}. What works best?"
+    if slots:
+        return f"I don't see {time_text} available. I found {slots_sentence(slots)}. Which works best?"
+    return f"I don't see {time_text} available. Want me to check another time?"
+
+
 def truth_aware_sms_line(voice_session: dict[str, Any] | None) -> str:
     """One short line about confirmation text; never claim delivered if API failed or delivery failed."""
     vs = voice_session or {}

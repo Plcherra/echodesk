@@ -24,6 +24,10 @@ def test_contains_clear_intent_post_booking_phrase():
     assert pipeline_transcript.contains_clear_intent("is there anything else I should know") is True
 
 
+def test_contains_clear_intent_time_availability_question():
+    assert pipeline_transcript.contains_clear_intent("Do you have nine AM?") is True
+
+
 def test_is_farewell_courtesy_intent():
     assert pipeline_transcript.is_farewell_courtesy_intent("Thank you. Have a great night.") is True
     assert pipeline_transcript.is_farewell_courtesy_intent("good morning") is False
@@ -76,6 +80,22 @@ def test_template_check_availability_success_bucket_then_times():
     assert out
     assert "afternoon openings" in out.lower()
     assert "which time works best" in out.lower()
+
+
+def test_unavailable_requested_time_reply_uses_last_periods():
+    out = pipeline_templates.unavailable_requested_time_reply(
+        "9 am",
+        {
+            "exact_slots": [
+                "2026-04-11T13:00:00-04:00",
+                "2026-04-11T18:00:00-04:00",
+            ],
+            "suggested_slots": [],
+            "summary_periods": ["afternoon", "evening"],
+        },
+    )
+    assert "9 am" in out.lower()
+    assert "afternoon and evening openings" in out.lower()
 
 
 @pytest.mark.parametrize(
