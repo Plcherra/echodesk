@@ -35,7 +35,9 @@ from voice.pipeline_templates import (
     unavailable_requested_time_reply,
 )
 from voice.pipeline_transcript import (
+    asks_for_time_list,
     contains_clear_intent,
+    extract_date_text_hint,
     extract_time_hint,
     is_farewell_courtesy_intent,
     is_incomplete_transcript,
@@ -210,9 +212,13 @@ async def run_voice_pipeline(
 
             slot_pre_attempted = False
             last_slot_resolution = None
+            explicit_datetime_request = bool(
+                extract_date_text_hint(user_text or "") and extract_time_hint(user_text or "")
+            )
             if (
                 user_text
                 and recent_offered_slots_present(offered_slots_state)
+                and not explicit_datetime_request
                 and not is_new_availability_search_intent(user_text)
             ):
                 slot_pre_attempted = True
@@ -377,6 +383,7 @@ async def run_voice_pipeline(
                         requested_date=fast_date,
                         requested_time=fast_time,
                         voice_session=config.get("voice_session"),
+                        list_exact_times=asks_for_time_list(user_text),
                     )
                     if templated:
                         logger.info("[CALL_DIAG] template_response_used type=%s", fast_tool_name)

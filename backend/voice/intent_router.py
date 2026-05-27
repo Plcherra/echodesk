@@ -45,6 +45,11 @@ def resolve_calendar_fast_path(
     fast_tool_args: dict[str, Any] = {}
     slot_fast = False
 
+    def _date_and_time_text() -> str:
+        return " ".join(
+            [p for p in [fast_date, ("at " + fast_time) if fast_time else None] if p]
+        ).strip()
+
     sr_pre = last_slot_resolution
     if slot_pre_attempted and sr_pre and sr_pre.ok and sr_pre.slot_iso:
         slot_fast = True
@@ -91,9 +96,7 @@ def resolve_calendar_fast_path(
 
     if not slot_fast and is_booking_confirmation_intent(user_text):
         fast_tool_name = "create_appointment"
-        date_and_time = " ".join(
-            [p for p in [fast_date, ("at " + fast_time) if fast_time else None] if p]
-        ).strip()
+        date_and_time = _date_and_time_text()
         if date_and_time:
             fast_tool_args["date_text"] = date_and_time
         if not fast_tool_args.get("date_text"):
@@ -104,7 +107,7 @@ def resolve_calendar_fast_path(
     elif not slot_fast and is_availability_intent(user_text):
         fast_tool_name = "check_availability"
         fast_tool_args = {
-            "date_text": fast_date or "tomorrow",
+            "date_text": _date_and_time_text() or fast_date or "tomorrow",
             "generic_appointment_requested": True,
         }
 

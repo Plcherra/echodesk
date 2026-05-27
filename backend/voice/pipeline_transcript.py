@@ -213,4 +213,43 @@ def is_booking_confirmation_intent(text: str) -> bool:
 
 def is_availability_intent(text: str) -> bool:
     norm = normalize_for_whitelist(text)
-    return any(k in norm for k in ("availability", "available", "spot", "book", "tomorrow", "today"))
+    return any(
+        k in norm
+        for k in (
+            "availability",
+            "available",
+            "opening",
+            "openings",
+            "slot",
+            "slots",
+            "spot",
+            "spots",
+            "time",
+            "times",
+            "have",
+            "book",
+            "tomorrow",
+            "today",
+        )
+    )
+
+
+def asks_for_time_list(text: str) -> bool:
+    norm = normalize_for_whitelist(text)
+    if not norm:
+        return False
+    return any(
+        p in norm
+        for p in (
+            "what time",
+            "what times",
+            "which time",
+            "which times",
+            "what slots",
+            "which slots",
+            "what openings",
+            "which openings",
+            "times do you have",
+            "time do you have",
+        )
+    )

@@ -14,6 +14,17 @@ def test_fast_path_check_availability_tomorrow():
     assert "tomorrow" in (d.fast_tool_args.get("date_text") or "")
 
 
+def test_fast_path_check_availability_keeps_requested_time():
+    d = resolve_calendar_fast_path(
+        "do you have tomorrow at 2pm",
+        {"exact_slots": ["2026-04-11T15:00:00-04:00"], "suggested_slots": []},
+        slot_pre_attempted=False,
+        last_slot_resolution=None,
+    )
+    assert d.fast_tool_name == "check_availability"
+    assert d.fast_tool_args.get("date_text") == "tomorrow at 2 pm"
+
+
 def test_fast_path_create_from_slot_resolution():
     from voice.slot_selection import SlotResolution
 

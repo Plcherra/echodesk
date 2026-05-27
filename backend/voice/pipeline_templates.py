@@ -217,6 +217,7 @@ def template_from_tool_result(
     requested_time: Optional[str],
     *,
     voice_session: Optional[dict[str, Any]] = None,
+    list_exact_times: bool = False,
 ) -> Optional[str]:
     try:
         parsed = json.loads(result_json or "{}")
@@ -233,6 +234,12 @@ def template_from_tool_result(
         slots = parsed.get("exact_slots") or parsed.get("suggested_slots") or []
         if slots:
             day_text = requested_date or "that day"
+            if requested_time and parsed.get("slot_available") is True:
+                return f"Yes, {requested_time} {day_text} is available. Would you like me to book it?"
+            if requested_time and parsed.get("slot_available") is False:
+                return f"I don't see {requested_time} available. I found {slots_sentence(slots)}. Which works best?"
+            if list_exact_times:
+                return f"I found {slots_sentence(slots)} for {day_text}. Which works best?"
             periods = parsed.get("summary_periods") if isinstance(parsed.get("summary_periods"), list) else []
             periods_norm = [p.lower() for p in periods if isinstance(p, str)]
             if not periods_norm:

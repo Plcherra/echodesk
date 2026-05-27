@@ -157,6 +157,33 @@ def test_check_availability_range_defaults_to_60_minutes():
     assert out["success"] is True
     assert out["slot_duration_minutes"] == calendar_handler.DEFAULT_AVAILABILITY_SLOT_MINUTES
     assert len(out.get("suggested_slots") or []) <= calendar_handler.SUGGESTED_SLOTS_MAX
+    assert len(out.get("exact_slots") or []) > len(out.get("suggested_slots") or [])
+    assert any("09:00:00" in s for s in out.get("exact_slots") or [])
+
+
+def test_check_availability_exact_time_unavailable_returns_alternatives():
+    freebusy = {
+        "calendars": {
+            "primary": {
+                "busy": [
+                    {
+                        "start": "2026-03-18T14:00:00-04:00",
+                        "end": "2026-03-18T15:00:00-04:00",
+                    }
+                ]
+            }
+        }
+    }
+    service = _Service(freebusy_result=freebusy)
+    out = calendar_handler._handle_check_availability(
+        service,
+        "primary",
+        params={"date_text": "2026-03-18T14:00:00-04:00", "timezone": "America/New_York"},
+    )
+    assert out["success"] is True
+    assert out["slot_available"] is False
+    assert any("15:00:00" in s for s in out.get("suggested_slots") or [])
+    assert any("15:00:00" in s for s in out.get("exact_slots") or [])
 
 
 def test_create_appointment_missing_date_returns_date_missing():

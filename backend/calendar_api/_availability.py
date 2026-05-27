@@ -137,8 +137,8 @@ def handle_check_availability(
         requested_range_end = range_data["timeMax"]
         available_slots = free_slots
         suggested_slots = free_slots[: min(suggested_slots_max, 3)]
-        exact_slots = list(suggested_slots)
-        summary_periods = _slots_to_summary_periods(suggested_slots) if suggested_slots else _slots_to_summary_periods(free_slots)
+        exact_slots = list(free_slots)
+        summary_periods = _slots_to_summary_periods(free_slots)
         logger.info(
             "[CAL_DATE] range_slot_generation mode=%s range_start=%s range_end=%s duration_minutes=%s candidate_slots=%d returned_slots=%d",
             parse_mode,
@@ -183,7 +183,10 @@ def handle_check_availability(
                 suggested_slots = [requested_slot_start]
                 summary_periods = _slots_to_summary_periods(exact_slots)
             elif not slot_available:
-                suggested_slots = []
+                available_slots = free_slots
+                suggested_slots = free_slots[: min(suggested_slots_max, 3)]
+                exact_slots = list(free_slots)
+                summary_periods = _slots_to_summary_periods(free_slots)
 
     return {
         "success": True,
@@ -200,4 +203,3 @@ def handle_check_availability(
         "requested_slot_end": requested_slot_end,
         "slot_available": slot_available,
     }
-

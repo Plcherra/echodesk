@@ -89,8 +89,20 @@ def is_new_availability_search_intent(text: str) -> bool:
             "slots for",
             "anything for tomorrow",
             "anything tomorrow",
+            "what time do you have",
+            "what times do you have",
+            "what do you have",
+            "do you have",
+            "do you got",
+            "you have anything",
+            "any openings",
+            "any slots",
         )
     ):
+        return True
+    if re.search(r"\b(what|which)\s+(time|times|slots|openings)\b", norm):
+        return True
+    if re.search(r"\b(do|did|can|could)\s+you\s+(have|see|find|check)\b", norm):
         return True
     if re.search(r"\b(check|see|find)\s+(availability|openings|slots)\b", norm):
         return True

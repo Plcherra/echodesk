@@ -70,3 +70,8 @@ def test_new_search_skips_slot_resolution():
     # Still resolves if we call resolve without gating — caller gates with is_new_availability_search_intent
     r = resolve_slot_selection("check another day", state)
     assert not r.ok
+
+
+def test_do_you_have_time_is_new_availability_search_not_stale_slot_choice():
+    assert is_new_availability_search_intent("do you have tomorrow at 2pm") is True
+    assert is_new_availability_search_intent("what time do you have") is True

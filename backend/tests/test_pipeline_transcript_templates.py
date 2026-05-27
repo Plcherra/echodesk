@@ -82,6 +82,59 @@ def test_template_check_availability_success_bucket_then_times():
     assert "which time works best" in out.lower()
 
 
+def test_template_check_availability_exact_time_available_answers_yes():
+    payload = json.dumps(
+        {
+            "success": True,
+            "slot_available": True,
+            "exact_slots": ["2026-04-11T14:00:00-04:00"],
+            "suggested_slots": ["2026-04-11T14:00:00-04:00"],
+        }
+    )
+    out = pipeline_templates.template_from_tool_result(
+        "check_availability",
+        payload,
+        requested_date="tomorrow",
+        requested_time="2 pm",
+        voice_session=None,
+    )
+    assert out
+    assert "yes" in out.lower()
+    assert "2 pm tomorrow is available" in out.lower()
+
+
+def test_template_check_availability_list_exact_times_when_requested():
+    payload = json.dumps(
+        {
+            "success": True,
+            "exact_slots": [
+                "2026-04-11T09:00:00-04:00",
+                "2026-04-11T10:00:00-04:00",
+                "2026-04-11T11:00:00-04:00",
+                "2026-04-11T12:00:00-04:00",
+            ],
+            "suggested_slots": [
+                "2026-04-11T09:00:00-04:00",
+                "2026-04-11T10:00:00-04:00",
+                "2026-04-11T11:00:00-04:00",
+            ],
+            "summary_periods": ["morning", "afternoon"],
+        }
+    )
+    out = pipeline_templates.template_from_tool_result(
+        "check_availability",
+        payload,
+        requested_date="tomorrow",
+        requested_time=None,
+        voice_session=None,
+        list_exact_times=True,
+    )
+    assert out
+    assert "9:00 am" in out.lower()
+    assert "10:00 am" in out.lower()
+    assert "11:00 am" in out.lower()
+
+
 def test_unavailable_requested_time_reply_uses_last_periods():
     out = pipeline_templates.unavailable_requested_time_reply(
         "9 am",
