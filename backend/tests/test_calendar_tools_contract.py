@@ -184,6 +184,7 @@ def test_check_availability_exact_time_unavailable_returns_alternatives():
     assert out["slot_available"] is False
     assert any("15:00:00" in s for s in out.get("suggested_slots") or [])
     assert any("15:00:00" in s for s in out.get("exact_slots") or [])
+    assert all(s.endswith("-04:00") for s in out.get("exact_slots") or [])
 
 
 def test_create_appointment_missing_date_returns_date_missing():

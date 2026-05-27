@@ -90,8 +90,10 @@ def get_free_slots(
 ) -> list[str]:
     slot_ms = slot_minutes * 60 * 1000
     try:
-        min_ts = datetime.fromisoformat(time_min.replace("Z", "+00:00")).timestamp() * 1000
-        max_ts = datetime.fromisoformat(time_max.replace("Z", "+00:00")).timestamp() * 1000
+        min_dt = datetime.fromisoformat(time_min.replace("Z", "+00:00"))
+        max_dt = datetime.fromisoformat(time_max.replace("Z", "+00:00"))
+        min_ts = min_dt.timestamp() * 1000
+        max_ts = max_dt.timestamp() * 1000
     except (ValueError, TypeError):
         return []
 
@@ -117,7 +119,6 @@ def get_free_slots(
             for r in busy_ranges
         )
         if not overlaps:
-            slots.append(datetime.fromtimestamp(t / 1000).isoformat())
+            slots.append(datetime.fromtimestamp(t / 1000, tz=min_dt.tzinfo).isoformat())
         t = slot_end
     return slots
-
