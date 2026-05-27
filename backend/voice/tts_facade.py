@@ -17,6 +17,7 @@ from voice.google_tts import (
     synthesize_text_with_retry,
 )
 from voice.tts_cache import build_cache_key, create_tts_cache
+from voice.trace import mark_voice_event
 from voice_presets import ResolvedTtsVoice, google_voice_allowlist
 
 logger = logging.getLogger(__name__)
@@ -79,16 +80,38 @@ async def _send_mulaw_chunks(
     audio: bytes,
     on_audio: Callable[[bytes], Awaitable[None]],
     chunk_bytes: int,
+    *,
+    call_control_id: str | None = None,
+    commit_id: int | None = None,
+    label: str | None = None,
+    request_index: int | None = None,
 ) -> None:
     if chunk_bytes <= 0:
         chunk_bytes = 1600
     t_chunk_start = time.perf_counter()
     chunks_sent = 0
+    mark_voice_event(
+        call_control_id,
+        "assistant_audio_start",
+        commit_id=commit_id,
+        label=label,
+        request_index=request_index,
+        audio_bytes=len(audio),
+    )
     for i in range(0, len(audio), chunk_bytes):
         await on_audio(audio[i : i + chunk_bytes])
         chunks_sent += 1
     t_chunk_end = time.perf_counter()
     logger.info("[BOOKING_LATENCY] tts_chunks_sent chunks=%s duration_ms=%.0f", chunks_sent, (t_chunk_end - t_chunk_start) * 1000)
+    mark_voice_event(
+        call_control_id,
+        "tts_media_chunks_sent",
+        commit_id=commit_id,
+        label=label,
+        request_index=request_index,
+        chunks=chunks_sent,
+        duration_ms=int((t_chunk_end - t_chunk_start) * 1000),
+    )
 
 
 async def _google_synthesize_to_mulaw(
@@ -158,6 +181,7 @@ async def generate_and_send_tts(
     on_error: Optional[Callable[[Exception], None]] = None,
     is_fallback: bool = False,
     _tts_failure_logged: Optional[list[bool]] = None,
+    trace_label: str | None = None,
 ) -> None:
     """Generate TTS and send via callback (Google Cloud TTS + chunking)."""
     if not text or not text.strip():
@@ -186,34 +210,119 @@ async def generate_and_send_tts(
 
     tts_state["requests"] = tts_state.get("requests", 0) + 1
     tts_state["chars"] = tts_state.get("chars", 0) + billable
+    request_index = tts_state["requests"]
+    call_control_id = config.get("call_control_id")
+    commit_id = config.get("active_turn_commit_id")
+    label = trace_label or ("turn" if commit_id is not None else "system")
 
     logger.info(
         "[TTS] utterance provider=google chars=%s chars_call_total=%s est_minutes=%.3f tts_request_index=%s",
         billable,
         tts_state["chars"],
         est_min,
-        tts_state["requests"],
+        request_index,
+    )
+    mark_voice_event(
+        call_control_id,
+        "tts_request_start",
+        commit_id=commit_id,
+        label=label,
+        request_index=request_index,
+        chars=billable,
+        fallback=is_fallback,
     )
 
     voice: ResolvedTtsVoice | None = config.get("resolved_tts_voice")
     if voice is None:
         logger.error("[TTS] resolved_tts_voice missing")
+        mark_voice_event(
+            call_control_id,
+            "tts_request_skipped",
+            commit_id=commit_id,
+            label=label,
+            request_index=request_index,
+            reason="missing_voice",
+        )
         return
 
     try:
+        mark_voice_event(
+            call_control_id,
+            "tts_synthesis_start",
+            commit_id=commit_id,
+            label=label,
+            request_index=request_index,
+            voice=voice.google_voice_name,
+            backup=False,
+        )
         audio = await _google_synthesize_to_mulaw(use_text, voice, use_backup_voice=False)
+        mark_voice_event(
+            call_control_id,
+            "tts_synthesis_end",
+            commit_id=commit_id,
+            label=label,
+            request_index=request_index,
+            audio_bytes=len(audio),
+            backup=False,
+        )
         await _send_mulaw_chunks(
             audio,
             on_audio,
             settings.tts_mulaw_chunk_bytes,
+            call_control_id=call_control_id,
+            commit_id=commit_id,
+            label=label,
+            request_index=request_index,
         )
     except Exception as err:
         logger.exception("[TTS] Google primary voice failed: %s", err)
+        mark_voice_event(
+            call_control_id,
+            "tts_primary_failed",
+            commit_id=commit_id,
+            label=label,
+            request_index=request_index,
+            error=str(err),
+        )
         try:
+            mark_voice_event(
+                call_control_id,
+                "tts_synthesis_start",
+                commit_id=commit_id,
+                label=label,
+                request_index=request_index,
+                voice=settings.google_tts_backup_voice_name,
+                backup=True,
+            )
             audio = await _google_synthesize_to_mulaw(use_text, voice, use_backup_voice=True)
-            await _send_mulaw_chunks(audio, on_audio, settings.tts_mulaw_chunk_bytes)
+            mark_voice_event(
+                call_control_id,
+                "tts_synthesis_end",
+                commit_id=commit_id,
+                label=label,
+                request_index=request_index,
+                audio_bytes=len(audio),
+                backup=True,
+            )
+            await _send_mulaw_chunks(
+                audio,
+                on_audio,
+                settings.tts_mulaw_chunk_bytes,
+                call_control_id=call_control_id,
+                commit_id=commit_id,
+                label=label,
+                request_index=request_index,
+            )
         except Exception as err2:
             logger.exception("[TTS] Google backup voice failed: %s", err2)
+            mark_voice_event(
+                call_control_id,
+                "tts_backup_failed",
+                commit_id=commit_id,
+                label=label,
+                request_index=request_index,
+                error=str(err2),
+            )
             if on_error:
                 on_error(err2)
             if not is_fallback:
@@ -224,6 +333,7 @@ async def generate_and_send_tts(
                     on_error,
                     is_fallback=True,
                     _tts_failure_logged=tts_logged,
+                    trace_label="tts_fallback",
                 )
 
 

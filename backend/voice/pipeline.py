@@ -55,6 +55,7 @@ from voice.tool_dispatch import (
     normalize_tool_args,
 )
 from voice.tts_facade import generate_and_send_tts
+from voice.trace import mark_voice_event
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,7 @@ async def run_voice_pipeline(
     dispatch_commit_id_holder: dict[str, Optional[int]] = {"id": None}
     commit_seq = 0
     active_debounce_commit_id: list[Optional[int]] = [None]
+    first_final_transcript_seen = False
 
     def _cancel_pending_response() -> None:
         """Cancel debounce and in-flight Grok. Call when new caller speech arrives."""
@@ -156,6 +158,7 @@ async def run_voice_pipeline(
         cid = dispatch_commit_id_holder["id"]
         dispatch_commit_id_holder["id"] = None
         logger.info("[TURN_GUARD] dispatch_started path=process commit_id=%s", cid)
+        mark_voice_event(config.get("call_control_id"), "dispatch_started", path="process", commit_id=cid)
 
         config["active_turn_commit_id"] = cid
         is_processing = True
@@ -176,6 +179,7 @@ async def run_voice_pipeline(
                     on_audio,
                     on_error,
                     _tts_failure_logged=tts_failure_logged,
+                    trace_label="farewell",
                 )
                 return
 
@@ -194,6 +198,7 @@ async def run_voice_pipeline(
                     on_audio,
                     on_error,
                     _tts_failure_logged=tts_failure_logged,
+                    trace_label="identity",
                 )
                 return
 
@@ -270,6 +275,7 @@ async def run_voice_pipeline(
                     on_audio,
                     on_error,
                     _tts_failure_logged=tts_failure_logged,
+                    trace_label="unavailable_time",
                 )
                 return
 
@@ -310,6 +316,7 @@ async def run_voice_pipeline(
                     on_audio,
                     on_error,
                     _tts_failure_logged=tts_failure_logged,
+                    trace_label="post_booking",
                 )
                 return
 
@@ -347,6 +354,7 @@ async def run_voice_pipeline(
                         on_audio,
                         on_error,
                         _tts_failure_logged=tts_failure_logged,
+                        trace_label="pre_ack",
                     )
 
                 prev_skip_pre_tool = bool(config.get("skip_pre_tool_speech"))
@@ -390,6 +398,7 @@ async def run_voice_pipeline(
                             on_audio,
                             on_error,
                             _tts_failure_logged=tts_failure_logged,
+                            trace_label=f"template_{fast_tool_name}",
                         )
                         config["skip_pre_tool_speech"] = prev_skip_pre_tool
                         t_turn_end = time.perf_counter()
@@ -410,9 +419,16 @@ async def run_voice_pipeline(
                     CALENDAR_TOOLS,
                     tool_exec,
                     config["grok_api_key"],
+                    trace_call_id=config.get("call_control_id"),
+                    trace_commit_id=cid,
                 )
             else:
-                response = await chat(history, config["grok_api_key"])
+                response = await chat(
+                    history,
+                    config["grok_api_key"],
+                    trace_call_id=config.get("call_control_id"),
+                    trace_commit_id=cid,
+                )
 
             history.append({"role": "assistant", "content": response})
             if use_calendar and offered_slots_state:
@@ -427,6 +443,7 @@ async def run_voice_pipeline(
             await generate_and_send_tts(
                 response, config, on_audio, on_error,
                 _tts_failure_logged=tts_failure_logged,
+                trace_label="llm_response",
             )
             t_turn_end = time.perf_counter()
             logger.info("[BOOKING_LATENCY] turn_end total_ms=%.0f tts_ms=%.0f", (t_turn_end - t_turn_start) * 1000, (t_turn_end - t_tts_start) * 1000)
@@ -448,6 +465,7 @@ async def run_voice_pipeline(
                 on_audio,
                 on_error,
                 _tts_failure_logged=tts_failure_logged,
+                trace_label="error_apology",
             )
         finally:
             config.pop("active_turn_commit_id", None)
@@ -458,6 +476,7 @@ async def run_voice_pipeline(
                 turn_complete_confidence = c2
                 dispatch_commit_id_holder["id"] = cid2
                 logger.info("[TURN_GUARD] dispatch_started path=queued_flush commit_id=%s", cid2)
+                mark_voice_event(config.get("call_control_id"), "dispatch_started", path="queued_flush", commit_id=cid2)
                 grok_task = asyncio.create_task(process_user_input())
 
     def _schedule_trigger(alts: list) -> None:
@@ -516,6 +535,13 @@ async def run_voice_pipeline(
             commit_text[:120],
         )
         logger.info("[TURN_GUARD] commit_enqueued commit_id=%s", commit_id)
+        mark_voice_event(
+            config.get("call_control_id"),
+            "commit_enqueued",
+            commit_id=commit_id,
+            reason=commit_reason,
+            word_count=len(commit_text.lower().split()),
+        )
 
         words = commit_text.lower().split()
         word_count = len(words)
@@ -532,6 +558,7 @@ async def run_voice_pipeline(
                     commit_id,
                     commit_text[:120],
                 )
+                mark_voice_event(config.get("call_control_id"), "dispatch_started", path="immediate", commit_id=commit_id, reason=commit_reason)
                 grok_task = asyncio.create_task(process_user_input())
             else:
                 pending_turn_queue.append((commit_text, confidence, commit_id))
@@ -569,6 +596,7 @@ async def run_voice_pipeline(
                     snap_id,
                     debounce_ms,
                 )
+                mark_voice_event(config.get("call_control_id"), "dispatch_started", path="debounce", commit_id=snap_id, debounce_ms=debounce_ms)
                 grok_task = asyncio.create_task(process_user_input())
             else:
                 pending_turn_queue.append((snap_text, snap_conf, snap_id))
@@ -582,7 +610,7 @@ async def run_voice_pipeline(
         debounce_task.add_done_callback(_on_debounce_done)
 
     async def on_dg_message(msg: dict) -> None:
-        nonlocal transcript_buffer, last_rich_transcript, last_rich_transcript_ts
+        nonlocal transcript_buffer, last_rich_transcript, last_rich_transcript_ts, first_final_transcript_seen
 
         msg_type = msg.get("type", "Results")
 
@@ -599,6 +627,7 @@ async def run_voice_pipeline(
             alts = []
             if isinstance(msg.get("channel"), dict):
                 alts = msg["channel"].get("alternatives") or []
+            mark_voice_event(config.get("call_control_id"), "utterance_end", source="deepgram_utterance_end")
             _schedule_trigger(alts)
             return
 
@@ -622,6 +651,11 @@ async def run_voice_pipeline(
 
         if is_final and transcript:
             transcript_buffer.append(transcript)
+            if first_final_transcript_seen:
+                mark_voice_event(config.get("call_control_id"), "final_transcript", transcript_len=len(transcript))
+            else:
+                mark_voice_event(config.get("call_control_id"), "first_final_transcript", transcript_len=len(transcript))
+                first_final_transcript_seen = True
             # Save richer final transcripts so short trailing utterances do not erase intent.
             if contains_clear_intent(transcript) or len((transcript or "").split()) >= 5:
                 last_rich_transcript = transcript
@@ -636,10 +670,12 @@ async def run_voice_pipeline(
 
         if speech_final:
             logger.debug("[turn] speech_final=True, scheduling trigger")
+            mark_voice_event(config.get("call_control_id"), "utterance_end", source="speech_final")
             _schedule_trigger(alts)
 
     def on_dg_error(err: Exception) -> None:
         logger.error("Deepgram error: %s", err)
+        mark_voice_event(config.get("call_control_id"), "deepgram_error", error=str(err))
         if on_error:
             on_error(err)
 
@@ -650,6 +686,7 @@ async def run_voice_pipeline(
         on_message=on_dg_message,
         on_error=on_dg_error,
     )
+    mark_voice_event(config.get("call_control_id"), "deepgram_connected")
 
     # Play recording consent phrase first when configured; then mark consent as played for CDR
     on_consent_played = config.get("on_consent_played")
@@ -658,6 +695,7 @@ async def run_voice_pipeline(
         await generate_and_send_tts(
             consent_phrase, config, on_audio, on_error,
             _tts_failure_logged=tts_failure_logged,
+            trace_label="consent",
         )
         try:
             if asyncio.iscoroutinefunction(on_consent_played):
@@ -672,6 +710,7 @@ async def run_voice_pipeline(
             generate_and_send_tts(
                 config["greeting"], config, on_audio, on_error,
                 _tts_failure_logged=tts_failure_logged,
+                trace_label="greeting",
             )
         )
 

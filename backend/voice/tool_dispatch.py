@@ -9,6 +9,7 @@ from typing import Any, Awaitable, Callable, Optional
 
 from voice.calendar_tools import call_calendar_tool
 from voice.tts_facade import generate_and_send_tts
+from voice.trace import mark_voice_event
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,7 @@ def make_calendar_tool_exec(
             on_audio,
             on_error,
             _tts_failure_logged=tts_failure_logged,
+            trace_label="pre_tool_filler",
         )
 
     async def tool_exec(name: str, args: dict) -> str:
@@ -133,14 +135,51 @@ def make_calendar_tool_exec(
 
             if not (base_url and api_key and rec_id):
                 result = '{"success": false, "error": "calendar_not_configured"}'
+                mark_voice_event(
+                    call_control_id,
+                    "calendar_tool_response",
+                    commit_id=config.get("active_turn_commit_id"),
+                    tool=name,
+                    success=False,
+                    error="calendar_not_configured",
+                    cached=False,
+                )
                 tool_cache[key] = result
                 return result
 
             t_tool_start = time.perf_counter()
             logger.info("[BOOKING_LATENCY] calendar_tool_start tool=%s t=%.3f", name, t_tool_start)
+            mark_voice_event(
+                call_control_id,
+                "calendar_tool_request",
+                commit_id=config.get("active_turn_commit_id"),
+                tool=name,
+                cached=False,
+            )
             result = await call_calendar_tool(base_url, api_key, rec_id, name, normalized, call_control_id=call_control_id)
             t_tool_end = time.perf_counter()
             logger.info("[BOOKING_LATENCY] calendar_tool_end tool=%s duration_ms=%.0f", name, (t_tool_end - t_tool_start) * 1000)
+            tool_success: bool | None = None
+            tool_error: str | None = None
+            try:
+                parsed_for_trace = json.loads(result) if result else {}
+                if isinstance(parsed_for_trace, dict):
+                    raw_success = parsed_for_trace.get("success")
+                    tool_success = raw_success if isinstance(raw_success, bool) else None
+                    raw_error = parsed_for_trace.get("error")
+                    tool_error = raw_error if isinstance(raw_error, str) else None
+            except (json.JSONDecodeError, TypeError):
+                tool_error = "unparseable_result"
+            mark_voice_event(
+                call_control_id,
+                "calendar_tool_response",
+                commit_id=config.get("active_turn_commit_id"),
+                tool=name,
+                success=tool_success,
+                error=tool_error,
+                cached=False,
+                duration_ms=int((t_tool_end - t_tool_start) * 1000),
+            )
             if name == "check_availability" and result:
                 try:
                     parsed = json.loads(result)

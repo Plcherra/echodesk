@@ -18,6 +18,7 @@ from supabase_client import create_service_role_client
 from api.mobile.call_logs_projection import is_missing_column_error
 from telnyx.payload_utils import extract_call_control_id, extract_call_party_numbers
 from telnyx.receptionist_lookup import get_receptionist_by_did_or_match
+from voice.trace import finish_voice_trace, mark_voice_event
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +183,10 @@ async def handle_cdr_webhook(raw_body: bytes, headers: dict[str, str]) -> dict[s
         "[CALL_DIAG] CDR received event_type=%s call_control_id=%s call_session_id=%s call_leg_id=%s payload_keys=%s",
         event_type, call_control_id, call_session_id, call_leg_id, list(payload.keys()) if isinstance(payload, dict) else [],
     )
+    if call_control_id:
+        mark_voice_event(call_control_id, "cdr_event_received", event_type=event_type)
+        if event_type in ("call.call-ended", "call.hangup"):
+            mark_voice_event(call_control_id, "call_end_received", event_type=event_type)
 
     parties = extract_call_party_numbers(payload)
     from_num = parties["from_number"]
@@ -326,6 +331,12 @@ async def handle_cdr_webhook(raw_body: bytes, headers: dict[str, str]) -> dict[s
             duration_seconds, ended_at, _ = _extract_duration_and_times(payload, supabase, call_control_id)
             logger.info("[CALL_DIAG] CDR no-receptionist finalize call_control_id=%s duration_seconds=%s", call_control_id, duration_seconds)
             _finalize_call_log(supabase, call_control_id, ended_at, duration_seconds)
+            finish_voice_trace(
+                call_control_id,
+                reason=event_type,
+                duration_seconds=duration_seconds,
+                receptionist_found=False,
+            )
         return {"received": True}
 
     duration_seconds, ended_at, started_at = _extract_duration_and_times(payload, supabase, call_control_id)
@@ -497,5 +508,15 @@ async def handle_cdr_webhook(raw_body: bytes, headers: dict[str, str]) -> dict[s
             ))
         except Exception as e:
             logger.warning("call_ended push schedule failed: %s", e)
+
+    if call_control_id and event_type in ("call.call-ended", "call.hangup"):
+        finish_voice_trace(
+            call_control_id,
+            reason=event_type,
+            duration_seconds=duration_seconds,
+            connected_seconds=connected_seconds,
+            billed_minutes=billed_minutes,
+            receptionist_found=True,
+        )
 
     return {"received": True}

@@ -17,6 +17,7 @@ from supabase_client import create_service_role_client
 from telnyx.payload_utils import extract_call_control_id, extract_call_party_numbers
 from telnyx.receptionist_lookup import get_receptionist_by_did_or_match
 from telnyx.webhook import validate_telnyx_webhook
+from voice.trace import mark_voice_event
 
 logger = logging.getLogger(__name__)
 TELNYX_API = "https://api.telnyx.com/v2"
@@ -86,6 +87,7 @@ async def _send_streaming_start(call_control_id: str, stream_url: str) -> bool:
     delay_ms = 300
     async with httpx.AsyncClient(timeout=15.0) as client:
         for attempt in range(max_retries):
+            mark_voice_event(call_control_id, "streaming_start_request_sent", attempt=attempt + 1)
             resp = await client.post(
                 f"{TELNYX_API}/calls/{call_control_id}/actions/streaming_start",
                 headers={
@@ -98,6 +100,7 @@ async def _send_streaming_start(call_control_id: str, stream_url: str) -> bool:
                 },
             )
             if resp.is_success:
+                mark_voice_event(call_control_id, "streaming_start_sent", attempt=attempt + 1)
                 logger.info("Stream started for %s", call_control_id)
                 return True
             try:
@@ -111,6 +114,12 @@ async def _send_streaming_start(call_control_id: str, stream_url: str) -> bool:
             except Exception:
                 pass
             logger.error("Stream start failed: %s", resp.text)
+            mark_voice_event(
+                call_control_id,
+                "streaming_start_failed",
+                attempt=attempt + 1,
+                status_code=resp.status_code,
+            )
             return False
     return False
 
@@ -217,6 +226,8 @@ async def handle_voice_webhook(body: dict[str, Any], raw_body: bytes, headers: d
         "[CALL_DIAG] voice_webhook received event_type=%s call_control_id=%s call_session_id=%s call_leg_id=%s",
         event_type, call_control_id, call_session_id, call_leg_id,
     )
+    if call_control_id:
+        mark_voice_event(call_control_id, "webhook_received", event_type=event_type)
 
     supabase = create_service_role_client()
 
@@ -377,6 +388,7 @@ async def handle_voice_webhook(body: dict[str, Any], raw_body: bytes, headers: d
     logger.info("Stream URL for %s: %s", call_control_id, stream_url)
 
     async with httpx.AsyncClient(timeout=10.0) as client:
+        mark_voice_event(call_control_id, "answer_request_sent")
         answer_resp = await client.post(
             f"{TELNYX_API}/calls/{call_control_id}/actions/answer",
             headers={
@@ -386,9 +398,11 @@ async def handle_voice_webhook(body: dict[str, Any], raw_body: bytes, headers: d
             json={},
         )
         if answer_resp.is_success:
+            mark_voice_event(call_control_id, "answer_accepted", status_code=answer_resp.status_code)
             logger.info("Answered call %s", call_control_id)
             _set_pending_stream(call_control_id, stream_url)
         else:
+            mark_voice_event(call_control_id, "answer_failed", status_code=answer_resp.status_code)
             logger.error("Answer failed: %s", answer_resp.text)
             _update_call_log(supabase, call_control_id, {"status": "failed"})
             from fastapi import HTTPException

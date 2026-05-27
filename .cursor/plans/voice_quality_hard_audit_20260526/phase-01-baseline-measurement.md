@@ -55,3 +55,25 @@ The current logs contain useful markers, but they are scattered across Telnyx we
 ## Owner Notes
 
 This phase should land before any aggressive debounce/STT tuning. It gives us the scoreboard.
+
+## Implementation Notes
+
+Status: implemented on 2026-05-27.
+
+- Runtime trace helper: `backend/voice/trace.py`
+- Log parser: `scripts/voice_trace_report.py`
+- Unit coverage: `backend/tests/test_voice_trace.py`
+
+To inspect live-call timing after a backend run, scan logs for `[VOICE_TRACE] summary` or pipe logs into:
+
+```bash
+python scripts/voice_trace_report.py /path/to/backend.log
+```
+
+The most important first-pass metrics are:
+
+- `webhook_to_first_assistant_audio_ms`
+- `first_inbound_audio_to_first_final_transcript_ms`
+- per-turn `commit_to_first_audio_ms`
+- per-turn `grok_ms`
+- per-turn `calendar_tool_ms`

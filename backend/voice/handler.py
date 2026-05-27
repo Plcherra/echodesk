@@ -25,6 +25,7 @@ from voice.send_media import send_media
 from voice.pipeline import run_voice_pipeline
 from prompts.fetch import get_cached_prompt, fetch_prompt
 from voice_presets import resolve_tts_voice
+from voice.trace import mark_voice_event
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,8 @@ async def handle_voice_stream_connection(ws: WebSocket) -> None:
     receptionist_id = params.get("receptionist_id", "")
     call_sid = params.get("call_sid", "")
     caller_phone = (params.get("caller_phone") or "").strip() or None
+    if call_sid:
+        mark_voice_event(call_sid, "websocket_accepted", receptionist_id=receptionist_id, direction=params.get("direction"))
 
     # Duplicate check disabled temporarily - was potentially causing 403.
     # If duplicate, both run; first to send media wins. Re-enable if needed.
@@ -202,6 +205,7 @@ async def handle_voice_stream_connection(ws: WebSocket) -> None:
             return
 
     try:
+        first_inbound_audio_seen = False
         while True:
             msg = await ws.receive()
             data = msg.get("text") or (msg.get("bytes") and msg["bytes"].decode("utf-8", errors="replace")) or ""
@@ -209,6 +213,9 @@ async def handle_voice_stream_connection(ws: WebSocket) -> None:
                 data = data.decode("utf-8", errors="replace")
             chunk = parse_message_chunk(data)
             if chunk and pipeline_send_audio:
+                if call_sid and not first_inbound_audio_seen:
+                    first_inbound_audio_seen = True
+                    mark_voice_event(call_sid, "first_inbound_audio", chunk_bytes=len(chunk))
                 pipeline_send_audio(chunk)
     except Exception as e:
         if "disconnect" not in str(e).lower():
@@ -222,3 +229,5 @@ async def handle_voice_stream_connection(ws: WebSocket) -> None:
             active_by_call_sid.pop(call_sid, None)
         if pipeline_stop:
             pipeline_stop()
+        if call_sid:
+            mark_voice_event(call_sid, "websocket_disconnected")
