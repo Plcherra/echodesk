@@ -53,3 +53,24 @@ The caller's first impression is formed before the AI understands anything. If t
 ## Owner Notes
 
 This phase should likely create the most obvious perceived quality improvement.
+
+## Implementation Notes
+
+Status: implemented on 2026-05-27.
+
+- Startup audio helper: `backend/voice/pipeline.py::_send_startup_audio`
+- Startup behavior coverage: `backend/tests/test_voice_startup_audio.py`
+- Default TTS cache is now filesystem-backed at `/tmp/echodesk-tts-cache` unless overridden by env.
+- When both recording consent and greeting are present, startup audio is combined by default:
+
+```text
+This call may be recorded. Thanks for calling, this is Eve. How can I help?
+```
+
+This keeps consent first while eliminating the extra post-consent greeting synthesis gap. Set `VOICE_COMBINE_CONSENT_AND_GREETING=false` to preserve separate utterances.
+
+After deploy, compare `[VOICE_TRACE] summary` values before/after, especially:
+
+- `webhook_to_first_assistant_audio_ms`
+- `websocket_to_deepgram_connected_ms`
+- startup TTS labels: `startup_combined`, `consent`, `greeting`

@@ -68,13 +68,14 @@ class Settings(BaseSettings):
     tts_max_requests_per_call: int = 30  # Env: TTS_MAX_REQUESTS_PER_CALL
     tts_daily_char_cap: int = 0  # 0 = disabled; Env: TTS_DAILY_CHAR_CAP
     # Cache: none | memory | filesystem | redis_gcs
-    tts_cache_backend: str = "none"  # Env: TTS_CACHE_BACKEND
+    tts_cache_backend: str = "filesystem"  # Env: TTS_CACHE_BACKEND
     tts_cache_ttl_seconds: int = 7776000  # 90 days; Env: TTS_CACHE_TTL_SECONDS
     tts_cache_memory_max_entries: int = 500  # Env: TTS_CACHE_MEMORY_MAX_ENTRIES
-    tts_cache_filesystem_dir: str = ""  # Env: TTS_CACHE_FILESYSTEM_DIR
+    tts_cache_filesystem_dir: str = "/tmp/echodesk-tts-cache"  # Env: TTS_CACHE_FILESYSTEM_DIR
     tts_cache_redis_url: str = ""  # Env: TTS_CACHE_REDIS_URL
     tts_cache_gcs_bucket: str = ""  # Env: TTS_CACHE_GCS_BUCKET
     tts_cache_gcs_prefix: str = "tts-cache/"  # Env: TTS_CACHE_GCS_PREFIX
+    voice_combine_consent_and_greeting: bool = True  # Env: VOICE_COMBINE_CONSENT_AND_GREETING
     # Retries
     tts_google_max_retries: int = 5  # Env: TTS_GOOGLE_MAX_RETRIES
     tts_google_retry_base_seconds: float = 0.5  # Env: TTS_GOOGLE_RETRY_BASE_SECONDS

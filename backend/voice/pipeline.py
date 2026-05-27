@@ -88,6 +88,72 @@ def _deterministic_identity_reply(user_text: str, config: dict[str, Any]) -> str
     return f"I'm {identity}. How can I help?"
 
 
+async def _maybe_mark_consent_played(config: dict[str, Any]) -> None:
+    on_consent_played = config.get("on_consent_played")
+    if not callable(on_consent_played):
+        return
+    try:
+        if asyncio.iscoroutinefunction(on_consent_played):
+            await on_consent_played()
+        else:
+            on_consent_played()
+    except Exception as e:
+        logger.warning("[voice/stream] on_consent_played callback failed: %s", e)
+
+
+async def _send_startup_audio(
+    config: dict[str, Any],
+    on_audio: Callable[[bytes], Awaitable[None]],
+    on_error: Optional[Callable[[Exception], None]],
+    tts_failure_logged: list[bool],
+) -> None:
+    """Play startup consent/greeting in the fastest legally-safe shape."""
+    consent_phrase = (config.get("consent_phrase") or "").strip()
+    greeting = (config.get("greeting") or "").strip()
+    has_consent_callback = callable(config.get("on_consent_played"))
+
+    if consent_phrase and greeting and has_consent_callback and settings.voice_combine_consent_and_greeting:
+        startup_text = f"{consent_phrase.rstrip()} {greeting.lstrip()}"
+        mark_voice_event(
+            config.get("call_control_id"),
+            "startup_audio_combined",
+            chars=len(startup_text),
+        )
+        await generate_and_send_tts(
+            startup_text,
+            config,
+            on_audio,
+            on_error,
+            _tts_failure_logged=tts_failure_logged,
+            trace_label="startup_combined",
+        )
+        await _maybe_mark_consent_played(config)
+        logger.info("[voice/stream] recording consent + greeting sent as combined startup audio")
+        return
+
+    if consent_phrase and has_consent_callback:
+        await generate_and_send_tts(
+            consent_phrase,
+            config,
+            on_audio,
+            on_error,
+            _tts_failure_logged=tts_failure_logged,
+            trace_label="consent",
+        )
+        await _maybe_mark_consent_played(config)
+        logger.info("[voice/stream] recording consent phrase sent; consent marked as played for this call")
+
+    if greeting:
+        await generate_and_send_tts(
+            greeting,
+            config,
+            on_audio,
+            on_error,
+            _tts_failure_logged=tts_failure_logged,
+            trace_label="greeting",
+        )
+
+
 async def run_voice_pipeline(
     config: dict[str, Any],
     on_audio: Callable[[bytes], Awaitable[None]],
@@ -695,31 +761,7 @@ async def run_voice_pipeline(
     )
     mark_voice_event(config.get("call_control_id"), "deepgram_connected")
 
-    # Play recording consent phrase first when configured; then mark consent as played for CDR
-    on_consent_played = config.get("on_consent_played")
-    consent_phrase = config.get("consent_phrase")
-    if consent_phrase and callable(on_consent_played):
-        await generate_and_send_tts(
-            consent_phrase, config, on_audio, on_error,
-            _tts_failure_logged=tts_failure_logged,
-            trace_label="consent",
-        )
-        try:
-            if asyncio.iscoroutinefunction(on_consent_played):
-                await on_consent_played()
-            else:
-                on_consent_played()
-        except Exception as e:
-            logger.warning("[voice/stream] on_consent_played callback failed: %s", e)
-        logger.info("[voice/stream] recording consent phrase sent; consent marked as played for this call")
-    if config.get("greeting"):
-        asyncio.create_task(
-            generate_and_send_tts(
-                config["greeting"], config, on_audio, on_error,
-                _tts_failure_logged=tts_failure_logged,
-                trace_label="greeting",
-            )
-        )
+    await _send_startup_audio(config, on_audio, on_error, tts_failure_logged)
 
     def send_audio(chunk: bytes) -> None:
         if dg_ws:
