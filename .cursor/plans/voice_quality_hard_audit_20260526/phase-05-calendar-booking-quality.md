@@ -14,6 +14,7 @@ The main business value is booking. A slow or unclear booking conversation hurts
 - `backend/voice/pipeline_templates.py` avoids inventing availability and gives bucket-first replies.
 - `backend/calendar_api/calendar_handler.py` enforces service-first behavior when services exist.
 - The live test booked an appointment, but the "9 AM" attempt previously failed to get a clear reply.
+- Phase 05 slice 1 adds tool-specific recovery replies for missing date/time, service selection, unavailable slots, location questions, and calendar errors.
 
 ## Implementation Plan
 
@@ -28,11 +29,13 @@ The main business value is booking. A slow or unclear booking conversation hurts
 2. Improve unavailable-slot behavior:
    - if caller asks for a specific unavailable time, speak the closest available periods or slots.
    - if no exact time is available, do not silently fall through to LLM.
+   - Status: slice 1 complete for `slot_unavailable` tool results with suggested slot readback.
 3. Add "one question at a time" recovery:
    - missing date
    - missing time
    - missing service
    - missing name if required
+   - Status: slice 1 complete for calendar tool failures, with deterministic one-question replies.
 4. Add tool time budgets:
    - availability soft budget
    - booking soft budget
@@ -55,6 +58,7 @@ The main business value is booking. A slow or unclear booking conversation hurts
 - Add tests for first/second/third slot, daypart choice, and "yes that works."
 - Add timeout simulation tests for calendar tool.
 - Add transcript scenario tests for the full booking flow.
+- Added template tests for missing date, service selection handoff, unavailable slot suggestions, and calendar-error recovery.
 
 ## Owner Notes
 

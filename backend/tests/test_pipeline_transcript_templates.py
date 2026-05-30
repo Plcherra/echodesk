@@ -77,6 +77,31 @@ def test_template_check_availability_failure_fixed_copy():
     assert out and "couldn't fetch availability" in out.lower()
 
 
+def test_template_check_availability_missing_date_asks_one_question():
+    payload = json.dumps({"success": False, "error": "date_missing"})
+    out = pipeline_templates.template_from_tool_result(
+        "check_availability",
+        payload,
+        requested_date=None,
+        requested_time="9 am",
+        voice_session=None,
+    )
+    assert out == "Which day should I check for 9 am?"
+
+
+def test_template_check_availability_service_selection_uses_backend_message():
+    msg = "Sure - what would you like to book?"
+    payload = json.dumps({"success": False, "error": "service_selection_required", "message": msg})
+    out = pipeline_templates.template_from_tool_result(
+        "check_availability",
+        payload,
+        requested_date="tomorrow",
+        requested_time=None,
+        voice_session=None,
+    )
+    assert out == msg
+
+
 def test_template_check_availability_success_bucket_then_times():
     payload = json.dumps(
         {
@@ -152,6 +177,55 @@ def test_template_check_availability_list_exact_times_when_requested():
     assert "9:00 am" in out.lower()
     assert "10:00 am" in out.lower()
     assert "11:00 am" in out.lower()
+
+
+def test_template_create_appointment_slot_unavailable_offers_suggestions():
+    payload = json.dumps(
+        {
+            "success": False,
+            "error": "slot_unavailable",
+            "suggested_slots": [
+                "2026-04-11T15:00:00-04:00",
+                "2026-04-11T15:30:00-04:00",
+                "2026-04-11T16:00:00-04:00",
+            ],
+        }
+    )
+    out = pipeline_templates.template_from_tool_result(
+        "create_appointment",
+        payload,
+        requested_date="tomorrow",
+        requested_time="2 pm",
+        voice_session=None,
+    )
+    assert out
+    assert "no longer available" in out.lower()
+    assert "3:00 pm, 3:30 pm, or 4:00 pm" in out.lower()
+    assert "which works best" in out.lower()
+
+
+def test_template_create_appointment_missing_date_asks_one_question():
+    payload = json.dumps({"success": False, "error": "date_missing"})
+    out = pipeline_templates.template_from_tool_result(
+        "create_appointment",
+        payload,
+        requested_date=None,
+        requested_time=None,
+        voice_session=None,
+    )
+    assert out == "What day and time should I book it for?"
+
+
+def test_template_create_appointment_calendar_error_clear_recovery():
+    payload = json.dumps({"success": False, "error": "calendar_internal_error"})
+    out = pipeline_templates.template_from_tool_result(
+        "create_appointment",
+        payload,
+        requested_date="tomorrow",
+        requested_time="2 pm",
+        voice_session=None,
+    )
+    assert out == "I'm having trouble creating that appointment right now. Could you try again in a moment?"
 
 
 def test_unavailable_requested_time_reply_uses_last_periods():

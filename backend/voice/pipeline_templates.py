@@ -210,6 +210,60 @@ def deterministic_farewell_reply(user_text: str) -> str:
     return "You too. Goodbye."
 
 
+def _tool_failure_reply(
+    tool_name: str,
+    parsed: dict[str, Any],
+    requested_date: Optional[str],
+    requested_time: Optional[str],
+) -> Optional[str]:
+    error = (parsed.get("error") or "").strip()
+    message = (parsed.get("message") or "").strip()
+
+    if error == "service_selection_required" and message:
+        return message
+
+    if error == "location_missing" and message:
+        return message
+
+    if error == "date_missing":
+        if tool_name == "check_availability":
+            if requested_time:
+                return f"Which day should I check for {requested_time}?"
+            return "Which day should I check?"
+        if tool_name == "create_appointment":
+            return "What day and time should I book it for?"
+
+    if error == "date_parse_failed":
+        if tool_name == "check_availability":
+            return "I didn't catch the day or time. What day should I check?"
+        if tool_name == "create_appointment":
+            return "I didn't catch the day or time. What day and time should I book?"
+
+    if error == "slot_unavailable":
+        slots = parsed.get("suggested_slots") or parsed.get("exact_slots") or []
+        if isinstance(slots, list) and slots:
+            return f"That time is no longer available. I found {slots_sentence(slots)}. Which works best?"
+        if requested_time:
+            date_part = f" on {requested_date}" if requested_date else ""
+            return f"I don't see {requested_time}{date_part} available. Want me to check another time?"
+        return "That time is no longer available. Want me to check another time?"
+
+    if error in {"calendar_internal_error", "calendar_error", "calendar_not_configured"}:
+        if tool_name == "create_appointment":
+            return "I'm having trouble creating that appointment right now. Could you try again in a moment?"
+        if tool_name == "check_availability":
+            return "I'm having trouble reaching the calendar right now. Could you try again in a moment?"
+
+    if message and len(message) <= 180:
+        return message
+
+    if tool_name == "check_availability":
+        return "I couldn't fetch availability just now. Want me to try a different day?"
+    if tool_name == "create_appointment":
+        return "I couldn't complete that booking yet. Could you repeat the date and time?"
+    return None
+
+
 def template_from_tool_result(
     tool_name: str,
     result_json: str,
@@ -224,11 +278,7 @@ def template_from_tool_result(
     except Exception:
         return None
     if parsed.get("success") is not True:
-        if tool_name == "check_availability":
-            return "I couldn't fetch availability just now. Want me to try a different day?"
-        if tool_name == "create_appointment":
-            return "I couldn't complete that booking yet. Could you repeat the date and time?"
-        return None
+        return _tool_failure_reply(tool_name, parsed, requested_date, requested_time)
 
     if tool_name == "check_availability":
         slots = parsed.get("exact_slots") or parsed.get("suggested_slots") or []
