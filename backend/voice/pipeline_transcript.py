@@ -16,6 +16,8 @@ SHORT_UTTERANCE_WHITELIST = frozenset({
     "book", "booking", "pricing", "price", "tomorrow", "today",
     "9am", "9 am", "10am", "10 am", "11am", "11 am", "8am", "8 am",
     "can you hear me", "you there", "anybody there",
+    "book that", "book it", "the first one", "first one", "the second one",
+    "second one", "yes that works", "that works", "sounds good",
 })
 
 INCOMPLETE_PHRASE_ENDINGS = (
@@ -169,6 +171,16 @@ def contains_clear_intent(text: str) -> bool:
             "schedule",
         )
     ):
+        return True
+    if re.search(r"\b(do you have|any|anything)\b.*\b(today|tomorrow|morning|afternoon|evening)\b", norm):
+        return True
+    if re.search(r"\bcan you (do|make|book|schedule)\s+(?:me\s+)?(?:for\s+)?\d{1,2}\b", norm):
+        return True
+    if re.search(r"\b(book|take|pick|choose)\s+(that|it|this|the first|the second|the third)\b", norm):
+        return True
+    if re.search(r"\b(the )?(first|second|third|fourth) one\b", norm):
+        return True
+    if any(p in norm for p in ("yes that works", "that works", "works for me", "sounds good", "perfect book it")):
         return True
     if "?" in (text or "") and any(h in norm for h in INTENT_HINTS):
         return True

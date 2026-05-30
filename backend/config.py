@@ -49,6 +49,8 @@ class Settings(BaseSettings):
 
     # Voice AI
     deepgram_api_key: str = ""
+    deepgram_endpointing_ms: int = 250  # Env: DEEPGRAM_ENDPOINTING_MS
+    deepgram_utterance_end_ms: int = 1000  # Env: DEEPGRAM_UTTERANCE_END_MS
     grok_api_key: str = ""
 
     # TTS provider: google (Google Cloud Text-to-Speech only)
@@ -76,6 +78,8 @@ class Settings(BaseSettings):
     tts_cache_gcs_bucket: str = ""  # Env: TTS_CACHE_GCS_BUCKET
     tts_cache_gcs_prefix: str = "tts-cache/"  # Env: TTS_CACHE_GCS_PREFIX
     voice_combine_consent_and_greeting: bool = True  # Env: VOICE_COMBINE_CONSENT_AND_GREETING
+    voice_debounce_ms: int = 1200  # Env: VOICE_DEBOUNCE_MS
+    voice_debounce_fallback_ms: int = 800  # Env: VOICE_DEBOUNCE_FALLBACK_MS
     # Retries
     tts_google_max_retries: int = 5  # Env: TTS_GOOGLE_MAX_RETRIES
     tts_google_retry_base_seconds: float = 0.5  # Env: TTS_GOOGLE_RETRY_BASE_SECONDS

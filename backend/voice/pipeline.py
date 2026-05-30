@@ -18,14 +18,14 @@ from voice.deepgram_client import create_deepgram_live
 from voice.grok_client import chat, chat_with_tools
 from voice.intent_router import resolve_calendar_fast_path
 from voice.pipeline_constants import (
-    DEBOUNCE_MS,
-    DEBOUNCE_MS_FALLBACK,
     FAST_ACK_AVAILABILITY,
     FAST_ACK_BOOKING,
     MAX_HISTORY,
     MIN_CONFIDENCE,
     SHORT_PAUSE_MAX_WORDS,
     VOICE_OUTPUT_INSTRUCTIONS,
+    voice_debounce_fallback_ms,
+    voice_debounce_ms,
 )
 from voice.pipeline_templates import (
     deterministic_farewell_reply,
@@ -552,7 +552,7 @@ async def run_voice_pipeline(
                 mark_voice_event(config.get("call_control_id"), "dispatch_started", path="queued_flush", commit_id=cid2)
                 grok_task = asyncio.create_task(process_user_input())
 
-    def _schedule_trigger(alts: list) -> None:
+    def _schedule_trigger(alts: list, *, trigger_source: str) -> None:
         """Schedule Grok after debounce. Only one response per user turn."""
         nonlocal debounce_task, turn_complete_transcript, turn_complete_confidence, grok_task, commit_seq
 
@@ -613,6 +613,7 @@ async def run_voice_pipeline(
             "commit_enqueued",
             commit_id=commit_id,
             reason=commit_reason,
+            trigger_source=trigger_source,
             word_count=len(commit_text.lower().split()),
         )
 
@@ -643,10 +644,10 @@ async def run_voice_pipeline(
             return
 
         if word_count <= SHORT_PAUSE_MAX_WORDS:
-            debounce_ms = DEBOUNCE_MS_FALLBACK
+            debounce_ms = voice_debounce_fallback_ms()
             logger.info("[TURN_GUARD] short_utterance_fallback_trigger transcript=%s", commit_text[:80])
         else:
-            debounce_ms = DEBOUNCE_MS
+            debounce_ms = voice_debounce_ms()
 
         snap_text, snap_conf, snap_id = commit_text, confidence, commit_id
 
@@ -701,7 +702,7 @@ async def run_voice_pipeline(
             if isinstance(msg.get("channel"), dict):
                 alts = msg["channel"].get("alternatives") or []
             mark_voice_event(config.get("call_control_id"), "utterance_end", source="deepgram_utterance_end")
-            _schedule_trigger(alts)
+            _schedule_trigger(alts, trigger_source="utterance_end")
             return
 
         channel = msg.get("channel")
@@ -738,13 +739,14 @@ async def run_voice_pipeline(
                     "[TURN_GUARD] final_short_utterance_trigger transcript=%s",
                     transcript[:80],
                 )
-                _schedule_trigger(alts)
+                _schedule_trigger(alts, trigger_source="final_short_utterance")
                 return
 
         if speech_final:
             logger.debug("[turn] speech_final=True, scheduling trigger")
+            mark_voice_event(config.get("call_control_id"), "speech_final", source="deepgram_results")
             mark_voice_event(config.get("call_control_id"), "utterance_end", source="speech_final")
-            _schedule_trigger(alts)
+            _schedule_trigger(alts, trigger_source="speech_final")
 
     def on_dg_error(err: Exception) -> None:
         logger.error("Deepgram error: %s", err)

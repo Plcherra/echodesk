@@ -24,7 +24,7 @@ def test_voice_trace_builds_call_and_turn_durations():
     trace.mark("deepgram_connected")
     trace.mark("first_inbound_audio")
     trace.mark("first_final_transcript")
-    trace.mark("commit_enqueued", commit_id=1, reason="speech_final")
+    trace.mark("commit_enqueued", commit_id=1, reason="speech_final", trigger_source="speech_final")
     trace.mark("dispatch_started", commit_id=1, path="process")
     trace.mark("grok_request_sent", commit_id=1)
     trace.mark("grok_response_received", commit_id=1)
@@ -42,6 +42,7 @@ def test_voice_trace_builds_call_and_turn_durations():
     assert "commit_to_first_audio_ms" in summary["turns"][0]
     assert "grok_ms" in summary["turns"][0]
     assert "calendar_tool_ms" in summary["turns"][0]
+    assert summary["turns"][0]["trigger_source"] == "speech_final"
 
 
 def test_global_trace_finishes_once():

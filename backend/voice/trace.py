@@ -124,6 +124,8 @@ def _build_turn_summaries(events: list[TraceEvent]) -> list[dict[str, Any]]:
             rec["commit_enqueued_ms"] = e.elapsed_ms
             if "reason" in e.attrs:
                 rec["reason"] = e.attrs["reason"]
+            if "trigger_source" in e.attrs:
+                rec["trigger_source"] = e.attrs["trigger_source"]
         elif e.name == "dispatch_started":
             rec.setdefault("dispatch_started_ms", e.elapsed_ms)
             if "path" in e.attrs:

@@ -28,6 +28,25 @@ def test_contains_clear_intent_time_availability_question():
     assert pipeline_transcript.contains_clear_intent("Do you have nine AM?") is True
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "do you have tomorrow morning",
+        "can you do 9",
+        "book that",
+        "the first one",
+        "yes that works",
+    ],
+)
+def test_contains_clear_intent_immediate_turn_patterns(text: str):
+    assert pipeline_transcript.contains_clear_intent(text) is True
+
+
+@pytest.mark.parametrize("text", ["can you", "tomorrow at", "I need"])
+def test_incomplete_transcript_still_waits(text: str):
+    assert pipeline_transcript.is_incomplete_transcript(text) is True
+
+
 def test_is_farewell_courtesy_intent():
     assert pipeline_transcript.is_farewell_courtesy_intent("Thank you. Have a great night.") is True
     assert pipeline_transcript.is_farewell_courtesy_intent("good morning") is False
