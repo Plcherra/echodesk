@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from config import settings
+from voice import tts_facade
 from voice.google_tts import assert_voice_allowed
 from voice.tts_cache import MemoryLRUTtsCache, build_cache_key
 from voice.tts_chars import (
@@ -13,7 +15,8 @@ from voice.tts_chars import (
     ssml_billable_counts,
 )
 from voice.tts_facade import _truncate_text
-from voice_presets import google_voice_allowlist
+from voice.tts_pronunciation import normalize_pronunciation_for_tts
+from voice_presets import ResolvedTtsVoice, google_voice_allowlist
 
 
 def test_normalize_text_for_cache_key_stable() -> None:
@@ -82,3 +85,49 @@ async def test_memory_cache_hit() -> None:
 def test_google_voice_allowlist_non_empty() -> None:
     wl = google_voice_allowlist()
     assert len(wl) >= 1
+
+
+def test_pronunciation_normalizes_phone_numbers() -> None:
+    out = normalize_pronunciation_for_tts("Call back at (617) 613-7764.")
+    assert out == "Call back at 6 1 7, 6 1 3, 7 7 6 4."
+
+
+def test_pronunciation_normalizes_prices() -> None:
+    assert normalize_pronunciation_for_tts("That is $35.") == "That is 35 dollars."
+    assert normalize_pronunciation_for_tts("That is $35.50.") == "That is 35 dollars and 50 cents."
+
+
+def test_pronunciation_normalizes_times() -> None:
+    assert normalize_pronunciation_for_tts("You are booked for 3:30pm.") == "You are booked for 3 30 P M."
+    assert normalize_pronunciation_for_tts("You are booked for 9 AM.") == "You are booked for 9 A M."
+
+
+def test_pronunciation_normalizes_common_acronyms() -> None:
+    out = normalize_pronunciation_for_tts("Your AI sent an SMS with the URL and ID.")
+    assert out == "Your A I sent an S M S with the U R L and I D."
+
+
+@pytest.mark.asyncio
+async def test_warm_tts_phrase_cache_uses_pronunciation_text(monkeypatch) -> None:
+    captured: list[str] = []
+
+    async def fake_synthesize(text: str, voice: ResolvedTtsVoice, *, use_backup_voice: bool = False) -> bytes:
+        captured.append(text)
+        return b"audio"
+
+    monkeypatch.setattr(settings, "tts_cache_backend", "memory")
+    monkeypatch.setattr(tts_facade, "_google_synthesize_to_mulaw", fake_synthesize)
+
+    count = await tts_facade.warm_tts_phrase_cache(
+        {
+            "resolved_tts_voice": ResolvedTtsVoice(
+                google_language_code="en-US",
+                google_voice_name="en-US-Neural2-C",
+                model_id=None,
+            )
+        },
+        phrases=("Call +16176137764 at 3:30pm.",),
+    )
+
+    assert count == 1
+    assert captured == ["Call 6 1 7, 6 1 3, 7 7 6 4 at 3 30 P M."]

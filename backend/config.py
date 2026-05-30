@@ -77,6 +77,7 @@ class Settings(BaseSettings):
     tts_cache_redis_url: str = ""  # Env: TTS_CACHE_REDIS_URL
     tts_cache_gcs_bucket: str = ""  # Env: TTS_CACHE_GCS_BUCKET
     tts_cache_gcs_prefix: str = "tts-cache/"  # Env: TTS_CACHE_GCS_PREFIX
+    tts_warm_common_phrases: bool = True  # Env: TTS_WARM_COMMON_PHRASES
     voice_combine_consent_and_greeting: bool = True  # Env: VOICE_COMBINE_CONSENT_AND_GREETING
     voice_debounce_ms: int = 1200  # Env: VOICE_DEBOUNCE_MS
     voice_debounce_fallback_ms: int = 800  # Env: VOICE_DEBOUNCE_FALLBACK_MS

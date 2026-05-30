@@ -11,6 +11,7 @@ from typing import Any, Awaitable, Callable, Optional
 from config import settings
 from voice import tts_chars
 from voice.tts_sanitizer import sanitize_for_tts
+from voice.tts_pronunciation import normalize_pronunciation_for_tts
 from voice.google_tts import (
     GoogleTtsSynthesizeOptions,
     assert_voice_allowed,
@@ -23,6 +24,16 @@ from voice_presets import ResolvedTtsVoice, google_voice_allowlist
 logger = logging.getLogger(__name__)
 
 _cache = None
+
+COMMON_TTS_CACHE_WARM_PHRASES: tuple[str, ...] = (
+    "Checking now.",
+    "Got it. Booking now.",
+    "One sec.",
+    "Which day should I check?",
+    "What day and time should I book it for?",
+    "That time is no longer available. Want me to check another time?",
+    "I'm having trouble reaching the calendar right now. Could you try again in a moment?",
+)
 
 
 def _get_cache():
@@ -74,6 +85,12 @@ def _truncate_text(text: str, max_chars: int) -> str:
     if max_chars <= 3:
         return t[:max_chars]
     return t[: max_chars - 3].rstrip() + "..."
+
+
+def _prepare_text_for_tts(text: str) -> str:
+    text = sanitize_for_tts(text)
+    text = normalize_pronunciation_for_tts(text)
+    return (text or "").strip()
 
 
 async def _send_mulaw_chunks(
@@ -186,7 +203,7 @@ async def generate_and_send_tts(
     """Generate TTS and send via callback (Google Cloud TTS + chunking)."""
     if not text or not text.strip():
         return
-    text = sanitize_for_tts(text)
+    text = _prepare_text_for_tts(text)
     if not text or not text.strip():
         return
     tts_logged = _tts_failure_logged if _tts_failure_logged is not None else [False]
@@ -337,6 +354,28 @@ async def generate_and_send_tts(
                 )
 
 
+async def warm_tts_phrase_cache(config: dict[str, Any], phrases: tuple[str, ...] | None = None) -> int:
+    """Best-effort warmup for frequent short spoken phrases."""
+    if (settings.tts_cache_backend or "none").strip().lower() == "none":
+        return 0
+    voice: ResolvedTtsVoice | None = config.get("resolved_tts_voice")
+    if voice is None:
+        return 0
+    warmed = 0
+    for phrase in phrases or COMMON_TTS_CACHE_WARM_PHRASES:
+        prepared = _prepare_text_for_tts(phrase)
+        if not prepared:
+            continue
+        try:
+            await _google_synthesize_to_mulaw(prepared, voice, use_backup_voice=False)
+            warmed += 1
+        except Exception as err:
+            logger.warning("[TTS] common phrase warmup failed phrase=%r error=%s", phrase[:40], err)
+    if warmed:
+        logger.info("[TTS] common phrase cache warmup complete count=%s", warmed)
+    return warmed
+
+
 async def google_preview_mp3(text: str, voice: ResolvedTtsVoice) -> bytes:
     """MP3 preview bytes for mobile voice preset (Google provider)."""
     allowlist = google_voice_allowlist()
@@ -353,6 +392,7 @@ async def google_preview_mp3(text: str, voice: ResolvedTtsVoice) -> bytes:
         audio_encoding="MP3",
         sample_rate_hertz=settings.google_tts_preview_sample_rate_hertz,
     )
+    text = _prepare_text_for_tts(text)
     return await synthesize_text_with_retry(
         text,
         opts,

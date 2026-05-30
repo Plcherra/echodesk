@@ -57,7 +57,7 @@ from voice.tool_dispatch import (
     make_calendar_tool_exec,
     normalize_tool_args,
 )
-from voice.tts_facade import generate_and_send_tts
+from voice.tts_facade import generate_and_send_tts, warm_tts_phrase_cache
 from voice.trace import mark_voice_event
 
 logger = logging.getLogger(__name__)
@@ -812,6 +812,8 @@ async def run_voice_pipeline(
     mark_voice_event(config.get("call_control_id"), "deepgram_connected")
 
     await _send_startup_audio(config, on_audio, on_error, tts_failure_logged)
+    if settings.tts_warm_common_phrases:
+        asyncio.create_task(warm_tts_phrase_cache(config))
 
     def send_audio(chunk: bytes) -> None:
         if dg_ws:
