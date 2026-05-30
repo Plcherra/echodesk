@@ -57,7 +57,7 @@ from voice.tool_dispatch import (
     make_calendar_tool_exec,
     normalize_tool_args,
 )
-from voice.tts_facade import generate_and_send_tts, warm_tts_phrase_cache
+from voice.tts_facade import generate_and_send_tts, interrupt_tts_playback, warm_tts_phrase_cache
 from voice.trace import mark_voice_event
 
 logger = logging.getLogger(__name__)
@@ -209,9 +209,23 @@ async def run_voice_pipeline(
     active_debounce_commit_id: list[Optional[int]] = [None]
     first_final_transcript_seen = False
 
+    def _clear_assistant_audio(reason: str) -> None:
+        clear_cb = config.get("clear_assistant_audio")
+        if not callable(clear_cb):
+            return
+        mark_voice_event(config.get("call_control_id"), "assistant_audio_clear_requested", reason=reason)
+        try:
+            result = clear_cb()
+            if asyncio.iscoroutine(result):
+                asyncio.create_task(result)
+        except Exception as e:
+            logger.warning("[voice/stream] clear_assistant_audio callback failed: %s", e)
+
     def _cancel_pending_response() -> None:
         """Cancel debounce and in-flight Grok. Call when new caller speech arrives."""
         nonlocal debounce_task, grok_task
+        if interrupt_tts_playback(config, reason="caller_speech"):
+            _clear_assistant_audio("caller_speech")
         if debounce_task and not debounce_task.done():
             debounce_task.cancel()
             debounce_task = None
@@ -827,7 +841,7 @@ async def run_voice_pipeline(
             debounce_task.cancel()
         if grok_task and not grok_task.done():
             grok_task.cancel()
-        if dg_task and not grok_task.done():
+        if dg_task and not dg_task.done():
             dg_task.cancel()
         if dg_ws:
             asyncio.create_task(dg_ws.close())

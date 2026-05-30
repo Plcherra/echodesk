@@ -21,7 +21,7 @@ from voice.constants import (
     get_prompt_base,
 )
 from supabase_client import create_service_role_client
-from voice.send_media import send_media
+from voice.send_media import send_clear, send_media
 from voice.pipeline import run_voice_pipeline
 from prompts.fetch import get_cached_prompt, fetch_prompt
 from voice_presets import resolve_tts_voice
@@ -69,9 +69,15 @@ async def handle_voice_stream_connection(ws: WebSocket) -> None:
     if call_sid:
         mark_voice_event(call_sid, "websocket_accepted", receptionist_id=receptionist_id, direction=params.get("direction"))
 
-    # Duplicate check disabled temporarily - was potentially causing 403.
-    # If duplicate, both run; first to send media wins. Re-enable if needed.
     if call_sid:
+        previous_ws = active_by_call_sid.get(call_sid)
+        if previous_ws is not None and previous_ws is not ws and previous_ws.client_state.name == "CONNECTED":
+            logger.warning("[voice/stream] duplicate stream replaced for call_sid=%s", call_sid)
+            mark_voice_event(call_sid, "websocket_duplicate_replaced")
+            try:
+                await previous_ws.close(code=1000, reason="Duplicate stream replaced")
+            except Exception:
+                pass
         active_by_call_sid[call_sid] = ws
 
     # Initial silence
@@ -192,6 +198,15 @@ async def handle_voice_stream_connection(ws: WebSocket) -> None:
                         await send_media(ws, buf)
                     except Exception:
                         pass
+
+            async def clear_assistant_audio() -> None:
+                if ws.client_state.name == "CONNECTED":
+                    try:
+                        await send_clear(ws)
+                    except Exception:
+                        pass
+
+            config["clear_assistant_audio"] = clear_assistant_audio
 
             pipeline_send_audio, pipeline_stop = await run_voice_pipeline(
                 config,

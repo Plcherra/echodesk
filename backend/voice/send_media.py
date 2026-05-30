@@ -13,3 +13,10 @@ async def send_media(ws: WebSocket, buffer: bytes) -> None:
     payload = base64.b64encode(buffer).decode("ascii")
     msg = json.dumps({"event": "media", "media": {"payload": payload}})
     await ws.send_text(msg)
+
+
+async def send_clear(ws: WebSocket) -> None:
+    """Ask Telnyx to stop current media playback and clear queued media."""
+    if ws.client_state.name != "CONNECTED":
+        return
+    await ws.send_text(json.dumps({"event": "clear"}))

@@ -36,6 +36,73 @@ COMMON_TTS_CACHE_WARM_PHRASES: tuple[str, ...] = (
 )
 
 
+def _playback_state(config: dict[str, Any]) -> dict[str, Any]:
+    return config.setdefault(
+        "tts_playback_state",
+        {
+            "utterance_seq": 0,
+            "active_utterance_id": None,
+            "status": "idle",
+            "interrupted_utterance_id": None,
+        },
+    )
+
+
+def begin_tts_utterance(config: dict[str, Any], *, label: str | None = None) -> int:
+    """Start a cancellable assistant audio utterance and return its id."""
+    state = _playback_state(config)
+    state["utterance_seq"] = int(state.get("utterance_seq") or 0) + 1
+    utterance_id = int(state["utterance_seq"])
+    state["active_utterance_id"] = utterance_id
+    state["interrupted_utterance_id"] = None
+    state["status"] = "synthesizing"
+    state["label"] = label
+    return utterance_id
+
+
+def mark_tts_sending(config: dict[str, Any], utterance_id: int) -> bool:
+    state = _playback_state(config)
+    if state.get("active_utterance_id") != utterance_id or state.get("interrupted_utterance_id") == utterance_id:
+        return False
+    state["status"] = "sending"
+    return True
+
+
+def finish_tts_utterance(config: dict[str, Any], utterance_id: int) -> None:
+    state = _playback_state(config)
+    if state.get("active_utterance_id") == utterance_id:
+        state["status"] = "idle"
+        state["active_utterance_id"] = None
+
+
+def interrupt_tts_playback(config: dict[str, Any], *, reason: str = "caller_speech") -> bool:
+    """Mark current assistant audio interrupted. Returns True if an utterance was active."""
+    state = _playback_state(config)
+    active = state.get("active_utterance_id")
+    if active is None or state.get("status") in {"idle", "interrupted"}:
+        return False
+    state["interrupted_utterance_id"] = active
+    state["status"] = "interrupted"
+    state["interrupt_reason"] = reason
+    mark_voice_event(
+        config.get("call_control_id"),
+        "assistant_audio_interrupted",
+        commit_id=config.get("active_turn_commit_id"),
+        utterance_id=active,
+        reason=reason,
+    )
+    return True
+
+
+def is_tts_utterance_interrupted(config: dict[str, Any], utterance_id: int) -> bool:
+    state = _playback_state(config)
+    return (
+        state.get("active_utterance_id") != utterance_id
+        or state.get("interrupted_utterance_id") == utterance_id
+        or state.get("status") == "interrupted"
+    )
+
+
 def _get_cache():
     global _cache
     if _cache is None:
@@ -98,6 +165,8 @@ async def _send_mulaw_chunks(
     on_audio: Callable[[bytes], Awaitable[None]],
     chunk_bytes: int,
     *,
+    config: dict[str, Any] | None = None,
+    utterance_id: int | None = None,
     call_control_id: str | None = None,
     commit_id: int | None = None,
     label: str | None = None,
@@ -116,6 +185,22 @@ async def _send_mulaw_chunks(
         audio_bytes=len(audio),
     )
     for i in range(0, len(audio), chunk_bytes):
+        if config is not None and utterance_id is not None and is_tts_utterance_interrupted(config, utterance_id):
+            logger.info(
+                "[TTS] chunk_send_interrupted utterance_id=%s chunks_sent=%s",
+                utterance_id,
+                chunks_sent,
+            )
+            mark_voice_event(
+                call_control_id,
+                "tts_chunk_send_interrupted",
+                commit_id=commit_id,
+                label=label,
+                request_index=request_index,
+                utterance_id=utterance_id,
+                chunks_sent=chunks_sent,
+            )
+            return
         await on_audio(audio[i : i + chunk_bytes])
         chunks_sent += 1
     t_chunk_end = time.perf_counter()
@@ -262,6 +347,7 @@ async def generate_and_send_tts(
         )
         return
 
+    utterance_id = begin_tts_utterance(config, label=label)
     try:
         mark_voice_event(
             call_control_id,
@@ -271,8 +357,20 @@ async def generate_and_send_tts(
             request_index=request_index,
             voice=voice.google_voice_name,
             backup=False,
+            utterance_id=utterance_id,
         )
         audio = await _google_synthesize_to_mulaw(use_text, voice, use_backup_voice=False)
+        if not mark_tts_sending(config, utterance_id):
+            logger.info("[TTS] utterance_interrupted_before_send utterance_id=%s", utterance_id)
+            mark_voice_event(
+                call_control_id,
+                "tts_interrupted_before_send",
+                commit_id=commit_id,
+                label=label,
+                request_index=request_index,
+                utterance_id=utterance_id,
+            )
+            return
         mark_voice_event(
             call_control_id,
             "tts_synthesis_end",
@@ -281,16 +379,21 @@ async def generate_and_send_tts(
             request_index=request_index,
             audio_bytes=len(audio),
             backup=False,
+            utterance_id=utterance_id,
         )
         await _send_mulaw_chunks(
             audio,
             on_audio,
             settings.tts_mulaw_chunk_bytes,
+            config=config,
+            utterance_id=utterance_id,
             call_control_id=call_control_id,
             commit_id=commit_id,
             label=label,
             request_index=request_index,
         )
+        if not is_tts_utterance_interrupted(config, utterance_id):
+            finish_tts_utterance(config, utterance_id)
     except Exception as err:
         logger.exception("[TTS] Google primary voice failed: %s", err)
         mark_voice_event(
@@ -302,6 +405,7 @@ async def generate_and_send_tts(
             error=str(err),
         )
         try:
+            backup_utterance_id = begin_tts_utterance(config, label=label)
             mark_voice_event(
                 call_control_id,
                 "tts_synthesis_start",
@@ -310,8 +414,12 @@ async def generate_and_send_tts(
                 request_index=request_index,
                 voice=settings.google_tts_backup_voice_name,
                 backup=True,
+                utterance_id=backup_utterance_id,
             )
             audio = await _google_synthesize_to_mulaw(use_text, voice, use_backup_voice=True)
+            if not mark_tts_sending(config, backup_utterance_id):
+                logger.info("[TTS] backup_utterance_interrupted_before_send utterance_id=%s", backup_utterance_id)
+                return
             mark_voice_event(
                 call_control_id,
                 "tts_synthesis_end",
@@ -320,16 +428,21 @@ async def generate_and_send_tts(
                 request_index=request_index,
                 audio_bytes=len(audio),
                 backup=True,
+                utterance_id=backup_utterance_id,
             )
             await _send_mulaw_chunks(
                 audio,
                 on_audio,
                 settings.tts_mulaw_chunk_bytes,
+                config=config,
+                utterance_id=backup_utterance_id,
                 call_control_id=call_control_id,
                 commit_id=commit_id,
                 label=label,
                 request_index=request_index,
             )
+            if not is_tts_utterance_interrupted(config, backup_utterance_id):
+                finish_tts_utterance(config, backup_utterance_id)
         except Exception as err2:
             logger.exception("[TTS] Google backup voice failed: %s", err2)
             mark_voice_event(
