@@ -6,7 +6,9 @@ import asyncio
 import logging
 from typing import Optional
 
-from prompts.builder import build_receptionist_prompt
+from prompts.builder import CUSTOM_PROMPT_GUARDRAILS, build_receptionist_prompt
+from prompts.metrics import inspect_prompt
+from prompts.personas import infer_persona_key_from_voice_preset
 from voice.constants import DEFAULT_GREETING
 
 logger = logging.getLogger(__name__)
@@ -69,7 +71,7 @@ def clear_cached_prompt(call_control_id: str) -> None:
 
 
 async def fetch_prompt(receptionist_id: str, supabase) -> tuple[str, str, Optional[str], Optional[str], str, str]:
-    """Fetch prompt for receptionist from Supabase. Returns (prompt, greeting, voice_id, voice_preset_key, greeting_source)."""
+    """Fetch prompt for receptionist from Supabase."""
     if not receptionist_id or not receptionist_id.strip():
         return DEFAULT
     return await asyncio.to_thread(_build_from_supabase_sync, receptionist_id, supabase)
@@ -91,11 +93,13 @@ def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str,
     rec = rec_res.data[0]
     name = rec.get("name", "Receptionist")
     identity = (rec.get("assistant_identity") or "").strip() or name
+    voice_preset_key = (rec.get("voice_preset_key") or "").strip() or None
+    persona_key = infer_persona_key_from_voice_preset(voice_preset_key)
 
     # Precedence: system_prompt if set, else generated
     custom_prompt = (rec.get("system_prompt") or "").strip()
     if custom_prompt:
-        prompt = custom_prompt
+        prompt = f"{CUSTOM_PROMPT_GUARDRAILS}\n\nBusiness prompt:\n{custom_prompt}"
         if (rec.get("extra_instructions") or "").strip():
             prompt += f"\n\nAdditional instructions from the business:\n{rec['extra_instructions'].strip()}"
     else:
@@ -123,6 +127,7 @@ def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str,
             payment_settings=rec.get("payment_settings"),
             website_content=rec.get("website_content"),
             extra_instructions=rec.get("extra_instructions"),
+            persona_key=persona_key,
             compact=True,
         )
 
@@ -137,13 +142,25 @@ def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str,
 
     # Precedence: voice_id if set, else None (caller uses env default)
     voice_id = (rec.get("voice_id") or "").strip() or None
-    voice_preset_key = (rec.get("voice_preset_key") or "").strip() or None
+    metrics = inspect_prompt(prompt)
+    if metrics.violations:
+        logger.warning(
+            "[PROMPT_METRICS] receptionist_id=%s persona=%s violations=%s",
+            receptionist_id,
+            persona_key,
+            ",".join(metrics.violations),
+        )
 
     logger.info(
-        "[receptionist config] receptionist_id=%s prompt_source=%s greeting_source=%s voice_id=%s",
+        "[receptionist config] receptionist_id=%s prompt_source=%s greeting_source=%s voice_id=%s persona=%s prompt_chars=%s estimated_tokens=%s booking_mentions=%s availability_mentions=%s",
         receptionist_id,
         "custom" if custom_prompt else "generated",
         greeting_source,
         "custom" if voice_id else "env_default",
+        persona_key,
+        metrics.chars,
+        metrics.estimated_tokens,
+        metrics.booking_mentions,
+        metrics.availability_mentions,
     )
     return prompt, greeting, voice_id, voice_preset_key, greeting_source, identity

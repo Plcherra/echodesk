@@ -400,7 +400,7 @@ async def receptionist_prompt(
     rec = rec_res.data[0]
     if rec.get("status") != "active" or rec.get("active") is False:
         raise HTTPException(status_code=404, detail="Receptionist not found or inactive")
-    prompt, greeting, _ = _build_from_supabase_sync(receptionist_id, supabase)
+    prompt, greeting, *_ = _build_from_supabase_sync(receptionist_id, supabase)
     return {"prompt": prompt, "greeting": greeting}
 
 

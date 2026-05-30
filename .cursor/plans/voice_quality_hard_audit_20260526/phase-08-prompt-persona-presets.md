@@ -62,3 +62,11 @@ Prompting affects the long-tail calls that deterministic routes do not cover. Th
 ## Owner Notes
 
 This phase should happen after deterministic router improvements, so the prompt only handles what it should handle.
+
+## Phase 8 Implementation Status
+
+- Added reusable receptionist persona presets tied to the existing voice preset keys.
+- Compact generated prompts now include persona style, recovery style, and confirmation style while preserving invariant booking safety rules.
+- Custom `system_prompt` values are wrapped with non-negotiable voice safety guardrails so business-provided instructions cannot override no-invented-availability or no-technical-errors behavior.
+- Added prompt metrics for compactness and repetition tracking in receptionist config logs.
+- Added tests for persona style variation, prompt compactness, custom prompt guardrails, voice preset inference, and spoken-output artifact rules.

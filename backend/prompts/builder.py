@@ -2,6 +2,8 @@
 
 from typing import Any, Optional
 
+from prompts.personas import get_persona
+
 MAX_PROMPT_CHARS = 28000
 COMPACT_SERVICES_LIMIT = 10
 COMPACT_STAFF_LIMIT = 15
@@ -12,6 +14,14 @@ TONE_GUIDANCE = {
     "casual": "Keep it conversational and relaxed. You can use a slightly informal tone when appropriate.",
     "formal": "Use formal language and titles. Be highly polite and structured.",
 }
+
+CUSTOM_PROMPT_GUARDRAILS = (
+    "Non-negotiable voice safety rules: Keep replies to 1-2 short spoken sentences unless the caller asks for details. "
+    "Never invent availability, times, prices, services, policies, or booking details. "
+    "Use calendar tools for availability, booking, and rescheduling. "
+    "Speak only returned exact_slots, suggested_slots, or summary_periods. "
+    "Never expose raw JSON, event IDs, tool metadata, payment links, or technical errors to the caller."
+)
 
 
 def build_receptionist_prompt(
@@ -27,33 +37,36 @@ def build_receptionist_prompt(
     website_content: Optional[str] = None,
     extra_instructions: Optional[str] = None,
     tone: Optional[str] = None,
+    persona_key: Optional[str] = None,
     business_type: Optional[str] = None,
     compact: bool = False,
 ) -> str:
     sections = []
+    persona = get_persona(persona_key)
+    effective_tone = (tone or persona.tone or "warm").lower()
 
-    # 1. Identity and consent
+    # 1. Invariant identity and safety rules
     recording = "This call may be recorded for quality and training purposes. By continuing, the caller consents to recording. "
     sections.append(
-        f"{recording}You are an AI receptionist named {name}. You represent this business on the phone. The business phone number is {phone_number}."
+        f"{recording}You are an AI receptionist named {name}. You represent this business on the phone. The business phone number is {phone_number}. "
+        "Never invent availability, prices, policies, services, or booking details. Never expose raw JSON, event IDs, tool metadata, payment links, or technical errors to the caller."
     )
 
     # 1b. Conversation memory
     sections.append(
-        "Conversation memory: You have access to the full conversation history for this call. Use it: remember the caller's name, requested service, date/time discussed, and any details they shared. When they say 'actually make it 11am' or 'change that to Tuesday', refer back to the previous turn and update accordingly. Never ask for information they already gave."
+        "Conversation memory: Use this call's history. Remember the caller's name, requested service, date/time discussed, and details already shared. If they revise something, update the previous request instead of starting over. Never ask again for information they already gave."
     )
 
     # 2. Tone and style
-    tone_key = (tone or "warm").lower()
-    tone_text = TONE_GUIDANCE.get(tone_key, TONE_GUIDANCE["warm"])
+    tone_text = TONE_GUIDANCE.get(effective_tone, TONE_GUIDANCE["warm"])
     business_ctx = f" This is a {business_type.strip()} business." if business_type and business_type.strip() else ""
     sections.append(
-        f"Tone and style: {tone_text}{business_ctx} Keep responses short (1–2 sentences) for natural phone conversation. Avoid long monologues. Before calling tools, give at most 1–2 short sentences. Be empathetic and clear. Avoid jargon. If the caller seems confused, slow down and rephrase."
+        f"Persona: {persona.label}. {persona.style_rule} {tone_text}{business_ctx} Keep responses to 1-2 short spoken sentences unless the caller asks for details. {persona.recovery_style}"
     )
 
     # 3. Tool usage (calendar)
     sections.append(
-        f"Calendar and booking: The business calendar ID is {calendar_id}. You have access to tools to check availability, create appointments, and reschedule. When the caller wants to book, reschedule, or check availability, you MUST use these tools—never invent times or slots. The caller may speak dates naturally (e.g. 'tomorrow at 4', 'next Friday morning', 'March 17th at 7pm'). You should accept natural language dates; only ask a follow-up if the date/time is missing or genuinely ambiguous. When calling tools, you may pass a natural-language date string as date_text; the backend will normalize it. Always confirm the details (service, date, time, name/contact) before creating or changing an appointment. After a tool returns results (e.g. available slots or a booking confirmation), summarize clearly for the caller. If a tool returns an error or \"slot_unavailable\", offer the suggested alternatives from the response and do not make up times."
+        f"Calendar tools: The calendar ID is {calendar_id}. Use tools for availability, booking, and rescheduling. Accept natural dates like 'tomorrow at 4' or 'next Friday morning'. Ask a follow-up only when date/time/service is missing or genuinely ambiguous. Speak only returned exact_slots, suggested_slots, or summary_periods. If slot_unavailable returns suggestions, offer only those suggestions."
     )
 
     # 4. Business knowledge
@@ -90,7 +103,7 @@ def build_receptionist_prompt(
         any_requires_location = any(s.get("requires_location") for s in svc_list)
         if any_requires_location:
             sections.append(
-                "Location for bookings (service-aware): Some services require a location. For configured services, the service configuration is the source of truth: if the service has a default_location_type, you MUST follow it and MUST NOT ask the caller to choose a platform (Zoom/Meet/FaceTime/WhatsApp/etc). Only collect the missing details required by that configured location type: if location_type is customer_address, ask for the street address; if location_type is custom, ask for the exact instructions/details to include. For phone_call or video_meeting, do not ask the caller to pick a platform; any platform/link belongs to the business owner workflow."
+                "Location: Follow each service's configured location_type. Do not ask the caller to choose Zoom, Meet, FaceTime, WhatsApp, or another platform. Only collect the missing required detail: address for customer_address, or exact instructions for custom. For phone_call or video_meeting, do not ask for a platform."
             )
 
     if locations:
@@ -131,28 +144,23 @@ def build_receptionist_prompt(
 
     # 5. Clarification and error recovery
     sections.append(
-        "Clarification and recovery: If the caller does not give enough information to book (e.g. missing date, time, service, or name), ask for the missing piece politely—one thing at a time. Never guess or invent details. If you did not hear clearly, say: \"I'm sorry, I didn't catch that. Could you repeat that for me?\" or \"Sorry, could you say that again?\" If a tool or calendar fails, tell the caller calmly: \"I'm having trouble with the calendar right now. Please try again in a moment, or leave your number and we'll call you back.\" Do not expose technical errors. For angry or frustrated callers, acknowledge their frustration first: \"I understand this is frustrating. Let me help you with that.\""
+        "Recovery: Ask for one missing piece at a time. If you did not hear clearly, say: \"I'm sorry, I didn't catch that. Could you repeat that?\" If a tool or calendar fails, say: \"I'm having trouble with the calendar right now. Could you try again in a moment?\" Do not mention internal systems or technical errors."
     )
 
     # 6. Service-before-availability (when services exist)
     if services:
         sections.append(
-            "Service-before-availability: When services are configured: (a) If the caller names a service (e.g. 'business consulting', 'I want business consulting tomorrow'), treat it as sufficient—call check_availability with service_name immediately. Do NOT ask 'what type of consulting?' or for more specificity when a configured service already matches. (b) If the caller says something generic like 'I want to book tomorrow' without naming a service, ask: 'Sure — what would you like to book? Are you looking for one of our services, or a general appointment?' Only ask clarifying questions when the service is ambiguous or missing. When the caller provides both date and service, move directly to check_availability with service_name."
+            "Service-first: If the caller names a configured service, use it immediately and pass service_name to tools. Do not ask for more specificity when the service matches. If they only say they want to book, ask what they want to book or whether it is a general appointment."
         )
 
     # 7. Booking flow
     sections.append(
-        "Booking flow: (1) Confirm what they want (e.g. which service). (2) If they selected a configured service, you MUST speak a confirmation of service name + duration + price (if present) BEFORE you call check_availability or create_appointment. Example: \"Business consulting is 60 minutes and costs $100. Let me check tomorrow for you.\" When calling check_availability, you MUST pass service_name (or service_id) if the caller named a configured service—this is required for the backend to proceed. (3) Get date and time (or offer to check availability). (4) Location: if the configured service has default_location_type, follow it and do NOT ask the caller to choose Zoom/Meet/etc. Only collect required details (address for customer_address; instructions for custom). (5) Get their name and optionally phone for the appointment. (6) Summarize: \"[Service] on [date] at [time] for [name]. Is that right?\" (7) Use the create_appointment tool (backend enforces service duration/price/location when service_id/service_name maps to a stored service). (8) Confirm success briefly. For rescheduling, use the reschedule_appointment tool with the new time; if they don't specify which appointment, ask. Availability: Speak ONLY what the check_availability tool returns. Use exact_slots or suggested_slots for specific times—if the tool returns [10am, 2pm, 4pm], speak only those; never add times like '3 PM is available too'. Use summary_periods (morning, afternoon, evening) only when the tool returns them. Never infer or generalize availability. When create_appointment returns slot_unavailable with suggested_slots, offer only those alternatives—never invent times. Do not mention timezone unless the caller asks or ambiguity blocks booking."
-    )
-
-    # 7b. Availability presentation (keep responses short)
-    sections.append(
-        "Availability presentation: Speak only slots from the tool result. If exact_slots or suggested_slots has specific times (e.g. 10am, 2pm, 4pm), say only those—never add or infer others. If summary_periods has morning/afternoon/evening, say only those. Examples: 'I have morning and afternoon openings.' / 'I can do 1, 2, or 4 PM. Which works best?' Never claim a slot is available unless it is in the tool payload. Never mention timezone unless the caller asks or it blocks booking."
+        f"Booking flow: Collect service or generic appointment type, date/time or availability window, required location details, caller name, and optional phone. Before creating or changing an appointment, briefly summarize the essential details and ask if that is right. After success, {persona.confirmation_style} Do not mention timezone unless the caller asks or ambiguity blocks booking."
     )
 
     # 8. Post-booking (short confirmation only; no SMS content on call)
     sections.append(
-        "After booking: When create_appointment returns success=true, give ONE concise spoken confirmation, e.g. \"Done — you're booked for tomorrow at 2 PM.\" or \"You're all set for tomorrow at 3 PM.\" Do not repeat extra metadata (event ID, link). Do NOT speak follow-up message content, payment links, meeting instructions, or \"under review\" text—those are sent via SMS. Keep the spoken response to one short sentence."
+        "After booking: Give one concise spoken confirmation, such as \"You're all set for tomorrow at 2 PM.\" Do not speak follow-up message content, payment links, meeting instructions, event IDs, or review text."
     )
 
     # 9. When no services are configured: generic appointment + optional location
@@ -164,7 +172,7 @@ def build_receptionist_prompt(
             "Set summary to include their name, e.g. \"Appointment — {caller_name}\". "
             "Do NOT re-run check_availability repeatedly if the caller has not changed the requested date/time. "
             "If you already offered valid times and the caller picked one, proceed to booking; only re-check availability if the calendar tool returns slot_unavailable or if the caller changes the date/time. "
-            "After the booking attempt: if success=true, confirm with one short sentence. If success=false, explain the failure; if suggested_slots are provided, offer only those alternatives—never invent times. When presenting availability, speak only slots from the tool result (exact_slots, suggested_slots, or summary_periods). Never mention timezone unless the caller asks. "
+            "After the booking attempt: if success=true, confirm with one short sentence. If success=false, explain the failure; if suggested_slots are provided, offer only those alternatives. Never invent times. "
             "For location: only ask if they say they need a location. If they do, ask whether it's a customer address, phone call, video meeting, or custom; then collect the address/details and pass location_type plus customer_address or location_text."
         )
 

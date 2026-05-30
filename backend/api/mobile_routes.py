@@ -1762,7 +1762,7 @@ async def prompt_preview(request: Request, receptionist_id: str):
         return JSONResponse({"error": err}, status_code=404)
 
     try:
-        prompt, greeting, _ = _build_from_supabase_sync(receptionist_id, supabase)
+        prompt, greeting, *_ = _build_from_supabase_sync(receptionist_id, supabase)
         compact = request.query_params.get("compact", "").lower() == "true"
         return {"prompt": prompt, "greeting": greeting, "charCount": len(prompt)}
     except Exception as e:
