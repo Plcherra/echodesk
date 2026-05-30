@@ -15,6 +15,7 @@ from config import settings
 from voice.calendar_tools import CALENDAR_TOOLS
 from voice.conversation_state import new_offered_slots_state, new_voice_session
 from voice.deepgram_client import create_deepgram_live
+from voice.deterministic_turns import resolve_deterministic_turn
 from voice.grok_client import chat, chat_with_tools
 from voice.intent_router import resolve_calendar_fast_path
 from voice.pipeline_constants import (
@@ -86,6 +87,15 @@ def _deterministic_identity_reply(user_text: str, config: dict[str, Any]) -> str
     if identity.lower() in {"receptionist", "the receptionist"}:
         return "I'm the receptionist. How can I help?"
     return f"I'm {identity}. How can I help?"
+
+
+def _last_assistant_text(history: list[dict[str, Any]]) -> str:
+    for msg in reversed(history):
+        if msg.get("role") == "assistant":
+            content = (msg.get("content") or "").strip()
+            if content:
+                return content
+    return ""
 
 
 async def _maybe_mark_consent_played(config: dict[str, Any]) -> None:
@@ -392,6 +402,39 @@ async def run_voice_pipeline(
                 )
                 return
 
+            deterministic = resolve_deterministic_turn(
+                user_text,
+                offered_slots_state=offered_slots_state,
+                use_calendar=use_calendar,
+                slot_pre_attempted=slot_pre_attempted,
+                last_slot_resolution=last_slot_resolution,
+                last_assistant_text=_last_assistant_text(history),
+            )
+            if deterministic.reply:
+                history.append({"role": "user", "content": user_text})
+                history.append({"role": "assistant", "content": deterministic.reply})
+                logger.info(
+                    "[turn] TTS started commit_id=%s response_len=%d (deterministic_%s)",
+                    cid,
+                    len(deterministic.reply),
+                    deterministic.reason,
+                )
+                mark_voice_event(
+                    config.get("call_control_id"),
+                    "deterministic_turn_reply",
+                    commit_id=cid,
+                    reason=deterministic.reason,
+                )
+                await generate_and_send_tts(
+                    deterministic.reply,
+                    config,
+                    on_audio,
+                    on_error,
+                    _tts_failure_logged=tts_failure_logged,
+                    trace_label=f"deterministic_{deterministic.reason}",
+                )
+                return
+
             logger.info("[turn] Grok task started transcript=%r", user_text[:80])
             t_turn_start = time.perf_counter()
             logger.info("[BOOKING_LATENCY] turn_start t=%.3f", t_turn_start)
@@ -401,16 +444,21 @@ async def run_voice_pipeline(
                 history[2 : 2 + len(history) - MAX_HISTORY - 2] = []
 
             if use_calendar:
-                fp = resolve_calendar_fast_path(
-                    user_text,
-                    offered_slots_state,
-                    slot_pre_attempted=slot_pre_attempted,
-                    last_slot_resolution=last_slot_resolution,
-                )
-                fast_tool_name = fp.fast_tool_name
-                fast_tool_args = fp.fast_tool_args
-                fast_date = fp.fast_date
-                fast_time = fp.fast_time
+                fast_tool_name = deterministic.tool_name
+                fast_tool_args = deterministic.tool_args
+                fast_date = deterministic.requested_date
+                fast_time = deterministic.requested_time
+                if not fast_tool_name:
+                    fp = resolve_calendar_fast_path(
+                        user_text,
+                        offered_slots_state,
+                        slot_pre_attempted=slot_pre_attempted,
+                        last_slot_resolution=last_slot_resolution,
+                    )
+                    fast_tool_name = fp.fast_tool_name
+                    fast_tool_args = fp.fast_tool_args
+                    fast_date = fp.fast_date
+                    fast_time = fp.fast_time
 
                 if fast_tool_name:
                     pre_ack = FAST_ACK_BOOKING if fast_tool_name == "create_appointment" else FAST_ACK_AVAILABILITY

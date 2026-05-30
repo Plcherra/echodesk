@@ -13,20 +13,25 @@ The best live voice systems are not "LLM for everything." They are deterministic
 - Identity, farewell, post-booking, availability, slot selection, and unavailable-time replies already have deterministic branches.
 - `docs/ops/RUNBOOK.md` defines the no-silence invariant.
 - `backend/tests/test_voice_pipeline_guardrails.py` and related tests protect several fast-path behaviors.
+- Phase 4 first implementation slice landed:
+  - Added an ordered deterministic turn router with `DeterministicTurnResult`.
+  - Added no-LLM replies for greeting, presence checks, repeat requests, bare-hour ambiguity, and time-without-date ambiguity.
+  - Wrapped existing calendar fast-path decisions in the deterministic result shape.
+  - Added tests for the top deterministic cases, including "do you have 9 AM?" asking one clarifying question instead of making a malformed calendar call.
 
 ## Implementation Plan
 
-1. Create a top-utterance map from real call transcripts and manual test scripts.
+1. Create a top-utterance map from real call transcripts and manual test scripts. **Started.**
 2. Add deterministic handlers for the top cases:
-   - greeting/hello
+   - greeting/hello **Done.**
    - "what's your name?"
-   - "what do you have tomorrow?"
-   - "do you have 9 AM?"
+   - "what do you have tomorrow?" **Done via calendar fast path.**
+   - "do you have 9 AM?" **Done: clarifies missing day.**
    - "book me for 9"
-   - "the first one"
-   - "yes that works"
+   - "the first one" **Done via slot fast path.**
+   - "yes that works" **Done when a single offered slot is active.**
    - "anything else?"
-   - "can you repeat that?"
+   - "can you repeat that?" **Done.**
    - goodbye/thanks
 3. Add a single `DeterministicTurnResult` object with:
    - `handled`
@@ -35,7 +40,8 @@ The best live voice systems are not "LLM for everything." They are deterministic
    - `tool_args`
    - `reason`
    - `requires_llm_fallback`
-4. Replace scattered deterministic checks with a clear ordered router.
+   **Done.**
+4. Replace scattered deterministic checks with a clear ordered router. **Started.**
 5. Add a no-silence test that verifies every deterministic and fallback branch either speaks or logs terminal skip.
 6. Add failure-specific apologies:
    - calendar unavailable
