@@ -3,76 +3,80 @@ const plans = [
   {
     name: "Free",
     price: "$0",
-    minutes: "Test workspace",
-    note: "For trying the app before connecting a business line.",
+    period: "/ month",
+    minutes: "Trial workspace",
+    note: "Explore the app, voice presets, and setup flow before adding a live business line.",
     cta: "Start free",
     href: "mailto:hello@echodesk.us?subject=Start%20EchoDesk%20Free",
-    features: ["Mobile app access", "Create a receptionist", "Preview voice presets", "Connect Google Calendar"],
+    features: ["Mobile app access", "Create a test receptionist", "Preview voice presets", "Connect Google Calendar"],
   },
   {
     name: "Starter",
     price: "$69",
+    period: "/ month",
     minutes: "400 minutes included",
-    note: "For solo operators and small appointment-based businesses.",
+    note: "For independent operators and small service businesses that want reliable call coverage.",
     cta: "Choose Starter",
     href: "mailto:hello@echodesk.us?subject=EchoDesk%20Starter",
     featured: true,
-    overage: "$0.35 / extra minute",
+    overage: "$0.29 / extra minute",
     features: ["AI call answering", "Calendar booking", "Call history and recordings", "Appointment review"],
   },
   {
     name: "Business",
     price: "$149",
+    period: "/ month",
     minutes: "1,200 minutes included",
-    note: "For busier teams that need higher call coverage.",
+    note: "For busier teams that need more receptionist coverage across the week.",
     cta: "Choose Business",
     href: "mailto:hello@echodesk.us?subject=EchoDesk%20Business",
-    overage: "$0.25 / extra minute",
+    overage: "$0.29 / extra minute",
     features: ["Everything in Starter", "Multiple receptionists", "Higher included usage", "Priority setup support"],
   },
   {
     name: "Enterprise",
     price: "Custom",
+    period: "",
     minutes: "Custom minutes",
-    note: "For multi-location operators and custom workflows.",
+    note: "For multi-location operators, higher call volume, and custom operational workflows.",
     cta: "Talk to us",
     href: "mailto:hello@echodesk.us?subject=EchoDesk%20Enterprise",
-    overage: "Custom overage",
-    features: ["Custom call routing", "Dedicated onboarding", "Compliance review", "Volume pricing"],
+    overage: "Volume pricing",
+    features: ["Custom call routing", "Dedicated onboarding", "Compliance review", "Custom reporting"],
   },
 ];
 
 const features = [
   {
-    title: "Answers every call",
-    text: "Give callers a calm, professional voice when you are with a client, closed, or simply busy.",
+    title: "Answers professionally",
+    text: "A calm AI receptionist picks up when your team is busy, closed, or with a customer.",
   },
   {
-    title: "Books into your calendar",
-    text: "EchoDesk checks real Google Calendar availability and creates appointments in the schedule you already use.",
+    title: "Books from real availability",
+    text: "EchoDesk checks Google Calendar before offering times and creates appointments in the right calendar.",
   },
   {
-    title: "Keeps the context",
-    text: "Call history, recordings, appointment status, and receptionist settings stay organized in the mobile app.",
+    title: "Keeps calls organized",
+    text: "Call summaries, recordings, appointments, and follow-up status stay available in the mobile app.",
   },
   {
-    title: "Built for service businesses",
-    text: "Designed for salons, clinics, home services, studios, consultants, and teams that live by the calendar.",
+    title: "Built for service teams",
+    text: "Designed for salons, clinics, studios, home services, consultants, and calendar-driven teams.",
   },
 ];
 
 const testimonials = [
   {
-    quote: "EchoDesk gives us a professional front desk without hiring another person. The calls feel calm and customers get booked.",
-    name: "Local salon owner",
+    quote: "The value is simple: customers get an answer, and bookings land in the calendar without us stopping a service.",
+    name: "Salon owner",
   },
   {
-    quote: "The calendar connection is the part that matters. It does not just take messages, it helps turn calls into appointments.",
-    name: "Independent service provider",
+    quote: "It feels calm and practical. We can see what happened on each call and decide what needs attention.",
+    name: "Wellness studio operator",
   },
   {
-    quote: "I can see missed opportunities, recordings, and upcoming bookings from my phone. It feels simple and under control.",
-    name: "Small business operator",
+    quote: "The pricing is easy to understand, and the app makes call handling feel less chaotic.",
+    name: "Local service provider",
   },
 ];
 ---
@@ -82,11 +86,13 @@ const testimonials = [
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>EchoDesk | AI receptionist for appointment-based businesses</title>
+    <title>EchoDesk | Calm AI receptionist for appointment booking</title>
     <meta
       name="description"
-      content="EchoDesk is a calm, professional AI receptionist that answers calls, books appointments, and syncs with Google Calendar."
+      content="EchoDesk is a calm AI receptionist that answers calls, checks calendar availability, books appointments, and keeps call records organized."
     />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -98,18 +104,21 @@ const testimonials = [
         color-scheme: light;
         --bg: #fbfaf8;
         --surface: #ffffff;
-        --surface-soft: #f5f3f0;
-        --ink: #15161a;
-        --muted: #676b76;
-        --soft: #8c9099;
-        --line: #e4e0db;
-        --line-strong: #c9c2bb;
-        --brand: #58649b;
-        --brand-dark: #343b66;
-        --sage: #5b8068;
-        --amber: #b87a3d;
-        --shadow: 0 18px 50px rgba(40, 38, 35, 0.08);
-        --shadow-soft: 0 12px 30px rgba(40, 38, 35, 0.06);
+        --surface-soft: #f4f1ee;
+        --surface-muted: #ede9e4;
+        --ink: #151821;
+        --muted: #626873;
+        --soft: #8b9099;
+        --line: #e6e0da;
+        --line-strong: #cfc6bd;
+        --brand: #174061;
+        --brand-2: #2f9c9d;
+        --brand-soft: #e6f3f2;
+        --accent: #57609a;
+        --sage: #4f8663;
+        --amber: #a87635;
+        --shadow: 0 24px 70px rgba(32, 36, 42, 0.1);
+        --shadow-soft: 0 14px 34px rgba(32, 36, 42, 0.07);
         --radius: 8px;
         --max: 1160px;
       }
@@ -140,6 +149,13 @@ const testimonials = [
         max-width: 100%;
       }
 
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
       .shell {
         width: min(var(--max), calc(100% - 40px));
         margin: 0 auto;
@@ -148,10 +164,10 @@ const testimonials = [
       .site-header {
         position: sticky;
         top: 0;
-        z-index: 20;
-        background: rgba(251, 250, 248, 0.9);
+        z-index: 30;
+        border-bottom: 1px solid rgba(230, 224, 218, 0.82);
+        background: rgba(251, 250, 248, 0.92);
         backdrop-filter: blur(18px);
-        border-bottom: 1px solid rgba(228, 224, 219, 0.82);
       }
 
       .nav {
@@ -170,14 +186,11 @@ const testimonials = [
       }
 
       .brand-mark {
-        width: 32px;
-        height: 32px;
+        width: 34px;
+        height: 34px;
         border-radius: 8px;
-        background: var(--brand-dark);
-        color: #fff;
-        display: grid;
-        place-items: center;
-        font-size: 13px;
+        border: 1px solid rgba(23, 64, 97, 0.12);
+        box-shadow: 0 8px 20px rgba(23, 64, 97, 0.08);
       }
 
       .nav-links {
@@ -186,6 +199,7 @@ const testimonials = [
         gap: 28px;
         color: var(--muted);
         font-size: 14px;
+        font-weight: 600;
       }
 
       .nav-actions {
@@ -195,22 +209,29 @@ const testimonials = [
       }
 
       .button {
+        min-height: 44px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 44px;
         padding: 0 18px;
-        border-radius: 8px;
         border: 1px solid var(--line);
-        font-size: 14px;
-        font-weight: 700;
+        border-radius: 8px;
         background: var(--surface);
         color: var(--ink);
+        font-size: 14px;
+        font-weight: 700;
+        transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+        border-color: var(--line-strong);
+        box-shadow: var(--shadow-soft);
       }
 
       .button.primary {
-        background: var(--brand-dark);
-        border-color: var(--brand-dark);
+        border-color: var(--brand);
+        background: var(--brand);
         color: #fff;
       }
 
@@ -219,23 +240,27 @@ const testimonials = [
       }
 
       .hero {
-        padding: 96px 0 48px;
+        padding: 96px 0 58px;
         border-bottom: 1px solid var(--line);
       }
 
       .hero-copy {
-        max-width: 820px;
+        max-width: 860px;
         margin: 0 auto;
         text-align: center;
+      }
+
+      .eyebrow,
+      .kicker {
+        color: var(--brand-2);
+        font-size: 13px;
+        font-weight: 700;
       }
 
       .eyebrow {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        color: var(--sage);
-        font-size: 13px;
-        font-weight: 700;
+        gap: 10px;
         margin-bottom: 22px;
       }
 
@@ -244,25 +269,17 @@ const testimonials = [
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: var(--sage);
-      }
-
-      h1,
-      h2,
-      h3,
-      p {
-        margin: 0;
+        background: var(--brand-2);
       }
 
       h1 {
         font-size: 64px;
-        line-height: 1.04;
-        letter-spacing: 0;
+        line-height: 1.05;
         font-weight: 700;
       }
 
       .hero-subtitle {
-        max-width: 660px;
+        max-width: 690px;
         margin: 24px auto 0;
         color: var(--muted);
         font-size: 20px;
@@ -270,7 +287,7 @@ const testimonials = [
       }
 
       .hero-actions {
-        margin-top: 32px;
+        margin-top: 34px;
         display: flex;
         justify-content: center;
         gap: 12px;
@@ -284,73 +301,380 @@ const testimonials = [
       }
 
       .hero-media {
-        margin-top: 62px;
+        margin-top: 70px;
       }
 
-      .product-frame {
-        overflow: hidden;
-        border-radius: 8px;
-        border: 1px solid var(--line);
-        background: #ece9e5;
+      .device-stage {
+        position: relative;
+        min-height: 580px;
+      }
+
+      .desktop-frame,
+      .phone-frame,
+      .customer-frame {
+        border: 1px solid rgba(23, 64, 97, 0.1);
+        background: #fff;
         box-shadow: var(--shadow);
       }
 
-      .product-frame img {
-        width: 100%;
-        max-height: 560px;
-        object-fit: cover;
-        object-position: top center;
+      .desktop-frame {
+        width: min(920px, 100%);
+        margin: 0 auto;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .browser-bar {
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--line);
+        background: #f2eee9;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #c8c0b7;
+      }
+
+      .url-bar {
+        height: 24px;
+        flex: 1;
+        border-radius: 999px;
+        background: #fff;
+        color: var(--soft);
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        font-size: 12px;
+      }
+
+      .mock-dashboard {
+        min-height: 510px;
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        background: var(--surface);
+      }
+
+      .mock-sidebar {
+        padding: 26px 22px;
+        border-right: 1px solid var(--line);
+        background: #f8f6f3;
+      }
+
+      .mock-logo-row,
+      .mock-profile {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .mock-logo-row img {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+      }
+
+      .mock-logo-row strong {
+        font-size: 15px;
+      }
+
+      .mock-nav {
+        margin-top: 34px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .mock-nav span {
+        border-radius: 8px;
+        padding: 11px 12px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .mock-nav span.active {
+        color: var(--brand);
+        background: var(--brand-soft);
+      }
+
+      .mock-main {
+        padding: 30px;
+      }
+
+      .mock-topline {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 18px;
+      }
+
+      .mock-topline h3,
+      .mini-title {
+        font-size: 20px;
+        line-height: 1.25;
+      }
+
+      .mock-topline p,
+      .mini-copy {
+        margin-top: 8px;
+        color: var(--muted);
+        line-height: 1.55;
+        font-size: 14px;
+      }
+
+      .status-pill,
+      .soft-pill,
+      .warning-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        min-height: 30px;
+        padding: 0 10px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .status-pill {
+        color: var(--sage);
+        background: #e5f3e9;
+      }
+
+      .soft-pill {
+        color: var(--accent);
+        background: #eceefa;
+      }
+
+      .warning-pill {
+        color: #b76d11;
+        background: #fff0d7;
+      }
+
+      .metric-grid {
+        margin-top: 28px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+      }
+
+      .metric-card,
+      .call-row,
+      .appointment-row,
+      .summary-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 10px 22px rgba(32, 36, 42, 0.04);
+      }
+
+      .metric-card {
+        padding: 18px;
+      }
+
+      .metric-card span {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 10px;
+      }
+
+      .metric-card strong {
+        font-size: 26px;
+      }
+
+      .call-list {
+        margin-top: 24px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .call-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 16px;
+        padding: 16px;
+      }
+
+      .call-row strong,
+      .appointment-row strong {
+        display: block;
+        font-size: 15px;
+        margin-bottom: 5px;
+      }
+
+      .call-row span,
+      .appointment-row span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .phone-frame {
+        position: absolute;
+        right: 34px;
+        bottom: -12px;
+        width: 292px;
+        border-radius: 34px;
+        padding: 12px;
+        background: #111827;
+      }
+
+      .phone-screen {
+        min-height: 510px;
+        border-radius: 26px;
+        overflow: hidden;
+        background: #faf8f5;
+      }
+
+      .phone-top {
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 18px;
+        color: var(--ink);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .phone-content {
+        padding: 22px 18px;
+      }
+
+      .incoming-card {
+        border-radius: 8px;
+        background: var(--brand);
+        color: #fff;
+        padding: 18px;
+      }
+
+      .incoming-card img {
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        margin-bottom: 18px;
+      }
+
+      .incoming-card h3 {
+        font-size: 20px;
+      }
+
+      .incoming-card p {
+        margin-top: 8px;
+        color: rgba(255, 255, 255, 0.74);
+        font-size: 13px;
+      }
+
+      .waveform {
+        margin: 20px 0 4px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .waveform span {
+        width: 4px;
+        height: 14px;
+        border-radius: 999px;
+        background: #6ed0ca;
+        animation: signalPulse 1.8s ease-in-out infinite;
+      }
+
+      .waveform span:nth-child(2) {
+        height: 25px;
+        animation-delay: 140ms;
+      }
+
+      .waveform span:nth-child(3) {
+        height: 18px;
+        animation-delay: 280ms;
+      }
+
+      .waveform span:nth-child(4) {
+        height: 30px;
+        animation-delay: 420ms;
+      }
+
+      .waveform span:nth-child(5) {
+        height: 16px;
+        animation-delay: 560ms;
+      }
+
+      .transcript {
+        margin-top: 16px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .bubble {
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .bubble.ai {
+        background: #fff;
+        border: 1px solid var(--line);
+      }
+
+      .bubble.customer {
+        background: var(--brand-soft);
+        color: var(--brand);
       }
 
       .trust-row {
+        margin-top: 36px;
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 1px;
         background: var(--line);
         border: 1px solid var(--line);
-        border-top: 0;
-        border-radius: 0 0 8px 8px;
+        border-radius: 8px;
         overflow: hidden;
       }
 
       .trust-item {
         background: var(--surface);
         padding: 18px;
-        font-size: 14px;
         color: var(--muted);
+        font-size: 14px;
       }
 
       .trust-item strong {
         display: block;
-        margin-bottom: 4px;
+        margin-bottom: 5px;
         color: var(--ink);
         font-size: 15px;
       }
 
       .section {
-        padding: 92px 0;
+        padding: 98px 0;
       }
 
       .section.compact {
-        padding: 72px 0;
+        padding: 78px 0;
       }
 
       .section-header {
-        max-width: 680px;
-        margin-bottom: 42px;
+        max-width: 700px;
+        margin-bottom: 44px;
       }
 
       .kicker {
-        color: var(--brand);
-        font-size: 13px;
-        font-weight: 700;
+        display: block;
         margin-bottom: 12px;
       }
 
       h2 {
         font-size: 42px;
         line-height: 1.16;
-        letter-spacing: 0;
+        font-weight: 700;
       }
 
       .section-copy {
@@ -361,14 +685,14 @@ const testimonials = [
       }
 
       .pricing-section {
-        background: var(--surface);
         border-top: 1px solid var(--line);
         border-bottom: 1px solid var(--line);
+        background: var(--surface);
       }
 
       .pricing-layout {
         display: grid;
-        grid-template-columns: 0.8fr 1.2fr;
+        grid-template-columns: 0.82fr 1.18fr;
         gap: 48px;
         align-items: start;
       }
@@ -383,7 +707,7 @@ const testimonials = [
         padding: 18px;
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: var(--surface-soft);
+        background: #f8f6f3;
         color: var(--muted);
         font-size: 15px;
         line-height: 1.6;
@@ -400,19 +724,19 @@ const testimonials = [
       }
 
       .plan {
-        min-height: 410px;
+        min-height: 426px;
+        display: flex;
+        flex-direction: column;
+        padding: 26px;
         border: 1px solid var(--line);
         border-radius: 8px;
         background: var(--surface);
-        padding: 26px;
-        display: flex;
-        flex-direction: column;
         box-shadow: var(--shadow-soft);
       }
 
       .plan.featured {
-        border-color: var(--brand-dark);
-        box-shadow: 0 20px 50px rgba(52, 59, 102, 0.14);
+        border-color: rgba(23, 64, 97, 0.55);
+        box-shadow: 0 22px 54px rgba(23, 64, 97, 0.14);
       }
 
       .plan-label {
@@ -425,12 +749,11 @@ const testimonials = [
 
       .plan-name {
         font-size: 19px;
-        font-weight: 700;
       }
 
       .recommended {
-        border: 1px solid rgba(91, 128, 104, 0.26);
-        background: rgba(91, 128, 104, 0.1);
+        border: 1px solid rgba(79, 134, 99, 0.24);
+        background: rgba(79, 134, 99, 0.1);
         color: var(--sage);
         border-radius: 999px;
         padding: 5px 9px;
@@ -441,8 +764,8 @@ const testimonials = [
       .price {
         display: flex;
         align-items: baseline;
-        gap: 4px;
-        margin-bottom: 8px;
+        gap: 5px;
+        margin-bottom: 9px;
       }
 
       .price strong {
@@ -450,19 +773,19 @@ const testimonials = [
         line-height: 1;
       }
 
-      .price span {
+      .price span,
+      .plan-note,
+      .overage {
         color: var(--muted);
-        font-size: 15px;
       }
 
       .minutes {
-        color: var(--brand-dark);
+        color: var(--brand);
         font-weight: 700;
         margin-bottom: 10px;
       }
 
       .plan-note {
-        color: var(--muted);
         font-size: 14px;
         line-height: 1.55;
       }
@@ -484,9 +807,12 @@ const testimonials = [
       }
 
       .feature-list li::before {
-        content: "✓";
-        color: var(--sage);
-        font-weight: 700;
+        content: "";
+        width: 8px;
+        height: 8px;
+        margin-top: 6px;
+        border-radius: 50%;
+        background: var(--brand-2);
       }
 
       .plan-footer {
@@ -496,7 +822,6 @@ const testimonials = [
       }
 
       .overage {
-        color: var(--soft);
         font-size: 13px;
       }
 
@@ -507,23 +832,23 @@ const testimonials = [
       }
 
       .feature-card {
+        min-height: 218px;
         border: 1px solid var(--line);
         border-radius: 8px;
         background: var(--surface);
         padding: 24px;
-        min-height: 210px;
       }
 
       .feature-number {
         width: 34px;
         height: 34px;
-        border-radius: 8px;
         display: grid;
         place-items: center;
-        background: var(--surface-soft);
-        color: var(--brand-dark);
-        font-weight: 700;
         margin-bottom: 28px;
+        border-radius: 8px;
+        background: var(--brand-soft);
+        color: var(--brand);
+        font-weight: 700;
       }
 
       .feature-card h3 {
@@ -537,51 +862,157 @@ const testimonials = [
         font-size: 15px;
       }
 
-      .showcase {
+      .product-section {
+        border-top: 1px solid var(--line);
+      }
+
+      .mockup-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 28px;
+        grid-template-columns: 1.04fr 0.96fr;
+        gap: 24px;
         align-items: stretch;
       }
 
-      .showcase-copy {
+      .mockup-stack {
+        display: grid;
+        gap: 24px;
+      }
+
+      .mock-card {
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: var(--surface);
-        padding: 34px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-      }
-
-      .showcase-copy h2 {
-        font-size: 36px;
-      }
-
-      .showcase-copy p {
-        margin-top: 18px;
-        color: var(--muted);
-        font-size: 17px;
-        line-height: 1.65;
-      }
-
-      .showcase-image {
+        background: #fff;
+        box-shadow: var(--shadow-soft);
         overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: #ece9e5;
       }
 
-      .showcase-image img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        object-position: top center;
+      .mock-card-pad {
+        padding: 26px;
+      }
+
+      .phone-device {
+        width: 320px;
+        margin: 0 auto;
+        border-radius: 36px;
+        padding: 12px;
+        background: #111827;
+        box-shadow: var(--shadow);
+      }
+
+      .booking-screen {
+        min-height: 610px;
+        border-radius: 27px;
+        background: #fbfaf8;
+        overflow: hidden;
+      }
+
+      .booking-header {
+        padding: 24px 20px 18px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .booking-header img {
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+      }
+
+      .booking-body {
+        padding: 20px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .appointment-row {
+        padding: 16px;
+      }
+
+      .calendar-mock {
+        min-height: 360px;
+      }
+
+      .calendar-toolbar,
+      .summary-toolbar {
+        padding: 18px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .calendar-grid {
+        padding: 18px;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 10px;
+      }
+
+      .day-column {
+        min-height: 230px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #faf8f5;
+        padding: 10px;
+      }
+
+      .day-column strong {
+        display: block;
+        margin-bottom: 12px;
+        font-size: 13px;
+      }
+
+      .slot {
+        margin-top: 8px;
+        padding: 8px;
+        border-radius: 8px;
+        background: #fff;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .slot.booked {
+        color: var(--brand);
+        background: var(--brand-soft);
+        font-weight: 700;
+      }
+
+      .summary-card {
+        padding: 20px;
+      }
+
+      .summary-details {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .summary-details div {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        background: #faf8f5;
+      }
+
+      .summary-details span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+
+      .summary-details strong {
+        font-size: 14px;
       }
 
       .testimonials {
-        background: var(--surface-soft);
         border-top: 1px solid var(--line);
+        background: var(--surface-soft);
       }
 
       .testimonial-grid {
@@ -591,6 +1022,7 @@ const testimonials = [
       }
 
       .testimonial {
+        margin: 0;
         border: 1px solid var(--line);
         border-radius: 8px;
         background: var(--surface);
@@ -598,7 +1030,6 @@ const testimonials = [
       }
 
       .testimonial p {
-        color: var(--ink);
         line-height: 1.65;
         font-size: 16px;
       }
@@ -611,9 +1042,9 @@ const testimonials = [
       }
 
       .final-cta {
-        text-align: center;
         max-width: 720px;
         margin: 0 auto;
+        text-align: center;
       }
 
       .final-cta p {
@@ -651,6 +1082,37 @@ const testimonials = [
         gap: 20px;
       }
 
+      @keyframes signalPulse {
+        0%,
+        100% {
+          opacity: 0.45;
+          transform: scaleY(0.72);
+        }
+
+        50% {
+          opacity: 1;
+          transform: scaleY(1);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+
+        .button,
+        .waveform span {
+          animation: none;
+          transition: none;
+        }
+      }
+
+      @media (max-width: 1080px) {
+        .phone-frame {
+          right: 0;
+        }
+      }
+
       @media (max-width: 980px) {
         .hero {
           padding-top: 76px;
@@ -660,7 +1122,20 @@ const testimonials = [
           font-size: 52px;
         }
 
-        .pricing-layout {
+        .device-stage {
+          min-height: auto;
+          display: grid;
+          gap: 24px;
+        }
+
+        .phone-frame {
+          position: static;
+          width: min(340px, 100%);
+          margin: 0 auto;
+        }
+
+        .pricing-layout,
+        .mockup-grid {
           grid-template-columns: 1fr;
           gap: 32px;
         }
@@ -670,13 +1145,9 @@ const testimonials = [
         }
 
         .features-grid,
-        .trust-row {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .showcase,
+        .trust-row,
         .testimonial-grid {
-          grid-template-columns: 1fr;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
 
@@ -701,27 +1172,54 @@ const testimonials = [
           font-size: 42px;
         }
 
-        h2,
-        .showcase-copy h2 {
+        h2 {
           font-size: 32px;
         }
 
-        .hero-subtitle {
-          font-size: 18px;
+        .hero-subtitle,
+        .section-copy {
+          font-size: 17px;
         }
 
         .section {
           padding: 72px 0;
         }
 
-        .pricing-grid,
-        .features-grid,
-        .trust-row {
+        .mock-dashboard {
           grid-template-columns: 1fr;
         }
 
-        .product-frame img {
-          max-height: 430px;
+        .mock-sidebar {
+          display: none;
+        }
+
+        .mock-main {
+          padding: 22px;
+        }
+
+        .mock-topline {
+          display: grid;
+        }
+
+        .metric-grid,
+        .pricing-grid,
+        .features-grid,
+        .trust-row,
+        .testimonial-grid,
+        .summary-details {
+          grid-template-columns: 1fr;
+        }
+
+        .calendar-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .day-column {
+          min-height: auto;
+        }
+
+        .phone-device {
+          width: min(320px, 100%);
         }
 
         .button {
@@ -738,7 +1236,7 @@ const testimonials = [
     <header class="site-header">
       <div class="shell nav">
         <a class="brand" href="#top" aria-label="EchoDesk home">
-          <span class="brand-mark">ED</span>
+          <img class="brand-mark" src="/images/echodesk-logo-mark.png" alt="" width="34" height="34" />
           <span>EchoDesk</span>
         </a>
         <nav class="nav-links" aria-label="Primary navigation">
@@ -759,32 +1257,111 @@ const testimonials = [
         <div class="shell">
           <div class="hero-copy">
             <p class="eyebrow">AI receptionist for appointment-based businesses</p>
-            <h1 id="hero-title">Answer every call. Book more appointments.</h1>
+            <h1 id="hero-title">Turn missed calls into booked appointments.</h1>
             <p class="hero-subtitle">
-              EchoDesk gives your business a calm, professional receptionist that answers calls,
-              checks your calendar, and books customers while you stay focused on the work.
+              EchoDesk answers calls with a calm, professional voice, checks real calendar availability,
+              and books customers while your team stays focused on service.
             </p>
             <div class="hero-actions">
               <a class="button primary" href="#pricing">View plans</a>
               <a class="button" href="mailto:hello@echodesk.us?subject=EchoDesk%20demo">Request a demo</a>
             </div>
-            <p class="hero-note">Starter plans from $69/month. Clear minutes, fair overage, no long-term contract.</p>
+            <p class="hero-note">Plans start at $69/month. Included minutes, clear overage, no long-term contract.</p>
           </div>
 
-          <div class="hero-media" aria-label="EchoDesk dashboard preview">
-            <div class="product-frame">
-              <img
-                src="/images/dashboard-overview.png"
-                alt="EchoDesk mobile dashboard showing calls, appointments, receptionists, and included minutes"
-                width="944"
-                height="2048"
-              />
+          <div class="hero-media" aria-label="Anonymized EchoDesk product preview">
+            <div class="device-stage">
+              <div class="desktop-frame" aria-label="Desktop dashboard mockup">
+                <div class="browser-bar">
+                  <span class="dot"></span>
+                  <span class="dot"></span>
+                  <span class="dot"></span>
+                  <div class="url-bar">echodesk.us/dashboard</div>
+                </div>
+                <div class="mock-dashboard">
+                  <aside class="mock-sidebar">
+                    <div class="mock-logo-row">
+                      <img src="/images/echodesk-logo-mark.png" alt="" width="34" height="34" />
+                      <strong>EchoDesk</strong>
+                    </div>
+                    <nav class="mock-nav" aria-label="Mock dashboard navigation">
+                      <span class="active">Dashboard</span>
+                      <span>Calls</span>
+                      <span>Appointments</span>
+                      <span>Customers</span>
+                      <span>Settings</span>
+                    </nav>
+                  </aside>
+                  <section class="mock-main">
+                    <div class="mock-topline">
+                      <div>
+                        <h3>Sarah's Salon</h3>
+                        <p>AI receptionist activity for today.</p>
+                      </div>
+                      <span class="status-pill">Active</span>
+                    </div>
+                    <div class="metric-grid">
+                      <div class="metric-card"><span>Calls handled</span><strong>18</strong></div>
+                      <div class="metric-card"><span>Appointments</span><strong>7</strong></div>
+                      <div class="metric-card"><span>Avg. response</span><strong>2.1s</strong></div>
+                    </div>
+                    <div class="call-list">
+                      <div class="call-row">
+                        <div>
+                          <strong>Maya R.</strong>
+                          <span>Booked haircut for tomorrow at 10:30 AM</span>
+                        </div>
+                        <span class="status-pill">Booked</span>
+                      </div>
+                      <div class="call-row">
+                        <div>
+                          <strong>Jordan Lee</strong>
+                          <span>Asked about color consultation pricing</span>
+                        </div>
+                        <span class="warning-pill">Review</span>
+                      </div>
+                      <div class="call-row">
+                        <div>
+                          <strong>New caller</strong>
+                          <span>Requested callback from Downtown Barbershop</span>
+                        </div>
+                        <span class="soft-pill">Follow up</span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+
+              <div class="phone-frame" aria-label="Phone call handling mockup">
+                <div class="phone-screen">
+                  <div class="phone-top">
+                    <span>9:41</span>
+                    <span>5G</span>
+                  </div>
+                  <div class="phone-content">
+                    <div class="incoming-card">
+                      <img src="/images/echodesk-logo-mark.png" alt="" width="42" height="42" />
+                      <h3>Call in progress</h3>
+                      <p>New customer - (555) 014-2081</p>
+                      <div class="waveform" aria-hidden="true">
+                        <span></span><span></span><span></span><span></span><span></span>
+                      </div>
+                    </div>
+                    <div class="transcript">
+                      <div class="bubble customer">Do you have anything open tomorrow morning?</div>
+                      <div class="bubble ai">Yes. I can book 10:30 AM or 11:15 AM with Sarah.</div>
+                      <div class="bubble customer">10:30 works.</div>
+                      <div class="bubble ai">You're booked. I'll send the confirmation now.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="trust-row" aria-label="Product highlights">
-              <div class="trust-item"><strong>24/7 coverage</strong>Never send callers to silence.</div>
-              <div class="trust-item"><strong>Calendar-first</strong>Books into Google Calendar.</div>
-              <div class="trust-item"><strong>Mobile control</strong>Manage calls from your phone.</div>
-              <div class="trust-item"><strong>Clear pricing</strong>Included minutes and fair overage.</div>
+              <div class="trust-item"><strong>24/7 coverage</strong>Customers get a polished answer after hours.</div>
+              <div class="trust-item"><strong>Calendar-first</strong>Availability comes from the schedule you trust.</div>
+              <div class="trust-item"><strong>Mobile control</strong>Review calls, bookings, and recordings from your phone.</div>
+              <div class="trust-item"><strong>Clear pricing</strong>Included minutes and a predictable $0.29 overage.</div>
             </div>
           </div>
         </div>
@@ -794,13 +1371,13 @@ const testimonials = [
         <div class="shell pricing-layout">
           <div class="pricing-summary">
             <p class="kicker">Pricing</p>
-            <h2 id="pricing-title">Simple plans built around call minutes.</h2>
+            <h2 id="pricing-title">Clear plans built around call minutes.</h2>
             <p class="section-copy">
-              Pick the amount of receptionist coverage you need. Upgrade as your call volume grows,
-              and keep overage predictable when a busy month happens.
+              Start small, upgrade when call volume grows, and keep busy months predictable with a simple
+              $0.29 per minute overage on paid plans.
             </p>
             <div class="pricing-note">
-              <strong>Overage:</strong> extra minutes are billed at $0.25-$0.35 per minute depending on plan.
+              <strong>Overage:</strong> Starter and Business include extra minutes at $0.29 per minute.
               Enterprise plans can use custom volume pricing.
             </div>
           </div>
@@ -815,7 +1392,7 @@ const testimonials = [
                   </div>
                   <div class="price">
                     <strong>{plan.price}</strong>
-                    {plan.price !== "Custom" && <span>/ month</span>}
+                    {plan.period && <span>{plan.period}</span>}
                   </div>
                   <p class="minutes">{plan.minutes}</p>
                   <p class="plan-note">{plan.note}</p>
@@ -837,10 +1414,10 @@ const testimonials = [
         <div class="shell">
           <div class="section-header">
             <p class="kicker">What it does</p>
-            <h2 id="features-title">A front desk that stays focused on booking.</h2>
+            <h2 id="features-title">A receptionist workflow that stays focused on booking.</h2>
             <p class="section-copy">
-              EchoDesk keeps the workflow simple: answer, understand, check availability,
-              book, and keep the record available for review.
+              EchoDesk keeps the experience simple: answer, understand, check availability, book,
+              and keep a clean record for your team.
             </p>
           </div>
           <div class="features-grid">
@@ -857,23 +1434,109 @@ const testimonials = [
         </div>
       </section>
 
-      <section class="section compact" id="product" aria-labelledby="product-title">
-        <div class="shell showcase">
-          <div class="showcase-copy">
-            <p class="kicker">Product</p>
-            <h2 id="product-title">Review calls, recordings, and appointments from one calm workspace.</h2>
-            <p>
-              Every call creates a record your team can understand. Open the call, review the outcome,
-              play the recording, and see the appointment that was booked.
+      <section class="section product-section" id="product" aria-labelledby="product-title">
+        <div class="shell">
+          <div class="section-header">
+            <p class="kicker">Product preview</p>
+            <h2 id="product-title">Staged views of the calls, bookings, and customer context your team sees.</h2>
+            <p class="section-copy">
+              These mockups use generic data to show the main flow without exposing personal notifications,
+              real names, or private phone numbers.
             </p>
           </div>
-          <div class="showcase-image">
-            <img
-              src="/images/call-details-recording.png"
-              alt="EchoDesk call details screen with call outcome, recording actions, and caller information"
-              width="944"
-              height="2048"
-            />
+
+          <div class="mockup-grid">
+            <div class="mock-card mock-card-pad">
+              <div class="phone-device" aria-label="Booking confirmation phone mockup">
+                <div class="booking-screen">
+                  <div class="phone-top">
+                    <span>9:41</span>
+                    <span>5G</span>
+                  </div>
+                  <div class="booking-header">
+                    <img src="/images/echodesk-logo-mark.png" alt="" width="38" height="38" />
+                    <div>
+                      <strong>Booking confirmed</strong>
+                      <p class="mini-copy">Sarah's Salon</p>
+                    </div>
+                  </div>
+                  <div class="booking-body">
+                    <div class="appointment-row">
+                      <strong>Maya R.</strong>
+                      <span>Haircut - Tomorrow, 10:30 AM</span>
+                    </div>
+                    <div class="appointment-row">
+                      <strong>Confirmation message</strong>
+                      <span>Your appointment is confirmed for tomorrow at 10:30 AM.</span>
+                    </div>
+                    <div class="appointment-row">
+                      <strong>Call summary</strong>
+                      <span>Caller requested a morning appointment and accepted the first available time.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mockup-stack">
+              <div class="mock-card calendar-mock" aria-label="Calendar availability mockup">
+                <div class="calendar-toolbar">
+                  <div>
+                    <h3 class="mini-title">Calendar view</h3>
+                    <p class="mini-copy">Downtown Barbershop - Week preview</p>
+                  </div>
+                  <span class="status-pill">Connected</span>
+                </div>
+                <div class="calendar-grid">
+                  <div class="day-column">
+                    <strong>Mon</strong>
+                    <div class="slot">9:00 AM open</div>
+                    <div class="slot booked">2:00 PM booked</div>
+                  </div>
+                  <div class="day-column">
+                    <strong>Tue</strong>
+                    <div class="slot booked">10:30 AM booked</div>
+                    <div class="slot">3:30 PM open</div>
+                  </div>
+                  <div class="day-column">
+                    <strong>Wed</strong>
+                    <div class="slot">11:15 AM open</div>
+                    <div class="slot booked">4:00 PM booked</div>
+                  </div>
+                  <div class="day-column">
+                    <strong>Thu</strong>
+                    <div class="slot">9:45 AM open</div>
+                    <div class="slot">1:30 PM open</div>
+                  </div>
+                  <div class="day-column">
+                    <strong>Fri</strong>
+                    <div class="slot booked">12:00 PM booked</div>
+                    <div class="slot">4:15 PM open</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mock-card">
+                <div class="summary-toolbar">
+                  <div>
+                    <h3 class="mini-title">Customer summary</h3>
+                    <p class="mini-copy">Clean context after every call.</p>
+                  </div>
+                  <span class="soft-pill">Ready</span>
+                </div>
+                <div class="mock-card-pad">
+                  <div class="summary-card">
+                    <h3 class="mini-title">Jordan Lee</h3>
+                    <p class="mini-copy">Asked about beard trim pricing and requested a Friday afternoon callback.</p>
+                    <div class="summary-details">
+                      <div><span>Status</span><strong>Follow up</strong></div>
+                      <div><span>Number</span><strong>(555) 019-4420</strong></div>
+                      <div><span>Source</span><strong>Voice call</strong></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -888,7 +1551,7 @@ const testimonials = [
             {
               testimonials.map((testimonial) => (
                 <blockquote class="testimonial">
-                  <p>“{testimonial.quote}”</p>
+                  <p>"{testimonial.quote}"</p>
                   <footer>{testimonial.name}</footer>
                 </blockquote>
               ))
@@ -902,7 +1565,7 @@ const testimonials = [
           <h2 id="final-title">Give callers a better first answer.</h2>
           <p>
             Start with a simple plan, connect your calendar, and let EchoDesk answer the next call
-            with the same calm consistency every time.
+            with calm consistency.
           </p>
           <div class="final-actions">
             <a class="button primary" href="#pricing">Compare plans</a>
@@ -914,7 +1577,7 @@ const testimonials = [
 
     <footer class="site-footer">
       <div class="shell footer-inner">
-        <span>© 2026 EchoDesk. All rights reserved.</span>
+        <span>&copy; 2026 EchoDesk. All rights reserved.</span>
         <nav class="footer-links" aria-label="Legal links">
           <a href="/privacy.html">Privacy</a>
           <a href="/terms.html">Terms</a>
