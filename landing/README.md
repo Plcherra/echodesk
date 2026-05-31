@@ -1,13 +1,26 @@
-# Static Landing Page
+# Astro Landing Page
 
-Plain HTML landing for echodesk.us. No build step required.
+Astro source for `echodesk.us`.
 
 ## Structure
 
-- `dist/index.html` - Single-page landing (Hero, Pricing, Testimonials)
-- Served by nginx from `landing/dist/`
+- `src/pages/index.astro` - Landing page source
+- `public/` - Static assets copied into `dist/`
+- `dist/` - Static build output served by nginx
 
-## Customization
+## Local development
 
-- **Demo video**: Edit `dist/index.html` and replace the YouTube embed `src` (default: dQw4w9WgXcQ) with your `DEMO_VIDEO_ID`
-- **App Store URLs**: Update links in `dist/index.html` when apps are published
+```bash
+cd landing
+npm install
+npm run dev
+```
+
+## Build
+
+```bash
+cd landing
+npm run build
+```
+
+The VPS deploy script syncs `landing/dist/` to `/var/www/echodesk-landing`.
