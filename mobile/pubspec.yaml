@@ -35,14 +35,16 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon/app_icon.png
 
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/app_icon.png"
-  adaptive_icon_background: "#5E35B1"
+  adaptive_icon_background: "#FBFAF8"
   remove_alpha_ios: true
 
 flutter_native_splash:
-  color: "#5E35B1"
+  color: "#FBFAF8"
   image: "assets/icon/app_icon.png"

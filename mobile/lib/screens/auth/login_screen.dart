@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/env.dart';
+import '../../widgets/brand_lockup.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -98,16 +99,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Center(child: BrandLockup(markSize: 44)),
+                  const SizedBox(height: 36),
                   Text(
                     'Log in',
                     style: Theme.of(context).textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'AI Receptionist',
+                    'Manage calls, bookings, and follow-up from one calm workspace.',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
                   TextFormField(

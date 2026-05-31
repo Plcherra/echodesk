@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/env.dart';
 import '../../services/pending_plan_service.dart';
+import '../../widgets/brand_lockup.dart';
 
 class SignupScreen extends StatefulWidget {
   final String? planId;
@@ -124,16 +125,20 @@ class _SignupScreenState extends State<SignupScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Center(child: BrandLockup(markSize: 44)),
+                  const SizedBox(height: 36),
                   Text(
                     'Create account',
                     style: Theme.of(context).textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'AI Receptionist',
+                    'Start with a simple setup flow, then connect calendar and call handling.',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
                   TextFormField(

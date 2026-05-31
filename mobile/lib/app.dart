@@ -10,6 +10,7 @@ import 'services/api_client.dart';
 import 'services/call_service.dart';
 import 'services/deep_link_handler.dart';
 import 'services/pending_plan_service.dart';
+import 'theme/echodesk_theme.dart';
 
 class EchodeskApp extends StatefulWidget {
   const EchodeskApp({super.key});
@@ -94,10 +95,7 @@ class _EchodeskAppState extends State<EchodeskApp> {
     return MaterialApp.router(
       scaffoldMessengerKey: _scaffoldKey,
       title: 'Echodesk',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        useMaterial3: true,
-      ),
+      theme: EchoDeskTheme.light(),
       routerConfig: _router,
     );
   }

@@ -15,32 +15,31 @@ class MainShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: navigationShell,
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: navigationShell.currentIndex,
-        onTap: (int index) => navigationShell.goBranch(
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: navigationShell.currentIndex,
+        onDestinationSelected: (int index) => navigationShell.goBranch(
           index,
           initialLocation: index == navigationShell.currentIndex,
         ),
-        items: const [
-          BottomNavigationBarItem(
+        destinations: const [
+          NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
-            activeIcon: Icon(Icons.dashboard),
+            selectedIcon: Icon(Icons.dashboard),
             label: 'Dashboard',
           ),
-          BottomNavigationBarItem(
+          NavigationDestination(
             icon: Icon(Icons.support_agent_outlined),
-            activeIcon: Icon(Icons.support_agent),
+            selectedIcon: Icon(Icons.support_agent),
             label: 'Receptionists',
           ),
-          BottomNavigationBarItem(
+          NavigationDestination(
             icon: Icon(Icons.event_outlined),
-            activeIcon: Icon(Icons.event),
+            selectedIcon: Icon(Icons.event),
             label: 'Appointments',
           ),
-          BottomNavigationBarItem(
+          NavigationDestination(
             icon: Icon(Icons.settings_outlined),
-            activeIcon: Icon(Icons.settings),
+            selectedIcon: Icon(Icons.settings),
             label: 'Settings',
           ),
         ],

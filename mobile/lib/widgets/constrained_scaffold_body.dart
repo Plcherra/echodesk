@@ -8,19 +8,18 @@ import '../constants/layout.dart';
 Widget constrainedScaffoldBody({
   required Widget child,
   EdgeInsets? padding,
+  double maxWidth = LayoutConstants.maxContentWidth,
 }) {
   return LayoutBuilder(
     builder: (context, constraints) {
-      final maxWidth = LayoutConstants.maxContentWidth;
       final useConstraint = constraints.maxWidth > maxWidth;
       return Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth: useConstraint ? maxWidth : double.infinity,
           ),
-          child: padding != null
-              ? Padding(padding: padding, child: child)
-              : child,
+          child:
+              padding != null ? Padding(padding: padding, child: child) : child,
         ),
       );
     },

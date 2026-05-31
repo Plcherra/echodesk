@@ -16,26 +16,22 @@ class Plan {
       ? 'Try free'
       : '\$${(priceCents / 100).toStringAsFixed(0)}/mo';
 
-  /// Option A tiers (keep in sync with backend stripe_plans / Stripe prices).
+  /// Public paid tiers shown in app surfaces.
+  /// Keep ids in sync with backend stripe_plans / Stripe prices.
   static const List<Plan> publicPlans = [
     Plan(
-        id: 'starter', name: 'Starter', priceCents: 6900, includedMinutes: 300),
-    Plan(id: 'pro', name: 'Pro', priceCents: 14900, includedMinutes: 1800),
+      id: 'starter',
+      name: 'Starter',
+      priceCents: 6900,
+      includedMinutes: 400,
+    ),
     Plan(
       id: 'business',
       name: 'Business',
-      priceCents: 24900,
-      includedMinutes: 1500,
+      priceCents: 14900,
+      includedMinutes: 1200,
     ),
-    Plan(
-      id: 'dev_test',
-      name: 'DEV test',
-      priceCents: 100,
-      includedMinutes: 50,
-    ),
-    Plan(id: 'payg', name: 'Pay As You Go', priceCents: 0, includedMinutes: 0),
   ];
 
-  static List<Plan> get subscriptionPlans =>
-      publicPlans.where((p) => p.id != 'payg').toList();
+  static List<Plan> get subscriptionPlans => publicPlans;
 }
