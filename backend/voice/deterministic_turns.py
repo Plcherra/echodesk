@@ -7,15 +7,17 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from voice.intent_router import resolve_calendar_fast_path
+from voice.pipeline_templates import daypart_narrowing_reply
 from voice.pipeline_transcript import (
     extract_date_text_hint,
+    extract_daypart,
     extract_time_hint,
     is_availability_intent,
     is_courtesy_how_are_you,
     is_smalltalk_greeting,
     normalize_for_whitelist,
 )
-from voice.slot_selection import SlotResolution
+from voice.slot_selection import SlotResolution, recent_offered_slots_present
 
 
 @dataclass
@@ -120,6 +122,25 @@ def resolve_deterministic_turn(
             reply=f"Sure — which day should I check for {time_hint}?",
             reason="clarify_time_without_date",
         )
+
+    # Daypart narrowing against the slots we just offered (e.g. we said "morning and
+    # afternoon", caller replies "mornings"). Filter the already-offered slots to that
+    # bucket and list the concrete times — this keeps the day the caller already picked
+    # instead of re-asking for a date, and needs no calendar re-query.
+    if use_calendar and recent_offered_slots_present(offered_slots_state):
+        daypart = extract_daypart(user_text)
+        if (
+            daypart
+            and time_hint is None
+            and not any(w in norm for w in ("book", "schedule", "reserve", "appointment"))
+        ):
+            reply = daypart_narrowing_reply(daypart, offered_slots_state)
+            if reply:
+                return DeterministicTurnResult(
+                    handled=True,
+                    reply=reply,
+                    reason="daypart_narrowing",
+                )
 
     if use_calendar:
         fp = resolve_calendar_fast_path(

@@ -64,7 +64,10 @@ def log_availability_guard(response: str, tool_slots: dict[str, Any]) -> None:
 def to_spoken_slot(slot: str) -> str:
     try:
         dt = datetime.fromisoformat(slot.replace("Z", "+00:00"))
-        return dt.strftime("%-I:%M %p").lower()
+        # Build manually (no %-I / %#I) so it renders identically on Linux and Windows.
+        hour = dt.hour % 12 or 12
+        meridiem = "am" if dt.hour < 12 else "pm"
+        return f"{hour}:{dt.minute:02d} {meridiem}"
     except Exception:
         return slot
 
@@ -148,6 +151,48 @@ def _availability_reply_bucket_first(day_text: str, slots: list[str], periods_no
             return f"I only have {p} openings {day_text}, around {span}. Which time works best for you?"
         return f"I only have {p} openings {day_text}. Which time works best for you?"
     return f"I found {slots_sentence(slots)} for {day_text}. Which works best?"
+
+
+def daypart_narrowing_reply(daypart: str, offered_slots_state: dict[str, Any]) -> Optional[str]:
+    """Caller narrowed the just-offered availability to a daypart (e.g. said "mornings").
+
+    Filter the already-offered slots to that bucket and list the concrete times, keeping the
+    original day context. No calendar re-query and no date re-parse, so it stays fast and never
+    loses the day the caller already chose.
+    """
+    if not isinstance(offered_slots_state, dict):
+        return None
+    slots = offered_slots_state.get("exact_slots") or offered_slots_state.get("suggested_slots") or []
+    if not slots:
+        return None
+    bucket = {"morning": (6, 12), "afternoon": (12, 17), "evening": (17, 21)}.get(daypart)
+    if not bucket:
+        return None
+    lo, hi = bucket
+    in_bucket: list[str] = []
+    for s in slots:
+        try:
+            dt = datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            continue
+        if lo <= dt.hour < hi:
+            in_bucket.append(s)
+
+    day_text = ""
+    if isinstance(offered_slots_state, dict):
+        day_text = (offered_slots_state.get("last_date_text") or "").strip()
+
+    if in_bucket:
+        in_bucket.sort()
+        when = f"{day_text} {daypart}" if day_text and day_text != "that day" else f"the {daypart}"
+        return f"For {when}, I have {slots_sentence(in_bucket)}. Which works best?"
+
+    # Nothing in that bucket — steer to the dayparts that do have openings.
+    others = [p for p in _infer_summary_periods_from_slots(slots) if p != daypart]
+    where = f"for {day_text}" if day_text and day_text != "that day" else "then"
+    if others:
+        return f"I don't have any {daypart} openings {where}. {_openings_line_from_summary_periods(others)}. What works best?"
+    return f"I don't have any {daypart} openings {where}. Want me to check another day?"
 
 
 def unavailable_requested_time_reply(

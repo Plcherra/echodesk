@@ -95,6 +95,53 @@ def test_greeting_with_time_still_routes_to_calendar():
     assert result.tool_name is None
 
 
+def test_daypart_narrowing_keeps_day_context_without_llm():
+    # Regression: after offering "morning and afternoon" for tomorrow, saying "mornings"
+    # must list the morning times for tomorrow — not re-ask for a specific day.
+    state = {
+        "exact_slots": [
+            "2026-04-11T09:00:00-04:00",
+            "2026-04-11T10:00:00-04:00",
+            "2026-04-11T14:00:00-04:00",
+        ],
+        "suggested_slots": [],
+        "summary_periods": ["morning", "afternoon"],
+        "last_date_text": "tomorrow",
+    }
+    result = _resolve("mornings", use_calendar=True, offered_slots_state=state)
+
+    assert result.handled is True
+    assert result.tool_name is None
+    assert result.reason == "daypart_narrowing"
+    reply = (result.reply or "").lower()
+    assert "tomorrow morning" in reply
+    assert "9" in reply and "10" in reply
+    assert "2" not in reply.split("which")[0]  # no afternoon 2pm slot listed
+
+
+def test_daypart_narrowing_when_bucket_empty_steers_to_available():
+    state = {
+        "exact_slots": ["2026-04-11T14:00:00-04:00", "2026-04-11T15:00:00-04:00"],
+        "suggested_slots": [],
+        "summary_periods": ["afternoon"],
+        "last_date_text": "tomorrow",
+    }
+    result = _resolve("mornings", use_calendar=True, offered_slots_state=state)
+
+    assert result.handled is True
+    assert result.reason == "daypart_narrowing"
+    reply = (result.reply or "").lower()
+    assert "don't have any morning" in reply
+    assert "afternoon" in reply
+
+
+def test_daypart_without_offered_slots_is_not_swallowed():
+    # No prior availability offered → let normal routing/LLM handle it.
+    result = _resolve("mornings", use_calendar=True, offered_slots_state={})
+
+    assert result.reason != "daypart_narrowing"
+
+
 def test_slot_selection_uses_create_appointment_without_llm():
     slot = "2026-04-11T13:00:00-04:00"
     result = _resolve(

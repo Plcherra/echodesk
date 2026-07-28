@@ -196,6 +196,21 @@ def extract_date_text_hint(text: str) -> Optional[str]:
     return None
 
 
+def extract_daypart(text: str) -> Optional[str]:
+    """Return 'morning' | 'afternoon' | 'evening' when the caller names a daypart
+    (e.g. 'mornings', 'in the morning', 'the afternoon'). Excludes 'good morning'
+    style greetings so pleasantries are not treated as a time-of-day choice."""
+    norm = normalize_for_whitelist(text)
+    if not norm:
+        return None
+    if any(g in norm for g in ("good morning", "good afternoon", "good evening")):
+        return None
+    for daypart in ("morning", "afternoon", "evening"):
+        if re.search(rf"\b{daypart}s?\b", norm):
+            return daypart
+    return None
+
+
 def extract_time_hint(text: str) -> Optional[str]:
     norm = normalize_for_whitelist(text)
     m = re.search(r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b", norm, flags=re.IGNORECASE)
