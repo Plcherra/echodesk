@@ -64,11 +64,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         recNames = Map<String, String>.from(aptData['receptionists'] ?? {});
         final now = DateTime.now().toUtc();
         for (final a in allApts) {
-          if ((a['status'] as String?) == 'needs_review') needsReview++;
+          final status = a['status'] as String? ?? '';
+          if (status == 'needs_review') needsReview++;
           final start = a['start_time'] != null
               ? DateTime.tryParse(a['start_time'] as String)
               : null;
-          if (start != null && start.isAfter(now)) {
+          // Upcoming = future AND still active. Exclude cancelled/completed so a
+          // rejected appointment never lingers here (matches the Appointments tab).
+          if (start != null &&
+              start.isAfter(now) &&
+              status != 'cancelled' &&
+              status != 'completed') {
             upcoming.add(a);
           }
         }
