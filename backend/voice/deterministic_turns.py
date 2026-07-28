@@ -11,6 +11,8 @@ from voice.pipeline_transcript import (
     extract_date_text_hint,
     extract_time_hint,
     is_availability_intent,
+    is_courtesy_how_are_you,
+    is_smalltalk_greeting,
     normalize_for_whitelist,
 )
 from voice.slot_selection import SlotResolution
@@ -67,6 +69,19 @@ def resolve_deterministic_turn(
             handled=True,
             reply="Hi. How can I help?",
             reason="greeting",
+        )
+
+    # Natural greeting / pleasantry (e.g. "hi Eve, how are you today"): reply warmly
+    # and immediately instead of misreading a stray "today" as an availability check.
+    if is_smalltalk_greeting(user_text):
+        if is_courtesy_how_are_you(user_text):
+            reply = "I'm doing great, thanks for asking! How can I help you today?"
+        else:
+            reply = "Hi there! How can I help you today?"
+        return DeterministicTurnResult(
+            handled=True,
+            reply=reply,
+            reason="smalltalk_greeting",
         )
 
     if norm in {"can you hear me", "you there", "anybody there"} or "are you there" in norm:

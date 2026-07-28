@@ -59,6 +59,42 @@ def test_calendar_availability_uses_tool_without_llm():
     assert result.reason == "calendar_check_availability"
 
 
+def test_how_are_you_greeting_does_not_trigger_availability():
+    # Regression: "how are you today" must not be read as a check_availability(today).
+    result = _resolve("hi eve how are you today", use_calendar=True)
+
+    assert result.handled is True
+    assert result.tool_name is None
+    assert result.reason == "smalltalk_greeting"
+    assert "how can i help" in (result.reply or "").lower()
+
+
+def test_short_greeting_opener_is_handled_without_llm():
+    result = _resolve("hey there", use_calendar=True)
+
+    assert result.handled is True
+    assert result.tool_name is None
+    assert result.reason == "smalltalk_greeting"
+
+
+def test_greeting_with_real_booking_still_routes_to_calendar():
+    # A booking cue overrides smalltalk: this must still reach the calendar fast path.
+    result = _resolve("hi eve, what do you have tomorrow", use_calendar=True)
+
+    assert result.handled is True
+    assert result.tool_name == "check_availability"
+    assert result.tool_args["date_text"] == "tomorrow"
+
+
+def test_greeting_with_time_still_routes_to_calendar():
+    result = _resolve("hi eve, do you have 9 AM", use_calendar=True)
+
+    assert result.handled is True
+    # time-without-date clarify path, not a smalltalk swallow
+    assert result.reason == "clarify_time_without_date"
+    assert result.tool_name is None
+
+
 def test_slot_selection_uses_create_appointment_without_llm():
     slot = "2026-04-11T13:00:00-04:00"
     result = _resolve(

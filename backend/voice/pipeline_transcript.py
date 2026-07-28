@@ -246,6 +246,82 @@ def is_availability_intent(text: str) -> bool:
     )
 
 
+# Pleasantries that should get a warm, immediate reply instead of a calendar lookup.
+_SMALLTALK_HOW_ARE_YOU = (
+    "how are you",
+    "how are ya",
+    "how you doing",
+    "how are things",
+    "how's it going",
+    "hows it going",
+    "how is it going",
+    "how have you been",
+    "how do you do",
+    "hope you are well",
+    "hope youre well",
+    "hope you're well",
+)
+
+# Any of these present means it is a real request, not just a greeting.
+_SMALLTALK_BOOKING_CUES = (
+    "book",
+    "appointment",
+    "schedule",
+    "availability",
+    "available",
+    "opening",
+    "slot",
+    "spot",
+    "reschedule",
+    "cancel",
+    "price",
+    "pricing",
+    "cost",
+    "quote",
+    "check",
+    "free",
+)
+
+
+def is_courtesy_how_are_you(text: str) -> bool:
+    """True when the caller asks a 'how are you' style pleasantry."""
+    norm = normalize_for_whitelist(text)
+    return bool(norm) and any(p in norm for p in _SMALLTALK_HOW_ARE_YOU)
+
+
+def is_smalltalk_greeting(text: str) -> bool:
+    """True for a pure greeting / pleasantry with no booking or time intent.
+
+    Example: "hi Eve, how are you today" — must NOT trigger a calendar lookup.
+    Conservative by design: any concrete time or booking cue makes this False so
+    genuine requests still reach the calendar fast path.
+    """
+    norm = normalize_for_whitelist(text)
+    if not norm:
+        return False
+    # A concrete time (e.g. "9am") or booking cue means this is a real request.
+    if extract_time_hint(text) is not None:
+        return False
+    if any(cue in norm for cue in _SMALLTALK_BOOKING_CUES):
+        return False
+    # "how are you" style pleasantries are smalltalk even if they contain a date word.
+    if is_courtesy_how_are_you(text):
+        return True
+    # A short greeting opener with no date word (e.g. "hi eve", "hello there").
+    words = norm.split()
+    if not words:
+        return False
+    starts_greeting = words[0] in (
+        "hi",
+        "hello",
+        "hey",
+        "heya",
+        "howdy",
+        "yo",
+    ) or norm.startswith(("good morning", "good afternoon", "good evening"))
+    return starts_greeting and len(words) <= 4 and extract_date_text_hint(text) is None
+
+
 def asks_for_time_list(text: str) -> bool:
     norm = normalize_for_whitelist(text)
     if not norm:
