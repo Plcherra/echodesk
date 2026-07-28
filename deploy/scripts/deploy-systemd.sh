@@ -31,13 +31,34 @@ if [ "${RUN_MIGRATION_CHECK:-0}" = "1" ]; then
   ./venv/bin/python scripts/check-migrations.py
 fi
 
-echo "=== Deploying landing ==="
-bash ./deploy/scripts/deploy-landing.sh
+# Landing deploy uses sudo rsync/chown/chmod (broad root). It's opt-in so a normal code
+# deploy never needs interactive sudo. Enable with DEPLOY_LANDING=1 once the deploy user
+# has the necessary passwordless rules (or run deploy-landing.sh manually).
+if [ "${DEPLOY_LANDING:-0}" = "1" ]; then
+  echo "=== Deploying landing ==="
+  bash ./deploy/scripts/deploy-landing.sh
+else
+  echo "=== Skipping landing deploy (set DEPLOY_LANDING=1 to enable) ==="
+fi
 
 echo "=== Installing/restarting systemd service ==="
-sudo cp "$ROOT/deploy/systemd/echodesk-backend.service" /etc/systemd/system/echodesk-backend.service
-sudo systemctl daemon-reload
-sudo systemctl enable echodesk-backend
+UNIT_SRC="$ROOT/deploy/systemd/echodesk-backend.service"
+UNIT_DST="/etc/systemd/system/echodesk-backend.service"
+# Only the unit-file install needs broad root (cp/daemon-reload/enable). A normal code
+# deploy just needs `restart`, which is granted passwordless (setup-restart-sudoers.sh),
+# so CI deploys don't require an interactive sudo password.
+if cmp -s "$UNIT_SRC" "$UNIT_DST"; then
+  echo "Unit file unchanged."
+else
+  echo "Unit file changed — attempting privileged install."
+  if sudo -n cp "$UNIT_SRC" "$UNIT_DST" 2>/dev/null; then
+    sudo -n systemctl daemon-reload
+    sudo -n systemctl enable echodesk-backend
+  else
+    echo "WARNING: unit file changed but passwordless sudo is unavailable. Install manually:"
+    echo "  sudo cp \"$UNIT_SRC\" \"$UNIT_DST\" && sudo systemctl daemon-reload && sudo systemctl enable echodesk-backend"
+  fi
+fi
 sudo systemctl restart echodesk-backend
 
 sleep 3
@@ -59,4 +80,5 @@ else
 fi
 
 echo "=== Deploy done ==="
-sudo systemctl status echodesk-backend --no-pager
+# status doesn't need root; tolerate non-zero exit so it never fails the deploy.
+systemctl status echodesk-backend --no-pager || true
