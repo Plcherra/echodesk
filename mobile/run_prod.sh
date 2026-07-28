@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Run Echodesk mobile against production without typing dart-define flags.
 # Usage:
-#   ./run_prod.sh [device] [debug|profile]
+#   ./run_prod.sh [device] [debug|profile|release]
 # Examples:
 #   ./run_prod.sh macos profile
 #   ./run_prod.sh chrome debug
+#   ./run_prod.sh <iphone-device-id> release   # true release build on a tethered device
+# Find your device id with: flutter devices
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -42,8 +44,9 @@ MODE_FLAG=()
 case "$MODE" in
   debug) ;;
   profile) MODE_FLAG=(--profile) ;;
+  release) MODE_FLAG=(--release) ;;
   *)
-    echo "Unknown mode '$MODE'. Use debug or profile."
+    echo "Unknown mode '$MODE'. Use debug, profile, or release."
     exit 1
     ;;
 esac
