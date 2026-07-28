@@ -61,6 +61,39 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     }
   }
 
+  /// Guard destructive rejection behind an explicit confirmation so a stray tap
+  /// can't cancel a real booking (the previous flat button did this instantly).
+  Future<void> _confirmReject() async {
+    final start = _appointment?['start_time'] != null
+        ? DateTime.tryParse(_appointment!['start_time'] as String)
+        : null;
+    final whenText = start != null ? ' on ${formatAppointmentDateTime(start)}' : '';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reject this appointment?'),
+        content: Text(
+          'This cancels the appointment$whenText. The caller won\'t be automatically '
+          'notified, and this can\'t be undone from here.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Keep it'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Reject appointment'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) _updateStatus('cancelled');
+  }
+
   Future<void> _showEditService() async {
     final current = (_appointment?['service_name'] as String?)?.trim() ?? '';
     final c = await showDialog<String>(
@@ -498,48 +531,138 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                     ),
                   ],
                   const SizedBox(height: 32),
-                  Text('Actions', style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (status != 'confirmed')
-                        FilledButton.icon(
-                          onPressed: _saving ? null : () => _updateStatus('confirmed'),
-                          icon: const Icon(Icons.check, size: 18),
-                          label: const Text('Confirm'),
-                        ),
-                      if (status != 'cancelled')
-                        OutlinedButton.icon(
-                          onPressed: _saving ? null : () => _updateStatus('cancelled'),
-                          icon: const Icon(Icons.cancel, size: 18),
-                          label: const Text('Reject'),
-                        ),
-                      if (status != 'completed' && start != null && start.isBefore(DateTime.now()))
-                        OutlinedButton.icon(
-                          onPressed: _saving ? null : () => _updateStatus('completed'),
-                          icon: const Icon(Icons.done_all, size: 18),
-                          label: const Text('Mark completed'),
-                        ),
-                      OutlinedButton.icon(
-                        onPressed: _saving ? null : _showEditService,
-                        icon: const Icon(Icons.edit, size: 18),
-                        label: const Text('Edit service'),
+
+                  // --- Primary decision: prominent, full-width, hard to mis-tap ---
+                  if (status != 'confirmed')
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _saving ? null : () => _updateStatus('confirmed'),
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const Text('Confirm appointment'),
                       ),
-                      OutlinedButton.icon(
-                        onPressed: _saving ? null : _showEditNotes,
-                        icon: const Icon(Icons.note_add, size: 18),
-                        label: const Text('Edit notes'),
+                    ),
+                  if (status == 'confirmed')
+                    _StatusNote(
+                      icon: Icons.check_circle,
+                      color: Colors.green.shade700,
+                      text: 'This appointment is confirmed.',
+                    ),
+                  if (status == 'cancelled')
+                    _StatusNote(
+                      icon: Icons.cancel,
+                      color: Theme.of(context).colorScheme.error,
+                      text: 'This appointment was rejected.',
+                    ),
+                  if (status != 'completed' && status != 'cancelled' && start != null && start.isBefore(DateTime.now())) ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _saving ? null : () => _updateStatus('completed'),
+                        icon: const Icon(Icons.done_all, size: 18),
+                        label: const Text('Mark as completed'),
                       ),
-                    ],
+                    ),
+                  ],
+                  if (status != 'cancelled') ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _saving ? null : _confirmReject,
+                        icon: const Icon(Icons.cancel_outlined, size: 18),
+                        label: const Text('Reject appointment'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Theme.of(context).colorScheme.error,
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 28),
+
+                  // --- Edit details: a tidy list, not a pile of buttons ---
+                  Text('Edit details', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  Card(
+                    margin: EdgeInsets.zero,
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        _ActionTile(
+                          icon: Icons.design_services_outlined,
+                          label: 'Service',
+                          value: displayService,
+                          onTap: _showEditService,
+                        ),
+                        const Divider(height: 1),
+                        _ActionTile(
+                          icon: Icons.notes_outlined,
+                          label: 'Notes',
+                          value: ((apt['notes'] as String?)?.trim().isNotEmpty ?? false) ? 'Added' : 'None',
+                          onTap: _showEditNotes,
+                        ),
+                        const Divider(height: 1),
+                        _ActionTile(
+                          icon: Icons.payment_outlined,
+                          label: 'Payment link',
+                          value: hasPayment ? 'Attached' : 'None',
+                          onTap: _showAttachPaymentLink,
+                        ),
+                        const Divider(height: 1),
+                        _ActionTile(
+                          icon: Icons.list_alt_outlined,
+                          label: 'Service instructions',
+                          value: ((apt['meeting_instructions'] as String?)?.trim().isNotEmpty ?? false) ? 'Added' : 'None',
+                          onTap: _showEditServiceInstructions,
+                        ),
+                        const Divider(height: 1),
+                        if (_isAddressBased(apt))
+                          _ActionTile(
+                            icon: Icons.place_outlined,
+                            label: 'Service address',
+                            value: (location != null && location.isNotEmpty) ? location : 'None',
+                            onTap: _showEditAddress,
+                          )
+                        else if (_isVideoMeeting(apt))
+                          _ActionTile(
+                            icon: Icons.videocam_outlined,
+                            label: 'Meeting link',
+                            value: (locationText != null && locationText.isNotEmpty) ? locationText : 'None',
+                            onTap: _showEditVideoLink,
+                          )
+                        else
+                          _ActionTile(
+                            icon: Icons.location_on_outlined,
+                            label: 'Address / meeting link',
+                            value: (locDisplay != null && locDisplay.isNotEmpty) ? locDisplay : 'None',
+                            onTap: _showEditAddressOrVideo,
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // --- Customer message (SMS): grouped and de-emphasized ---
+                  Text('Customer message', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Send an SMS confirmation to the caller.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                   ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      FilledButton.icon(
+                      FilledButton.tonalIcon(
                         onPressed: confirmSent || callerNumber == null || callerNumber.isEmpty
                             ? null
                             : () => _showSendConfirmation(isResend: false),
@@ -548,37 +671,11 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                       ),
                       if (confirmSent)
                         OutlinedButton.icon(
-                          onPressed: callerNumber == null || callerNumber.isEmpty ? null : () => _showSendConfirmation(isResend: true),
+                          onPressed: callerNumber == null || callerNumber.isEmpty
+                              ? null
+                              : () => _showSendConfirmation(isResend: true),
                           icon: const Icon(Icons.refresh, size: 18),
                           label: const Text('Resend confirmation'),
-                        ),
-                      OutlinedButton.icon(
-                        onPressed: _saving ? null : _showAttachPaymentLink,
-                        icon: const Icon(Icons.payment, size: 18),
-                        label: const Text('Payment link'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: _saving ? null : _showEditServiceInstructions,
-                        icon: const Icon(Icons.list_alt, size: 18),
-                        label: const Text('Service instructions'),
-                      ),
-                      if (_isAddressBased(apt))
-                        OutlinedButton.icon(
-                          onPressed: _saving ? null : _showEditAddress,
-                          icon: const Icon(Icons.place, size: 18),
-                          label: const Text('Address'),
-                        ),
-                      if (_isVideoMeeting(apt))
-                        OutlinedButton.icon(
-                          onPressed: _saving ? null : _showEditVideoLink,
-                          icon: const Icon(Icons.video_call, size: 18),
-                          label: const Text('Meeting link'),
-                        ),
-                      if (!_isAddressBased(apt) && !_isVideoMeeting(apt))
-                        OutlinedButton.icon(
-                          onPressed: _saving ? null : _showEditAddressOrVideo,
-                          icon: const Icon(Icons.location_on, size: 18),
-                          label: const Text('Address / link'),
                         ),
                     ],
                   ),
@@ -615,6 +712,72 @@ class _FollowUpRow extends StatelessWidget {
           Expanded(child: Text(value, style: Theme.of(context).textTheme.bodyMedium)),
         ],
       ),
+    );
+  }
+}
+
+/// Compact, scannable row for the "Edit details" card. Reads like a settings
+/// list (label + current value + chevron) instead of a wall of buttons.
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? value;
+  final VoidCallback? onTap;
+
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    this.value,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = value != null && value!.trim().isNotEmpty;
+    return ListTile(
+      leading: Icon(icon, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
+      title: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+      subtitle: hasValue
+          ? Text(
+              value!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            )
+          : null,
+      trailing: Icon(Icons.chevron_right, size: 20, color: Colors.grey.shade400),
+      onTap: onTap,
+    );
+  }
+}
+
+/// Inline status confirmation note shown in place of a Confirm button once the
+/// decision has been made.
+class _StatusNote extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String text;
+
+  const _StatusNote({required this.icon, required this.color, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w500,
+                ),
+          ),
+        ),
+      ],
     );
   }
 }

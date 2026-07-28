@@ -35,6 +35,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
   String _localDateLabel = '';
   bool _loading = true;
   String? _error;
+  int _needsReviewCount = 0;
 
   String? _effectiveReceptionistIdForToday;
   _TodayContext _todayContext = _TodayContext.resolving;
@@ -78,6 +79,23 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
     await _resolveTodayReceptionist();
     if (!mounted) return;
     await _load();
+    await _refreshNeedsReviewCount();
+  }
+
+  /// Keep the "Needs review" tab badge accurate regardless of the active tab so
+  /// pending appointments are impossible to miss.
+  Future<void> _refreshNeedsReviewCount() async {
+    try {
+      final data = await loadAppointments(
+        status: 'needs_review',
+        receptionistId: widget.receptionistId,
+        limit: 100,
+      );
+      final list = List<Map<String, dynamic>>.from(data['appointments'] ?? []);
+      if (mounted) setState(() => _needsReviewCount = list.length);
+    } catch (_) {
+      // Non-fatal: the badge just won't update.
+    }
   }
 
   Future<void> _resolveTodayReceptionist() async {
@@ -173,6 +191,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
     );
     _appointments = List<Map<String, dynamic>>.from(data['appointments'] ?? []);
     _receptionists = Map<String, String>.from(data['receptionists'] ?? {});
+    if (status == 'needs_review') {
+      _needsReviewCount = _appointments.length;
+    }
   }
 
   Future<void> _loadUpcoming() async {
@@ -235,7 +256,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
           controller: _tabController,
           isScrollable: true,
           tabAlignment: TabAlignment.start,
-          tabs: [for (final t in _tabs) Tab(text: t)],
+          tabs: [
+            for (int i = 0; i < _tabs.length; i++)
+              Tab(child: _buildTabLabel(_tabs[i], i == 1 ? _needsReviewCount : 0)),
+          ],
         ),
       ),
       body: constrainedScaffoldBody(
@@ -260,6 +284,32 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTabLabel(String text, int count) {
+    if (count <= 0) return Text(text);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(text),
+        const SizedBox(width: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade600,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            '$count',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -412,7 +462,13 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
           return _AppointmentRow(
             appointment: apt,
             receptionistName: _receptionists[apt['receptionist_id']] ?? '—',
-            onTap: () => context.push('/appointments/${apt['id']}'),
+            onTap: () => context.push('/appointments/${apt['id']}').then((_) {
+              // Reflect any confirm/reject made on the detail screen immediately.
+              if (mounted) {
+                _load();
+                _refreshNeedsReviewCount();
+              }
+            }),
           );
         },
       ),
@@ -490,14 +546,22 @@ class _AppointmentRow extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Status accent stripe — status is readable at a glance without
+              // hunting for the chip.
+              Container(width: 4, color: _accentColor(status)),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
               Row(
                 children: [
                   Expanded(
@@ -558,11 +622,30 @@ class _AppointmentRow extends StatelessWidget {
                   ],
                 ),
               ],
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Color _accentColor(String status) {
+    switch (status) {
+      case 'needs_review':
+        return Colors.orange.shade600;
+      case 'confirmed':
+        return Colors.green.shade600;
+      case 'completed':
+        return Colors.blue.shade400;
+      case 'cancelled':
+        return Colors.red.shade300;
+      default:
+        return Colors.grey.shade300;
+    }
   }
 }
 
