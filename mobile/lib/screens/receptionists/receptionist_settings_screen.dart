@@ -229,6 +229,8 @@ class _ServicesTab extends StatefulWidget {
 class _ServicesTabState extends State<_ServicesTab> {
   List<Map<String, dynamic>> _services = [];
   bool _loading = true;
+  bool _showEditor = false;
+  Map<String, dynamic>? _editingService;
 
   @override
   void initState() {
@@ -243,486 +245,37 @@ class _ServicesTabState extends State<_ServicesTab> {
             'id, name, description, price_cents, duration_minutes, requires_location, default_location_type, followup_mode, followup_message_template, payment_link, meeting_instructions, owner_selected_platform, internal_followup_notes')
         .eq('receptionist_id', widget.receptionistId)
         .order('name');
+    if (!mounted) return;
     setState(() {
       _services = (res as List).cast<Map<String, dynamic>>();
       _loading = false;
     });
   }
 
-  Future<void> _openServiceEditor({Map<String, dynamic>? service}) async {
-    final nameController =
-        TextEditingController(text: (service?['name'] as String?) ?? '');
-    final descriptionController =
-        TextEditingController(text: (service?['description'] as String?) ?? '');
-    final durationController = TextEditingController(
-      text: ((service?['duration_minutes'] as int?)?.toString()) ?? '',
-    );
-    final priceController = TextEditingController(
-      text: ((service?['price_cents'] as int?) != null)
-          ? (((service?['price_cents'] as int) / 100).toStringAsFixed(2))
-          : '',
-    );
-    String followupMode =
-        ((service?['followup_mode'] as String?) ?? 'under_review');
-    if (!['none', 'under_review', 'send_payment_link', 'send_custom_message']
-        .contains(followupMode)) {
-      followupMode = 'under_review';
-    }
-    final followupTemplateController = TextEditingController(
-      text: (service?['followup_message_template'] as String?) ?? '',
-    );
-    final paymentLinkController = TextEditingController(
-      text: (service?['payment_link'] as String?) ?? '',
-    );
-    final meetingInstructionsController = TextEditingController(
-      text: (service?['meeting_instructions'] as String?) ?? '',
-    );
-    final ownerSelectedPlatformController = TextEditingController(
-      text: (service?['owner_selected_platform'] as String?) ?? '',
-    );
-    final internalFollowupNotesController = TextEditingController(
-      text: (service?['internal_followup_notes'] as String?) ?? '',
-    );
-    bool requiresLocation = (service?['requires_location'] as bool?) ?? false;
-    String locationType =
-        ((service?['default_location_type'] as String?) ?? 'customer_address');
-    if (locationType == 'no_location') locationType = 'customer_address';
+  void _openAddForm() {
+    setState(() {
+      _showEditor = true;
+      _editingService = null;
+    });
+  }
 
-    final createdOrUpdated = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (modalContext, setModalState) {
-          final media = MediaQuery.of(modalContext);
-          final maxHeight = media.size.height * 0.85;
-          final sectionTitleStyle = Theme.of(modalContext)
-              .textTheme
-              .labelLarge
-              ?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: EchoDeskColors.ink,
-              );
-          const fieldGap = SizedBox(height: 6);
-          const sectionGap = SizedBox(height: EchoDeskSpacing.xs + 2);
-          const followUpGap = SizedBox(height: EchoDeskSpacing.xs + 2);
-          const panelPadding = EdgeInsets.fromLTRB(10, 8, 10, 8);
-          const denseLabelStyle = TextStyle(
-            fontSize: 12.5,
-            color: EchoDeskColors.muted,
-            height: 1.15,
-          );
+  void _openEditForm(Map<String, dynamic> service) {
+    setState(() {
+      _showEditor = true;
+      _editingService = service;
+    });
+  }
 
-          Widget sectionPanel({
-            required Color color,
-            required List<Widget> children,
-          }) {
-            return Container(
-              width: double.infinity,
-              padding: panelPadding,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(EchoDeskRadii.sm),
-                border: Border.all(color: EchoDeskColors.line),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: children,
-              ),
-            );
-          }
+  void _closeEditor() {
+    setState(() {
+      _showEditor = false;
+      _editingService = null;
+    });
+  }
 
-          InputDecoration denseDecoration(
-            String label, {
-            bool filled = false,
-            bool compact = false,
-          }) {
-            return InputDecoration(
-              labelText: label,
-              labelStyle: denseLabelStyle,
-              floatingLabelStyle: denseLabelStyle.copyWith(
-                fontSize: 12,
-                color: EchoDeskColors.muted,
-              ),
-              floatingLabelBehavior: FloatingLabelBehavior.always,
-              alignLabelWithHint: true,
-              border: const OutlineInputBorder(),
-              isDense: true,
-              filled: filled,
-              fillColor: filled ? EchoDeskColors.surface : null,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 11,
-                vertical: compact ? 9 : 10,
-              ),
-            );
-          }
-
-          Future<void> saveService() async {
-            final name = nameController.text.trim();
-            if (name.isEmpty) return;
-
-            final duration = int.tryParse(durationController.text.trim());
-            final priceDollars =
-                double.tryParse(priceController.text.trim());
-            final priceCents =
-                priceDollars != null ? (priceDollars * 100).round() : null;
-
-            final payload = <String, dynamic>{
-              'name': name,
-              'description': descriptionController.text.trim(),
-              'requires_location': requiresLocation,
-              'default_location_type':
-                  requiresLocation ? locationType : null,
-              'followup_mode': followupMode,
-              'followup_message_template':
-                  followupTemplateController.text.trim().isEmpty
-                      ? null
-                      : followupTemplateController.text.trim(),
-              'payment_link': paymentLinkController.text.trim().isEmpty
-                  ? null
-                  : paymentLinkController.text.trim(),
-              'meeting_instructions':
-                  meetingInstructionsController.text.trim().isEmpty
-                      ? null
-                      : meetingInstructionsController.text.trim(),
-              'owner_selected_platform':
-                  ownerSelectedPlatformController.text.trim().isEmpty
-                      ? null
-                      : ownerSelectedPlatformController.text.trim(),
-              'internal_followup_notes':
-                  internalFollowupNotesController.text.trim().isEmpty
-                      ? null
-                      : internalFollowupNotesController.text.trim(),
-            };
-            if (duration != null) payload['duration_minutes'] = duration;
-            if (priceCents != null) payload['price_cents'] = priceCents;
-
-            try {
-              if (service == null) {
-                await Supabase.instance.client.from('services').insert({
-                  ...payload,
-                  'receptionist_id': widget.receptionistId,
-                });
-              } else {
-                await Supabase.instance.client
-                    .from('services')
-                    .update(payload)
-                    .eq('id', service['id'])
-                    .eq('receptionist_id', widget.receptionistId);
-              }
-              if (!modalContext.mounted) return;
-              Navigator.of(modalContext).pop(true);
-            } catch (_) {
-              if (!modalContext.mounted) return;
-              ScaffoldMessenger.of(modalContext).showSnackBar(
-                const SnackBar(content: Text('Could not save service')),
-              );
-            }
-          }
-
-          return Dialog(
-            insetPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: 440,
-                maxHeight: maxHeight,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      EchoDeskSpacing.md,
-                      EchoDeskSpacing.sm + 2,
-                      EchoDeskSpacing.md,
-                      EchoDeskSpacing.xs + 2,
-                    ),
-                    child: Text(
-                      service == null ? 'Add service' : 'Edit service',
-                      style: Theme.of(modalContext)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(
-                        EchoDeskSpacing.md,
-                        0,
-                        EchoDeskSpacing.md,
-                        EchoDeskSpacing.xs,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          sectionPanel(
-                            color: EchoDeskColors.surfaceSoft,
-                            children: [
-                              Text('Basics', style: sectionTitleStyle),
-                              fieldGap,
-                              TextField(
-                                controller: nameController,
-                                decoration: denseDecoration('Name'),
-                                textInputAction: TextInputAction.next,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              fieldGap,
-                              TextField(
-                                controller: descriptionController,
-                                decoration: denseDecoration('Description'),
-                                maxLines: 2,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              fieldGap,
-                              Row(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: durationController,
-                                      decoration: denseDecoration(
-                                          'Duration (min)'),
-                                      keyboardType: TextInputType.number,
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                  ),
-                                  const SizedBox(width: EchoDeskSpacing.sm),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: priceController,
-                                      decoration:
-                                          denseDecoration(r'Price ($)'),
-                                      keyboardType:
-                                          const TextInputType
-                                              .numberWithOptions(
-                                        decimal: true,
-                                      ),
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          sectionGap,
-                          sectionPanel(
-                            color: EchoDeskColors.surfaceSoft,
-                            children: [
-                              Text('Location', style: sectionTitleStyle),
-                              CheckboxListTile(
-                                title: const Text(
-                                  'Requires location',
-                                  style: TextStyle(fontSize: 13.5),
-                                ),
-                                value: requiresLocation,
-                                onChanged: (v) => setModalState(
-                                  () => requiresLocation = v ?? false,
-                                ),
-                                controlAffinity:
-                                    ListTileControlAffinity.leading,
-                                contentPadding: EdgeInsets.zero,
-                                visualDensity: const VisualDensity(
-                                  horizontal: -2,
-                                  vertical: -3,
-                                ),
-                                dense: true,
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              if (requiresLocation) ...[
-                                fieldGap,
-                                DropdownButtonFormField<String>(
-                                  // ignore: deprecated_member_use -- value is the current selection; initialValue is for uncontrolled form fields
-                                  value: locationType,
-                                  decoration: denseDecoration(
-                                    'Location type',
-                                    filled: true,
-                                  ),
-                                  isExpanded: true,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: EchoDeskColors.ink,
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'customer_address',
-                                      child: Text('Customer address'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'phone_call',
-                                      child: Text('Phone call'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'video_meeting',
-                                      child: Text('Video meeting'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'custom',
-                                      child: Text('Custom text'),
-                                    ),
-                                  ],
-                                  onChanged: (v) => setModalState(
-                                    () => locationType =
-                                        v ?? 'customer_address',
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          sectionGap,
-                          sectionPanel(
-                            color: EchoDeskColors.brandSoft
-                                .withValues(alpha: 0.45),
-                            children: [
-                              Text('Follow-up', style: sectionTitleStyle),
-                              Text(
-                                'Owner-controlled actions after a booking.',
-                                style: Theme.of(modalContext)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color: EchoDeskColors.muted,
-                                      fontSize: 11.5,
-                                      height: 1.25,
-                                    ),
-                              ),
-                              followUpGap,
-                              DropdownButtonFormField<String>(
-                                initialValue: followupMode,
-                                decoration: denseDecoration(
-                                  'Follow-up mode',
-                                  filled: true,
-                                  compact: true,
-                                ),
-                                isExpanded: true,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: EchoDeskColors.ink,
-                                ),
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: 'none',
-                                    child: Text('None'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'under_review',
-                                    child: Text('Under review'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'send_payment_link',
-                                    child: Text('Send payment link'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'send_custom_message',
-                                    child: Text('Send custom message'),
-                                  ),
-                                ],
-                                onChanged: (v) => setModalState(
-                                  () =>
-                                      followupMode = v ?? 'under_review',
-                                ),
-                              ),
-                              followUpGap,
-                              TextField(
-                                controller: followupTemplateController,
-                                decoration: denseDecoration(
-                                  'Follow-up message template (optional)',
-                                  filled: true,
-                                  compact: true,
-                                ),
-                                maxLines: 2,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              followUpGap,
-                              TextField(
-                                controller: paymentLinkController,
-                                decoration: denseDecoration(
-                                  'Payment link (optional)',
-                                  filled: true,
-                                  compact: true,
-                                ),
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              followUpGap,
-                              TextField(
-                                controller:
-                                    ownerSelectedPlatformController,
-                                decoration: denseDecoration(
-                                  'Owner-selected platform (optional)',
-                                  filled: true,
-                                  compact: true,
-                                ),
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              followUpGap,
-                              TextField(
-                                controller: meetingInstructionsController,
-                                decoration: denseDecoration(
-                                  'Meeting instructions (optional)',
-                                  filled: true,
-                                  compact: true,
-                                ),
-                                maxLines: 2,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              followUpGap,
-                              TextField(
-                                controller:
-                                    internalFollowupNotesController,
-                                decoration: denseDecoration(
-                                  'Internal follow-up notes (optional)',
-                                  filled: true,
-                                  compact: true,
-                                ),
-                                maxLines: 2,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const Divider(height: 1, color: EchoDeskColors.line),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () =>
-                              Navigator.of(modalContext).pop(false),
-                          child: const Text('Cancel'),
-                        ),
-                        const SizedBox(width: EchoDeskSpacing.sm),
-                        FilledButton(
-                          onPressed: saveService,
-                          child: const Text('Save'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-
-    nameController.dispose();
-    descriptionController.dispose();
-    durationController.dispose();
-    priceController.dispose();
-    followupTemplateController.dispose();
-    paymentLinkController.dispose();
-    meetingInstructionsController.dispose();
-    ownerSelectedPlatformController.dispose();
-    internalFollowupNotesController.dispose();
-
-    if (createdOrUpdated == true) _load();
+  Future<void> _onEditorSaved() async {
+    _closeEditor();
+    await _load();
   }
 
   Future<void> _updateService(String id,
@@ -750,10 +303,19 @@ class _ServicesTabState extends State<_ServicesTab> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_services.isEmpty) {
-      return ListView(
-        padding: const EdgeInsets.all(EchoDeskSpacing.lg),
-        children: [
+    return ListView(
+      padding: const EdgeInsets.all(EchoDeskSpacing.lg),
+      children: [
+        if (_showEditor) ...[
+          _InlineServiceForm(
+            key: ValueKey(_editingService?['id'] ?? 'new-service'),
+            receptionistId: widget.receptionistId,
+            service: _editingService,
+            onCancel: _closeEditor,
+            onSaved: _onEditorSaved,
+          ),
+          if (_services.isNotEmpty) const SizedBox(height: EchoDeskSpacing.lg),
+        ] else if (_services.isEmpty) ...[
           Text(
             'Add services so callers can book the right thing automatically.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -762,173 +324,592 @@ class _ServicesTabState extends State<_ServicesTab> {
           ),
           const SizedBox(height: EchoDeskSpacing.md),
           FilledButton(
-            onPressed: () => _openServiceEditor(),
+            onPressed: _openAddForm,
             child: const Text('Add service'),
           ),
+        ] else ...[
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Service menu with pricing, duration, and optional location.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: EchoDeskColors.muted,
+                      ),
+                ),
+              ),
+              FilledButton.tonal(
+                onPressed: _openAddForm,
+                child: const Text('Add service'),
+              ),
+            ],
+          ),
+          const SizedBox(height: EchoDeskSpacing.md),
         ],
+        if (_services.isNotEmpty)
+          ..._services.map((s) {
+            final requiresLocation =
+                (s['requires_location'] as bool?) ?? false;
+            final rawType = s['default_location_type'] as String?;
+            final defaultLocationType =
+                (rawType == null || rawType == 'no_location')
+                    ? 'customer_address'
+                    : rawType;
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                onTap: () => _openEditForm(s),
+                borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+                child: Padding(
+                  padding: const EdgeInsets.all(EchoDeskSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  s['name'] ?? '',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '\$${(s['price_cents'] ?? 0) / 100} · ${s['duration_minutes'] ?? 0} min',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: EchoDeskColors.muted),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.delete_outline,
+                                color: EchoDeskColors.danger),
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('Delete service?'),
+                                  content: Text(
+                                    'Remove "${s['name'] ?? 'this service'}"? This cannot be undone.',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(ctx).pop(false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () =>
+                                          Navigator.of(ctx).pop(true),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor:
+                                            Theme.of(ctx).colorScheme.error,
+                                      ),
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true && mounted) {
+                                await Supabase.instance.client
+                                    .from('services')
+                                    .delete()
+                                    .eq('id', s['id'])
+                                    .eq('receptionist_id',
+                                        widget.receptionistId);
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '"${s['name'] ?? 'Service'}" deleted',
+                                    ),
+                                  ),
+                                );
+                                _load();
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: EchoDeskSpacing.sm),
+                      CheckboxListTile(
+                        title: const Text('Requires location',
+                            style: TextStyle(fontSize: 14)),
+                        value: requiresLocation,
+                        onChanged: (v) => _updateService(
+                          s['id'] as String,
+                          requiresLocation: v ?? false,
+                        ),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                      ),
+                      if (requiresLocation) ...[
+                        const SizedBox(height: EchoDeskSpacing.sm),
+                        DropdownButtonFormField<String>(
+                          // ignore: deprecated_member_use -- value is the current selection; initialValue is for uncontrolled form fields
+                          value: defaultLocationType,
+                          decoration: const InputDecoration(
+                            labelText: 'Location type',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          isExpanded: true,
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'customer_address',
+                              child: Text('Customer address'),
+                            ),
+                            DropdownMenuItem(
+                                value: 'phone_call',
+                                child: Text('Phone call')),
+                            DropdownMenuItem(
+                                value: 'video_meeting',
+                                child: Text('Video meeting')),
+                            DropdownMenuItem(
+                                value: 'custom', child: Text('Custom text')),
+                          ],
+                          onChanged: (v) => _updateService(
+                            s['id'] as String,
+                            defaultLocationType: v ?? 'customer_address',
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+}
+
+class _InlineServiceForm extends StatefulWidget {
+  final String receptionistId;
+  final Map<String, dynamic>? service;
+  final VoidCallback onCancel;
+  final Future<void> Function() onSaved;
+
+  const _InlineServiceForm({
+    super.key,
+    required this.receptionistId,
+    required this.service,
+    required this.onCancel,
+    required this.onSaved,
+  });
+
+  @override
+  State<_InlineServiceForm> createState() => _InlineServiceFormState();
+}
+
+class _InlineServiceFormState extends State<_InlineServiceForm> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _durationController;
+  late final TextEditingController _priceController;
+  late final TextEditingController _followupTemplateController;
+  late final TextEditingController _paymentLinkController;
+  late final TextEditingController _meetingInstructionsController;
+  late final TextEditingController _ownerSelectedPlatformController;
+  late final TextEditingController _internalFollowupNotesController;
+  late String _followupMode;
+  late bool _requiresLocation;
+  late String _locationType;
+  bool _saving = false;
+
+  static const _denseLabelStyle = TextStyle(
+    fontSize: 12.5,
+    color: EchoDeskColors.muted,
+    height: 1.15,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    final service = widget.service;
+    _nameController =
+        TextEditingController(text: (service?['name'] as String?) ?? '');
+    _descriptionController =
+        TextEditingController(text: (service?['description'] as String?) ?? '');
+    _durationController = TextEditingController(
+      text: ((service?['duration_minutes'] as int?)?.toString()) ?? '',
+    );
+    _priceController = TextEditingController(
+      text: ((service?['price_cents'] as int?) != null)
+          ? (((service?['price_cents'] as int) / 100).toStringAsFixed(2))
+          : '',
+    );
+    var followupMode =
+        ((service?['followup_mode'] as String?) ?? 'under_review');
+    if (!['none', 'under_review', 'send_payment_link', 'send_custom_message']
+        .contains(followupMode)) {
+      followupMode = 'under_review';
+    }
+    _followupMode = followupMode;
+    _followupTemplateController = TextEditingController(
+      text: (service?['followup_message_template'] as String?) ?? '',
+    );
+    _paymentLinkController = TextEditingController(
+      text: (service?['payment_link'] as String?) ?? '',
+    );
+    _meetingInstructionsController = TextEditingController(
+      text: (service?['meeting_instructions'] as String?) ?? '',
+    );
+    _ownerSelectedPlatformController = TextEditingController(
+      text: (service?['owner_selected_platform'] as String?) ?? '',
+    );
+    _internalFollowupNotesController = TextEditingController(
+      text: (service?['internal_followup_notes'] as String?) ?? '',
+    );
+    _requiresLocation = (service?['requires_location'] as bool?) ?? false;
+    var locationType =
+        ((service?['default_location_type'] as String?) ?? 'customer_address');
+    if (locationType == 'no_location') locationType = 'customer_address';
+    _locationType = locationType;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _durationController.dispose();
+    _priceController.dispose();
+    _followupTemplateController.dispose();
+    _paymentLinkController.dispose();
+    _meetingInstructionsController.dispose();
+    _ownerSelectedPlatformController.dispose();
+    _internalFollowupNotesController.dispose();
+    super.dispose();
+  }
+
+  InputDecoration _decoration(String label, {bool filled = false}) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: _denseLabelStyle,
+      floatingLabelStyle: _denseLabelStyle.copyWith(
+        fontSize: 12,
+        color: EchoDeskColors.muted,
+      ),
+      floatingLabelBehavior: FloatingLabelBehavior.always,
+      alignLabelWithHint: true,
+      border: const OutlineInputBorder(),
+      isDense: true,
+      filled: filled,
+      fillColor: filled ? EchoDeskColors.surface : null,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    );
+  }
+
+  Widget _sectionPanel({
+    required Color color,
+    required List<Widget> children,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(EchoDeskSpacing.md),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+        border: Border.all(color: EchoDeskColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty || _saving) return;
+
+    setState(() => _saving = true);
+
+    final duration = int.tryParse(_durationController.text.trim());
+    final priceDollars = double.tryParse(_priceController.text.trim());
+    final priceCents =
+        priceDollars != null ? (priceDollars * 100).round() : null;
+
+    final payload = <String, dynamic>{
+      'name': name,
+      'description': _descriptionController.text.trim(),
+      'requires_location': _requiresLocation,
+      'default_location_type': _requiresLocation ? _locationType : null,
+      'followup_mode': _followupMode,
+      'followup_message_template':
+          _followupTemplateController.text.trim().isEmpty
+              ? null
+              : _followupTemplateController.text.trim(),
+      'payment_link': _paymentLinkController.text.trim().isEmpty
+          ? null
+          : _paymentLinkController.text.trim(),
+      'meeting_instructions':
+          _meetingInstructionsController.text.trim().isEmpty
+              ? null
+              : _meetingInstructionsController.text.trim(),
+      'owner_selected_platform':
+          _ownerSelectedPlatformController.text.trim().isEmpty
+              ? null
+              : _ownerSelectedPlatformController.text.trim(),
+      'internal_followup_notes':
+          _internalFollowupNotesController.text.trim().isEmpty
+              ? null
+              : _internalFollowupNotesController.text.trim(),
+    };
+    if (duration != null) payload['duration_minutes'] = duration;
+    if (priceCents != null) payload['price_cents'] = priceCents;
+
+    try {
+      if (widget.service == null) {
+        await Supabase.instance.client.from('services').insert({
+          ...payload,
+          'receptionist_id': widget.receptionistId,
+        });
+      } else {
+        await Supabase.instance.client
+            .from('services')
+            .update(payload)
+            .eq('id', widget.service!['id'])
+            .eq('receptionist_id', widget.receptionistId);
+      }
+      if (!mounted) return;
+      await widget.onSaved();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save service')),
       );
     }
+  }
 
-    return ListView(
-      padding: const EdgeInsets.all(EchoDeskSpacing.lg),
-      children: [
-        Row(
+  @override
+  Widget build(BuildContext context) {
+    final sectionTitleStyle = Theme.of(context).textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: EchoDeskColors.ink,
+        );
+    const fieldGap = SizedBox(height: EchoDeskSpacing.sm);
+    const sectionGap = SizedBox(height: EchoDeskSpacing.md);
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(EchoDeskSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: Text(
-                'Service menu with pricing, duration, and optional location.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: EchoDeskColors.muted,
-                    ),
-              ),
+            Text(
+              widget.service == null ? 'Add service' : 'Edit service',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
             ),
-            FilledButton.tonal(
-              onPressed: () => _openServiceEditor(),
-              child: const Text('Add service'),
+            const SizedBox(height: EchoDeskSpacing.md),
+            _sectionPanel(
+              color: EchoDeskColors.surfaceSoft,
+              children: [
+                Text('Basics', style: sectionTitleStyle),
+                fieldGap,
+                TextField(
+                  controller: _nameController,
+                  decoration: _decoration('Name'),
+                  textInputAction: TextInputAction.next,
+                ),
+                fieldGap,
+                TextField(
+                  controller: _descriptionController,
+                  decoration: _decoration('Description'),
+                  maxLines: 2,
+                ),
+                fieldGap,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _durationController,
+                        decoration: _decoration('Duration (min)'),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: EchoDeskSpacing.sm),
+                    Expanded(
+                      child: TextField(
+                        controller: _priceController,
+                        decoration: _decoration(r'Price ($)'),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            sectionGap,
+            _sectionPanel(
+              color: EchoDeskColors.surfaceSoft,
+              children: [
+                Text('Location', style: sectionTitleStyle),
+                CheckboxListTile(
+                  title: const Text(
+                    'Requires location',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  value: _requiresLocation,
+                  onChanged: (v) =>
+                      setState(() => _requiresLocation = v ?? false),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+                if (_requiresLocation) ...[
+                  fieldGap,
+                  DropdownButtonFormField<String>(
+                    // ignore: deprecated_member_use -- value is the current selection; initialValue is for uncontrolled form fields
+                    value: _locationType,
+                    decoration: _decoration('Location type', filled: true),
+                    isExpanded: true,
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'customer_address',
+                        child: Text('Customer address'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'phone_call',
+                        child: Text('Phone call'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'video_meeting',
+                        child: Text('Video meeting'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'custom',
+                        child: Text('Custom text'),
+                      ),
+                    ],
+                    onChanged: (v) => setState(
+                      () => _locationType = v ?? 'customer_address',
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            sectionGap,
+            _sectionPanel(
+              color: EchoDeskColors.brandSoft.withValues(alpha: 0.45),
+              children: [
+                Text('Follow-up', style: sectionTitleStyle),
+                const SizedBox(height: 2),
+                Text(
+                  'Owner-controlled actions after a booking.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: EchoDeskColors.muted,
+                      ),
+                ),
+                fieldGap,
+                DropdownButtonFormField<String>(
+                  initialValue: _followupMode,
+                  decoration: _decoration('Follow-up mode', filled: true),
+                  isExpanded: true,
+                  items: const [
+                    DropdownMenuItem(value: 'none', child: Text('None')),
+                    DropdownMenuItem(
+                      value: 'under_review',
+                      child: Text('Under review'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'send_payment_link',
+                      child: Text('Send payment link'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'send_custom_message',
+                      child: Text('Send custom message'),
+                    ),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => _followupMode = v ?? 'under_review'),
+                ),
+                fieldGap,
+                TextField(
+                  controller: _followupTemplateController,
+                  decoration: _decoration(
+                    'Follow-up message template (optional)',
+                    filled: true,
+                  ),
+                  maxLines: 3,
+                ),
+                fieldGap,
+                TextField(
+                  controller: _paymentLinkController,
+                  decoration: _decoration(
+                    'Payment link (optional)',
+                    filled: true,
+                  ),
+                ),
+                fieldGap,
+                TextField(
+                  controller: _ownerSelectedPlatformController,
+                  decoration: _decoration(
+                    'Owner-selected platform (optional)',
+                    filled: true,
+                  ),
+                ),
+                fieldGap,
+                TextField(
+                  controller: _meetingInstructionsController,
+                  decoration: _decoration(
+                    'Meeting instructions (optional)',
+                    filled: true,
+                  ),
+                  maxLines: 2,
+                ),
+                fieldGap,
+                TextField(
+                  controller: _internalFollowupNotesController,
+                  decoration: _decoration(
+                    'Internal follow-up notes (optional)',
+                    filled: true,
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+            const SizedBox(height: EchoDeskSpacing.md),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _saving ? null : widget.onCancel,
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: EchoDeskSpacing.sm),
+                FilledButton(
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save'),
+                ),
+              ],
             ),
           ],
         ),
-        const SizedBox(height: EchoDeskSpacing.md),
-        ..._services.map((s) {
-          final requiresLocation = (s['requires_location'] as bool?) ?? false;
-          final rawType = s['default_location_type'] as String?;
-          final defaultLocationType =
-              (rawType == null || rawType == 'no_location')
-                  ? 'customer_address'
-                  : rawType;
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: InkWell(
-              onTap: () => _openServiceEditor(service: s),
-              borderRadius: BorderRadius.circular(EchoDeskRadii.md),
-              child: Padding(
-                padding: const EdgeInsets.all(EchoDeskSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                s['name'] ?? '',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '\$${(s['price_cents'] ?? 0) / 100} · ${s['duration_minutes'] ?? 0} min',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(color: EchoDeskColors.muted),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete_outline,
-                              color: EchoDeskColors.danger),
-                          onPressed: () async {
-                            final confirm = await showDialog<bool>(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('Delete service?'),
-                                content: Text(
-                                  'Remove "${s['name'] ?? 'this service'}"? This cannot be undone.',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(ctx).pop(false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () =>
-                                        Navigator.of(ctx).pop(true),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor:
-                                          Theme.of(ctx).colorScheme.error,
-                                    ),
-                                    child: const Text('Delete'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirm == true && mounted) {
-                              await Supabase.instance.client
-                                  .from('services')
-                                  .delete()
-                                  .eq('id', s['id'])
-                                  .eq('receptionist_id', widget.receptionistId);
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    '"${s['name'] ?? 'Service'}" deleted',
-                                  ),
-                                ),
-                              );
-                              _load();
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: EchoDeskSpacing.sm),
-                    CheckboxListTile(
-                      title: const Text('Requires location',
-                          style: TextStyle(fontSize: 14)),
-                      value: requiresLocation,
-                      onChanged: (v) => _updateService(
-                        s['id'] as String,
-                        requiresLocation: v ?? false,
-                      ),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                    ),
-                    if (requiresLocation) ...[
-                      const SizedBox(height: EchoDeskSpacing.sm),
-                      DropdownButtonFormField<String>(
-                        // ignore: deprecated_member_use -- value is the current selection; initialValue is for uncontrolled form fields
-                        value: defaultLocationType,
-                        decoration: const InputDecoration(
-                          labelText: 'Location type',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        isExpanded: true,
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'customer_address',
-                            child: Text('Customer address'),
-                          ),
-                          DropdownMenuItem(
-                              value: 'phone_call', child: Text('Phone call')),
-                          DropdownMenuItem(
-                              value: 'video_meeting',
-                              child: Text('Video meeting')),
-                          DropdownMenuItem(
-                              value: 'custom', child: Text('Custom text')),
-                        ],
-                        onChanged: (v) => _updateService(
-                          s['id'] as String,
-                          defaultLocationType: v ?? 'customer_address',
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          );
-        }),
-      ],
+      ),
     );
   }
 }
