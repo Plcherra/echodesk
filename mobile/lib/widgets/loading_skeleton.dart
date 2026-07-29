@@ -83,3 +83,24 @@ class SkeletonCard extends StatelessWidget {
     );
   }
 }
+
+/// Shared list-loading pattern: a few skeleton cards instead of a lone spinner.
+class ListLoadingView extends StatelessWidget {
+  final int itemCount;
+  final EdgeInsetsGeometry padding;
+
+  const ListLoadingView({
+    super.key,
+    this.itemCount = 4,
+    this.padding = const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: padding,
+      children: List.generate(itemCount, (_) => const SkeletonCard()),
+    );
+  }
+}

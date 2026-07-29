@@ -8,6 +8,7 @@ import '../../models/receptionist.dart';
 import '../../strings.dart';
 import '../../services/api_client.dart';
 import '../../widgets/constrained_scaffold_body.dart';
+import '../../widgets/loading_skeleton.dart';
 import '../../widgets/state_views.dart';
 
 class ReceptionistsScreen extends StatefulWidget {
@@ -178,7 +179,7 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
       ),
       body: constrainedScaffoldBody(
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const ListLoadingView()
             : _error != null
                 ? Center(
                     child: ErrorStateView(

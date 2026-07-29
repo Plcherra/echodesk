@@ -6,9 +6,11 @@ import '../../services/appointment_service.dart';
 import '../../utils/appointment_formatters.dart';
 import '../../widgets/appointment_day_schedule.dart';
 import '../../widgets/constrained_scaffold_body.dart';
+import '../../widgets/loading_skeleton.dart';
 import '../../widgets/main_shell.dart';
 import '../../widgets/state_views.dart';
 import '../../widgets/status_chip.dart';
+import '../../theme/echodesk_theme.dart';
 
 class AppointmentsScreen extends StatefulWidget {
   final String? initialStatus;
@@ -345,7 +347,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
           decoration: BoxDecoration(
-            color: Colors.orange.shade600,
+            color: EchoDeskColors.warning,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Text(
@@ -363,7 +365,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
 
   Widget _wrapTabContent(int tabIndex, Widget child) {
     if (_loading && _tabController.index == tabIndex) {
-      return const Center(child: CircularProgressIndicator());
+      return const ListLoadingView();
     }
     if (_error != null && _tabController.index == tabIndex) {
       return _buildError();
@@ -424,7 +426,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
         Icon(
           Icons.groups_outlined,
           size: 48,
-          color: Colors.grey.shade400,
+          color: EchoDeskColors.soft,
         ),
         const SizedBox(height: 12),
         Text(
@@ -476,7 +478,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 48, color: Colors.grey.shade400),
+                Icon(icon, size: 48, color: EchoDeskColors.soft),
                 const SizedBox(height: 12),
                 Text(title, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
@@ -623,7 +625,7 @@ class _AppointmentRow extends StatelessWidget {
                   StatusChip(status: status),
                   if (isGeneric) _GenericBadge(),
                   const SizedBox(width: 4),
-                  Icon(Icons.chevron_right, size: 20, color: Colors.grey.shade400),
+                  Icon(Icons.chevron_right, size: 20, color: EchoDeskColors.soft),
                 ],
               ),
               const SizedBox(height: 8),
@@ -636,7 +638,7 @@ class _AppointmentRow extends StatelessWidget {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  Icon(Icons.person_outline, size: 14, color: Colors.grey.shade600),
+                  Icon(Icons.person_outline, size: 14, color: EchoDeskColors.muted),
                   const SizedBox(width: 4),
                   Text(
                     receptionistName,
@@ -646,7 +648,7 @@ class _AppointmentRow extends StatelessWidget {
                   ),
                   if (callerNumber != null && callerNumber.isNotEmpty) ...[
                     const SizedBox(width: 16),
-                    Icon(Icons.phone_outlined, size: 14, color: Colors.grey.shade600),
+                    Icon(Icons.phone_outlined, size: 14, color: EchoDeskColors.muted),
                     const SizedBox(width: 4),
                     Text(
                       maskPhone(callerNumber),
@@ -661,12 +663,12 @@ class _AppointmentRow extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.payment, size: 14, color: Colors.green.shade700),
+                    Icon(Icons.payment, size: 14, color: EchoDeskColors.success),
                     const SizedBox(width: 4),
                     Text(
                       'Payment link attached',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.green.shade700,
+                            color: EchoDeskColors.success,
                           ),
                     ),
                   ],
@@ -686,15 +688,15 @@ class _AppointmentRow extends StatelessWidget {
   Color _accentColor(String status) {
     switch (status) {
       case 'needs_review':
-        return Colors.orange.shade600;
+        return EchoDeskColors.warning;
       case 'confirmed':
-        return Colors.green.shade600;
+        return EchoDeskColors.success;
       case 'completed':
-        return Colors.blue.shade400;
+        return EchoDeskColors.info;
       case 'cancelled':
-        return Colors.red.shade300;
+        return EchoDeskColors.danger;
       default:
-        return Colors.grey.shade300;
+        return EchoDeskColors.lineStrong;
     }
   }
 }
@@ -706,17 +708,21 @@ class _GenericBadge extends StatelessWidget {
       margin: const EdgeInsets.only(left: 6),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.amber.shade100,
+        color: EchoDeskColors.warningSoft,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.warning_amber, size: 12, color: Colors.amber.shade800),
+          Icon(Icons.warning_amber, size: 12, color: EchoDeskColors.warning),
           const SizedBox(width: 4),
           Text(
             'Generic',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.amber.shade900),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: EchoDeskColors.warning,
+            ),
           ),
         ],
       ),

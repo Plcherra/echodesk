@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 import '../../services/call_history_service.dart';
 import '../../utils/call_formatters.dart';
 import '../../widgets/constrained_scaffold_body.dart';
+import '../../widgets/loading_skeleton.dart';
+import '../../widgets/state_views.dart';
+import '../../theme/echodesk_theme.dart';
 
 class CallHistoryScreen extends StatefulWidget {
   final String receptionistId;
@@ -69,7 +72,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
       ),
       body: constrainedScaffoldBody(
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const ListLoadingView()
             : _error != null
                 ? _buildError()
                 : Column(
@@ -140,33 +143,10 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
 
   Widget _buildError() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'Could not load calls',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _error!,
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _load,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
-        ),
+      child: ErrorStateView(
+        title: 'Could not load calls',
+        message: _error,
+        onRetry: _load,
       ),
     );
   }
@@ -177,30 +157,12 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
       slivers: [
         SliverFillRemaining(
           hasScrollBody: false,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.phone_missed_outlined,
-                    size: 48, color: Colors.grey.shade400),
-                const SizedBox(height: 12),
-                Text(
-                  isFiltered ? 'No $_outcomeFilter calls' : 'No calls yet',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isFiltered
-                      ? 'Try a different filter.'
-                      : "When customers call your AI receptionist, they'll appear here.",
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
+          child: EmptyStateView(
+            icon: Icons.phone_missed_outlined,
+            title: isFiltered ? 'No $_outcomeFilter calls' : 'No calls yet',
+            subtitle: isFiltered
+                ? 'Try a different filter.'
+                : "When customers call your AI receptionist, they'll appear here.",
           ),
         ),
       ],
@@ -332,15 +294,15 @@ class _OutcomeChip extends StatelessWidget {
   (Color, Color) _colorsForOutcome(String label) {
     switch (label) {
       case 'Booked':
-        return (Colors.green.shade800, Colors.green.shade100);
+        return (EchoDeskColors.success, EchoDeskColors.successSoft);
       case 'Completed':
-        return (Colors.blue.shade800, Colors.blue.shade100);
+        return (EchoDeskColors.info, EchoDeskColors.infoSoft);
       case 'Short Call':
-        return (Colors.orange.shade800, Colors.orange.shade100);
+        return (EchoDeskColors.warning, EchoDeskColors.warningSoft);
       case 'Missed':
-        return (Colors.red.shade800, Colors.red.shade100);
+        return (EchoDeskColors.danger, EchoDeskColors.dangerSoft);
       default:
-        return (Colors.grey.shade700, Colors.grey.shade200);
+        return (EchoDeskColors.muted, EchoDeskColors.surfaceMuted);
     }
   }
 }
