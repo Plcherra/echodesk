@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../services/api_client.dart';
+import '../../theme/echodesk_theme.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 import 'settings_tabs/calendar_tab.dart';
 import 'settings_tabs/staff_tab.dart';
@@ -295,7 +296,15 @@ class _ServicesTabState extends State<_ServicesTab> {
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Text(
+                  'Basics',
+                  style: Theme.of(modalContext).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: EchoDeskSpacing.sm),
                 TextField(
                   controller: nameController,
                   decoration: const InputDecoration(
@@ -304,7 +313,7 @@ class _ServicesTabState extends State<_ServicesTab> {
                   ),
                   textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: EchoDeskSpacing.md),
                 TextField(
                   controller: descriptionController,
                   decoration: const InputDecoration(
@@ -313,8 +322,9 @@ class _ServicesTabState extends State<_ServicesTab> {
                   ),
                   maxLines: 2,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: EchoDeskSpacing.md),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: TextField(
@@ -326,7 +336,7 @@ class _ServicesTabState extends State<_ServicesTab> {
                         keyboardType: TextInputType.number,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: EchoDeskSpacing.md),
                     Expanded(
                       child: TextField(
                         controller: priceController,
@@ -340,120 +350,178 @@ class _ServicesTabState extends State<_ServicesTab> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                CheckboxListTile(
-                  title: const Text('Requires location',
-                      style: TextStyle(fontSize: 14)),
-                  value: requiresLocation,
-                  onChanged: (v) =>
-                      setModalState(() => requiresLocation = v ?? false),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-                if (requiresLocation) ...[
-                  const SizedBox(height: 4),
-                  DropdownButtonFormField<String>(
-                    // ignore: deprecated_member_use -- value is the current selection; initialValue is for uncontrolled form fields
-                    value: locationType,
-                    decoration: const InputDecoration(
-                      labelText: 'Location type',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    isExpanded: true,
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'customer_address',
-                        child: Text('Customer address'),
+                const SizedBox(height: EchoDeskSpacing.lg),
+                Container(
+                  padding: const EdgeInsets.all(EchoDeskSpacing.md),
+                  decoration: BoxDecoration(
+                    color: EchoDeskColors.surfaceSoft,
+                    borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+                    border: Border.all(color: EchoDeskColors.line),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Location',
+                        style: Theme.of(modalContext)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w600),
                       ),
-                      DropdownMenuItem(
-                          value: 'phone_call', child: Text('Phone call')),
-                      DropdownMenuItem(
-                          value: 'video_meeting', child: Text('Video meeting')),
-                      DropdownMenuItem(
-                          value: 'custom', child: Text('Custom text')),
+                      const SizedBox(height: EchoDeskSpacing.xs),
+                      CheckboxListTile(
+                        title: const Text('Requires location',
+                            style: TextStyle(fontSize: 14)),
+                        value: requiresLocation,
+                        onChanged: (v) => setModalState(
+                            () => requiresLocation = v ?? false),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                      ),
+                      if (requiresLocation) ...[
+                        const SizedBox(height: EchoDeskSpacing.sm),
+                        DropdownButtonFormField<String>(
+                          // ignore: deprecated_member_use -- value is the current selection; initialValue is for uncontrolled form fields
+                          value: locationType,
+                          decoration: const InputDecoration(
+                            labelText: 'Location type',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            filled: true,
+                            fillColor: EchoDeskColors.surface,
+                          ),
+                          isExpanded: true,
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'customer_address',
+                              child: Text('Customer address'),
+                            ),
+                            DropdownMenuItem(
+                                value: 'phone_call',
+                                child: Text('Phone call')),
+                            DropdownMenuItem(
+                                value: 'video_meeting',
+                                child: Text('Video meeting')),
+                            DropdownMenuItem(
+                                value: 'custom', child: Text('Custom text')),
+                          ],
+                          onChanged: (v) => setModalState(
+                            () => locationType = v ?? 'customer_address',
+                          ),
+                        ),
+                      ],
                     ],
-                    onChanged: (v) => setModalState(
-                      () => locationType = v ?? 'customer_address',
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 8),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Follow-up (owner-controlled)',
-                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: followupMode,
-                  decoration: const InputDecoration(
-                    labelText: 'Follow-up mode',
-                    border: OutlineInputBorder(),
-                    isDense: true,
+                const SizedBox(height: EchoDeskSpacing.md),
+                Container(
+                  padding: const EdgeInsets.all(EchoDeskSpacing.md),
+                  decoration: BoxDecoration(
+                    color: EchoDeskColors.brandSoft.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+                    border: Border.all(color: EchoDeskColors.line),
                   ),
-                  isExpanded: true,
-                  items: const [
-                    DropdownMenuItem(value: 'none', child: Text('None')),
-                    DropdownMenuItem(
-                        value: 'under_review', child: Text('Under review')),
-                    DropdownMenuItem(
-                        value: 'send_payment_link',
-                        child: Text('Send payment link')),
-                    DropdownMenuItem(
-                        value: 'send_custom_message',
-                        child: Text('Send custom message')),
-                  ],
-                  onChanged: (v) =>
-                      setModalState(() => followupMode = v ?? 'under_review'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: followupTemplateController,
-                  decoration: const InputDecoration(
-                    labelText: 'Follow-up message template (optional)',
-                    border: OutlineInputBorder(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Follow-up',
+                        style: Theme.of(modalContext)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: EchoDeskSpacing.xs),
+                      Text(
+                        'Owner-controlled actions after a booking.',
+                        style:
+                            Theme.of(modalContext).textTheme.bodySmall?.copyWith(
+                                  color: EchoDeskColors.muted,
+                                ),
+                      ),
+                      const SizedBox(height: EchoDeskSpacing.md),
+                      DropdownButtonFormField<String>(
+                        initialValue: followupMode,
+                        decoration: const InputDecoration(
+                          labelText: 'Follow-up mode',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          filled: true,
+                          fillColor: EchoDeskColors.surface,
+                        ),
+                        isExpanded: true,
+                        items: const [
+                          DropdownMenuItem(
+                              value: 'none', child: Text('None')),
+                          DropdownMenuItem(
+                              value: 'under_review',
+                              child: Text('Under review')),
+                          DropdownMenuItem(
+                              value: 'send_payment_link',
+                              child: Text('Send payment link')),
+                          DropdownMenuItem(
+                              value: 'send_custom_message',
+                              child: Text('Send custom message')),
+                        ],
+                        onChanged: (v) => setModalState(
+                            () => followupMode = v ?? 'under_review'),
+                      ),
+                      const SizedBox(height: EchoDeskSpacing.md),
+                      TextField(
+                        controller: followupTemplateController,
+                        decoration: const InputDecoration(
+                          labelText: 'Follow-up message template (optional)',
+                          border: OutlineInputBorder(),
+                          filled: true,
+                          fillColor: EchoDeskColors.surface,
+                        ),
+                        maxLines: 3,
+                      ),
+                      const SizedBox(height: EchoDeskSpacing.md),
+                      TextField(
+                        controller: paymentLinkController,
+                        decoration: const InputDecoration(
+                          labelText: 'Payment link (optional)',
+                          border: OutlineInputBorder(),
+                          filled: true,
+                          fillColor: EchoDeskColors.surface,
+                        ),
+                      ),
+                      const SizedBox(height: EchoDeskSpacing.md),
+                      TextField(
+                        controller: ownerSelectedPlatformController,
+                        decoration: const InputDecoration(
+                          labelText: 'Owner-selected platform (optional)',
+                          border: OutlineInputBorder(),
+                          filled: true,
+                          fillColor: EchoDeskColors.surface,
+                        ),
+                      ),
+                      const SizedBox(height: EchoDeskSpacing.md),
+                      TextField(
+                        controller: meetingInstructionsController,
+                        decoration: const InputDecoration(
+                          labelText: 'Meeting instructions (optional)',
+                          border: OutlineInputBorder(),
+                          filled: true,
+                          fillColor: EchoDeskColors.surface,
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: EchoDeskSpacing.md),
+                      TextField(
+                        controller: internalFollowupNotesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Internal follow-up notes (optional)',
+                          border: OutlineInputBorder(),
+                          filled: true,
+                          fillColor: EchoDeskColors.surface,
+                        ),
+                        maxLines: 2,
+                      ),
+                    ],
                   ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: paymentLinkController,
-                  decoration: const InputDecoration(
-                    labelText: 'Payment link (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: ownerSelectedPlatformController,
-                  decoration: const InputDecoration(
-                    labelText: 'Owner-selected platform (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: meetingInstructionsController,
-                  decoration: const InputDecoration(
-                    labelText: 'Meeting instructions (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: internalFollowupNotesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Internal follow-up notes (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
                 ),
               ],
             ),
@@ -573,12 +641,15 @@ class _ServicesTabState extends State<_ServicesTab> {
 
     if (_services.isEmpty) {
       return ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(EchoDeskSpacing.lg),
         children: [
-          const Text(
+          Text(
             'Add services so callers can book the right thing automatically.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: EchoDeskColors.muted,
+                ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: EchoDeskSpacing.md),
           FilledButton(
             onPressed: () => _openServiceEditor(),
             child: const Text('Add service'),
@@ -588,13 +659,17 @@ class _ServicesTabState extends State<_ServicesTab> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(EchoDeskSpacing.lg),
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
-                  'Service menu with pricing, duration, and optional location.'),
+                'Service menu with pricing, duration, and optional location.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: EchoDeskColors.muted,
+                    ),
+              ),
             ),
             FilledButton.tonal(
               onPressed: () => _openServiceEditor(),
@@ -602,7 +677,7 @@ class _ServicesTabState extends State<_ServicesTab> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: EchoDeskSpacing.md),
         ..._services.map((s) {
           final requiresLocation = (s['requires_location'] as bool?) ?? false;
           final rawType = s['default_location_type'] as String?;
@@ -611,12 +686,12 @@ class _ServicesTabState extends State<_ServicesTab> {
                   ? 'customer_address'
                   : rawType;
           return Card(
-            margin: const EdgeInsets.only(bottom: 12),
+            margin: const EdgeInsets.only(bottom: 8),
             child: InkWell(
               onTap: () => _openServiceEditor(service: s),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(EchoDeskRadii.md),
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(EchoDeskSpacing.md),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -628,17 +703,25 @@ class _ServicesTabState extends State<_ServicesTab> {
                             children: [
                               Text(
                                 s['name'] ?? '',
-                                style: Theme.of(context).textTheme.titleMedium,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
+                              const SizedBox(height: 2),
                               Text(
                                 '\$${(s['price_cents'] ?? 0) / 100} · ${s['duration_minutes'] ?? 0} min',
-                                style: Theme.of(context).textTheme.bodySmall,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: EchoDeskColors.muted),
                               ),
                             ],
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete),
+                          icon: Icon(Icons.delete_outline,
+                              color: EchoDeskColors.danger),
                           onPressed: () async {
                             final confirm = await showDialog<bool>(
                               context: context,
@@ -677,7 +760,7 @@ class _ServicesTabState extends State<_ServicesTab> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: EchoDeskSpacing.sm),
                     CheckboxListTile(
                       title: const Text('Requires location',
                           style: TextStyle(fontSize: 14)),
@@ -691,7 +774,7 @@ class _ServicesTabState extends State<_ServicesTab> {
                       dense: true,
                     ),
                     if (requiresLocation) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: EchoDeskSpacing.sm),
                       DropdownButtonFormField<String>(
                         // ignore: deprecated_member_use -- value is the current selection; initialValue is for uncontrolled form fields
                         value: defaultLocationType,
@@ -768,47 +851,67 @@ class _LocationsTabState extends State<_LocationsTab> {
       return const Center(child: CircularProgressIndicator());
     }
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(EchoDeskSpacing.lg),
       children: [
-        const Text('Stores or branches for this receptionist.'),
-        const SizedBox(height: 16),
-        ..._locations.map((l) => ListTile(
-              title: Text(l['name'] ?? ''),
-              subtitle: Text(l['address'] ?? ''),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Delete location?'),
-                      content: Text(
-                        'Remove "${l['name'] ?? 'this location'}"? This cannot be undone.',
+        Text(
+          'Stores or branches for this receptionist.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: EchoDeskColors.muted,
+              ),
+        ),
+        const SizedBox(height: EchoDeskSpacing.md),
+        ..._locations.map((l) => Card(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                title: Text(
+                  l['name'] ?? '',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(false),
-                          child: const Text('Cancel'),
+                ),
+                subtitle: Text(
+                  l['address'] ?? '',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: EchoDeskColors.muted,
+                      ),
+                ),
+                trailing: IconButton(
+                  icon: Icon(Icons.delete_outline, color: EchoDeskColors.danger),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Delete location?'),
+                        content: Text(
+                          'Remove "${l['name'] ?? 'this location'}"? This cannot be undone.',
                         ),
-                        FilledButton(
-                          onPressed: () => Navigator.of(ctx).pop(true),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Theme.of(ctx).colorScheme.error,
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Cancel'),
                           ),
-                          child: const Text('Delete'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirm == true && mounted) {
-                    await Supabase.instance.client
-                        .from('locations')
-                        .delete()
-                        .eq('id', l['id'])
-                        .eq('receptionist_id', widget.receptionistId);
-                    _load();
-                  }
-                },
+                          FilledButton(
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Theme.of(ctx).colorScheme.error,
+                            ),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true && mounted) {
+                      await Supabase.instance.client
+                          .from('locations')
+                          .delete()
+                          .eq('id', l['id'])
+                          .eq('receptionist_id', widget.receptionistId);
+                      _load();
+                    }
+                  },
+                ),
               ),
             )),
       ],
@@ -939,12 +1042,15 @@ class _PromosTabState extends State<_PromosTab> {
 
     if (_promos.isEmpty) {
       return ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(EchoDeskSpacing.lg),
         children: [
-          const Text(
+          Text(
             'No promos yet. Add an offer, package, or seasonal promotion.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: EchoDeskColors.muted,
+                ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: EchoDeskSpacing.md),
           FilledButton(
             onPressed: () => _openPromoEditor(),
             child: const Text('Add promo'),
@@ -954,12 +1060,17 @@ class _PromosTabState extends State<_PromosTab> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(EchoDeskSpacing.lg),
       children: [
         Row(
           children: [
-            const Expanded(
-              child: Text('Discount codes and promotions.'),
+            Expanded(
+              child: Text(
+                'Discount codes and promotions.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: EchoDeskColors.muted,
+                    ),
+              ),
             ),
             FilledButton.tonal(
               onPressed: () => _openPromoEditor(),
@@ -967,44 +1078,55 @@ class _PromosTabState extends State<_PromosTab> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        ..._promos.map((p) => ListTile(
-              title: Text('${p['code'] ?? ''} · ${p['description'] ?? ''}'),
-              onTap: () => _openPromoEditor(promo: p),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Delete promotion?'),
-                      content: Text(
-                        'Remove "${p['code'] ?? 'this promo'}"? This cannot be undone.',
+        const SizedBox(height: EchoDeskSpacing.md),
+        ..._promos.map((p) => Card(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                title: Text(
+                  '${p['code'] ?? ''} · ${p['description'] ?? ''}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(false),
-                          child: const Text('Cancel'),
+                ),
+                onTap: () => _openPromoEditor(promo: p),
+                trailing: IconButton(
+                  icon:
+                      Icon(Icons.delete_outline, color: EchoDeskColors.danger),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Delete promotion?'),
+                        content: Text(
+                          'Remove "${p['code'] ?? 'this promo'}"? This cannot be undone.',
                         ),
-                        FilledButton(
-                          onPressed: () => Navigator.of(ctx).pop(true),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Theme.of(ctx).colorScheme.error,
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Cancel'),
                           ),
-                          child: const Text('Delete'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirm == true && mounted) {
-                    await Supabase.instance.client
-                        .from('promos')
-                        .delete()
-                        .eq('id', p['id'])
-                        .eq('receptionist_id', widget.receptionistId);
-                    _load();
-                  }
-                },
+                          FilledButton(
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Theme.of(ctx).colorScheme.error,
+                            ),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true && mounted) {
+                      await Supabase.instance.client
+                          .from('promos')
+                          .delete()
+                          .eq('id', p['id'])
+                          .eq('receptionist_id', widget.receptionistId);
+                      _load();
+                    }
+                  },
+                ),
               ),
             )),
       ],

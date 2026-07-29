@@ -10,7 +10,7 @@ Source: mobile UX audit + polish passes on `main`.
 | **P0** | Demo-blocking / embarrassing | **Done** — do not touch |
 | **P1** | Dashboard Overview cleanup | **Done** (+ hierarchy refinement) |
 | **P2** | Remaining polish (former leftover P1) | **Done** (after #14) |
-| **P3** | Receptionist Area Redesign | **In progress** — highest priority now |
+| **P3** | Receptionist Area Redesign | **Done** |
 | **P4** | Nice-to-have (former P3) | Todo |
 
 **How many P levels?** Five: **P0**, **P1**, **P2**, **P3**, **P4**.
@@ -20,6 +20,8 @@ Source: mobile UX audit + polish passes on `main`.
 **Is P1 finished?** Yes (includes 2026-07-28 hierarchy refinement). Rebuild and run [P1 smoke tests](#p1-manual-smoke-tests).
 
 **Is P2 finished?** Yes. Rebuild and run [P2 manual smoke tests](#p2-manual-smoke-tests-historical--already-shipped-items).
+
+**Is P3 finished?** Yes (2026-07-28). Rebuild and run [P3 manual smoke tests](#p3-manual-smoke-tests).
 
 ### Rebuild (Mac)
 
@@ -164,16 +166,18 @@ Started 2026-07-28. Finished 2026-07-28 (incl. onboarding Ready step).
 
 ---
 
-## P3 — Receptionist Area Redesign (IN PROGRESS)
+## P3 — Receptionist Area Redesign (DONE)
 
 Goal: Make the Receptionist experience feel modern, calm, and consistent with the improved Dashboard. Remove the heavy full-width button stack.
+
+Finished 2026-07-28.
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
 | R1 | Receptionist Detail page redesign | Done | Compact info chips + 2×2 actions + Dashboard-style Recent Calls |
-| R2 | Receptionists list: consistent card style and spacing | Todo | Match Dashboard density |
-| R3 | Receptionist Settings: cleaner grouping | Todo | Visual section grouping |
-| R4 | Add Service modal: better spacing / Duration+Price side-by-side / Follow-up | Todo | Visual grouping only |
+| R2 | Receptionists list: consistent card style and spacing | Done | Dense cards, status badge, EchoDesk tokens |
+| R3 | Receptionist Settings: cleaner grouping | Done | Calendar card; Instructions sections; 24px padding |
+| R4 | Add Service modal: better spacing / Duration+Price side-by-side / Follow-up | Done | Basics + Location + Follow-up visual groups |
 
 ### P3 manual smoke tests
 
@@ -241,5 +245,5 @@ Skip until items are implemented. Then add one check per shipped row above.
 - **P0** — demo blockers (locked)
 - **P1** — Dashboard Overview cleanup (done)
 - **P2** — remaining polish (done)
-- **P3** — Receptionist Area Redesign (highest priority)
+- **P3** — Receptionist Area Redesign (done)
 - **P4** — nice-to-have

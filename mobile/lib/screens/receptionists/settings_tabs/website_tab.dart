@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../services/api_client.dart';
 import '../../../strings.dart';
+import '../../../theme/echodesk_theme.dart';
 
 class ReceptionistWebsiteTab extends StatefulWidget {
   final String receptionistId;
@@ -29,7 +30,7 @@ class _ReceptionistWebsiteTabState extends State<ReceptionistWebsiteTab> {
   Widget build(BuildContext context) {
     if (!_showForm) {
       return ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(EchoDeskSpacing.lg),
         children: [
           const Text(
             'Add your website or business links so the assistant can reference them.',
@@ -44,7 +45,7 @@ class _ReceptionistWebsiteTabState extends State<ReceptionistWebsiteTab> {
     }
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(EchoDeskSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

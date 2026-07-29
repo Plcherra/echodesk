@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../theme/echodesk_theme.dart';
+
 class ReceptionistStaffTab extends StatefulWidget {
   final String receptionistId;
 
@@ -38,52 +40,73 @@ class _ReceptionistStaffTabState extends State<ReceptionistStaffTab> {
       return const Center(child: CircularProgressIndicator());
     }
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(EchoDeskSpacing.lg),
       children: [
-        const Text('Staff members for this receptionist.'),
-        const SizedBox(height: 16),
+        Text(
+          'Staff members for this receptionist.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: EchoDeskColors.muted,
+              ),
+        ),
+        const SizedBox(height: EchoDeskSpacing.md),
         _AddStaffForm(
           receptionistId: widget.receptionistId,
           onAdded: _load,
         ),
-        const SizedBox(height: 16),
-        ..._staff.map((s) => ListTile(
-              title: Text(s['name'] ?? ''),
-              subtitle: Text(s['role'] ?? ''),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Delete staff member?'),
-                      content: Text(
-                        'Remove "${s['name'] ?? 'this person'}"? This cannot be undone.',
+        const SizedBox(height: EchoDeskSpacing.md),
+        ..._staff.map((s) => Card(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                title: Text(
+                  s['name'] ?? '',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(false),
-                          child: const Text('Cancel'),
+                ),
+                subtitle: Text(
+                  s['role'] ?? '',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: EchoDeskColors.muted,
+                      ),
+                ),
+                trailing: IconButton(
+                  icon:
+                      Icon(Icons.delete_outline, color: EchoDeskColors.danger),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Delete staff member?'),
+                        content: Text(
+                          'Remove "${s['name'] ?? 'this person'}"? This cannot be undone.',
                         ),
-                        FilledButton(
-                          onPressed: () => Navigator.of(ctx).pop(true),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Theme.of(ctx).colorScheme.error,
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Cancel'),
                           ),
-                          child: const Text('Delete'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirm == true && mounted) {
-                    await Supabase.instance.client
-                        .from('staff')
-                        .delete()
-                        .eq('id', s['id'])
-                        .eq('receptionist_id', widget.receptionistId);
-                    _load();
-                  }
-                },
+                          FilledButton(
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Theme.of(ctx).colorScheme.error,
+                            ),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true && mounted) {
+                      await Supabase.instance.client
+                          .from('staff')
+                          .delete()
+                          .eq('id', s['id'])
+                          .eq('receptionist_id', widget.receptionistId);
+                      _load();
+                    }
+                  },
+                ),
               ),
             )),
       ],

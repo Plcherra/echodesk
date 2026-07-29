@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../services/api_client.dart';
 import '../../../strings.dart';
+import '../../../theme/echodesk_theme.dart';
 
 class ReceptionistInstructionsTab extends StatefulWidget {
   final String receptionistId;
@@ -303,88 +304,92 @@ class _ReceptionistInstructionsTabState
       return const Center(child: CircularProgressIndicator());
     }
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(EchoDeskSpacing.lg),
       children: [
-        const Text('Core instructions — main system prompt for the AI.'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _coreInstructionsController,
-          decoration: const InputDecoration(
-            hintText: "Leave blank to use generated prompt from business data",
-            border: OutlineInputBorder(),
-            alignLabelWithHint: true,
-          ),
-          maxLines: 6,
-        ),
-        const SizedBox(height: 16),
-        const Text('Greeting — first thing the AI says when a call is answered.'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _greetingController,
-          decoration: const InputDecoration(
-            hintText:
-                "e.g. Hello! Thanks for calling. I'm Eve. How can I help you today?",
-            border: OutlineInputBorder(),
-            alignLabelWithHint: true,
-          ),
-          maxLines: 2,
-        ),
-        const SizedBox(height: 16),
-        const Text('Voice — how your receptionist sounds.'),
-        const SizedBox(height: 8),
-        ListTile(
-          title: Text(
-            () {
-              final found = _voicePresets
-                  .where((p) => p['key'] == _voicePresetKey);
-              return found.isEmpty
-                  ? (_voicePresetKey ?? 'Default')
-                  : (found.first['label'] as String? ?? 'Default');
-            }(),
-          ),
-          subtitle: const Text('Name and voice are separate choices.'),
-          trailing: FilledButton.tonal(
-            onPressed: _showVoicePicker,
-            child: const Text('Change voice'),
+        _SettingsSection(
+          title: 'Core instructions',
+          subtitle: 'Main system prompt for the AI.',
+          child: TextField(
+            controller: _coreInstructionsController,
+            decoration: const InputDecoration(
+              hintText: "Leave blank to use generated prompt from business data",
+              border: OutlineInputBorder(),
+              alignLabelWithHint: true,
+            ),
+            maxLines: 6,
           ),
         ),
-        const SizedBox(height: 16),
-        const Text(
-            'Extra notes — additional instructions appended to the main prompt.'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _extraNotesController,
-          decoration: const InputDecoration(
-            hintText:
-                "e.g. We're closed on Sundays. Cancellations must be 24h in advance.",
-            border: OutlineInputBorder(),
-            alignLabelWithHint: true,
+        const SizedBox(height: EchoDeskSpacing.md),
+        _SettingsSection(
+          title: 'Greeting',
+          subtitle: 'First thing the AI says when a call is answered.',
+          child: TextField(
+            controller: _greetingController,
+            decoration: const InputDecoration(
+              hintText:
+                  "e.g. Hello! Thanks for calling. I'm Eve. How can I help you today?",
+              border: OutlineInputBorder(),
+              alignLabelWithHint: true,
+            ),
+            maxLines: 2,
           ),
-          maxLines: 4,
         ),
-        const SizedBox(height: 16),
-        const Text(
-          'Generic booking follow-up message (no services) — sent by SMS after booking when no service is selected.',
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Use {business_name} for your business or assistant name (from Settings → Business name, else receptionist name).',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _genericFollowupController,
-          decoration: const InputDecoration(
-            hintText:
-                'e.g. Your appointment with {business_name} is under review; we will text you shortly.',
-            border: OutlineInputBorder(),
-            alignLabelWithHint: true,
+        const SizedBox(height: EchoDeskSpacing.md),
+        _SettingsSection(
+          title: 'Voice',
+          subtitle: 'How your receptionist sounds. Name and voice are separate.',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              () {
+                final found =
+                    _voicePresets.where((p) => p['key'] == _voicePresetKey);
+                return found.isEmpty
+                    ? (_voicePresetKey ?? 'Default')
+                    : (found.first['label'] as String? ?? 'Default');
+              }(),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            trailing: FilledButton.tonal(
+              onPressed: _showVoicePicker,
+              child: const Text('Change voice'),
+            ),
           ),
-          maxLines: 3,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: EchoDeskSpacing.md),
+        _SettingsSection(
+          title: 'Extra notes',
+          subtitle: 'Additional instructions appended to the main prompt.',
+          child: TextField(
+            controller: _extraNotesController,
+            decoration: const InputDecoration(
+              hintText:
+                  "e.g. We're closed on Sundays. Cancellations must be 24h in advance.",
+              border: OutlineInputBorder(),
+              alignLabelWithHint: true,
+            ),
+            maxLines: 4,
+          ),
+        ),
+        const SizedBox(height: EchoDeskSpacing.md),
+        _SettingsSection(
+          title: 'Generic booking follow-up',
+          subtitle:
+              'SMS after booking when no service is selected. Use {business_name} for your business or assistant name.',
+          child: TextField(
+            controller: _genericFollowupController,
+            decoration: const InputDecoration(
+              hintText:
+                  'e.g. Your appointment with {business_name} is under review; we will text you shortly.',
+              border: OutlineInputBorder(),
+              alignLabelWithHint: true,
+            ),
+            maxLines: 3,
+          ),
+        ),
+        const SizedBox(height: EchoDeskSpacing.lg),
         FilledButton(
           onPressed: _saving ? null : _save,
           child: _saving
@@ -396,6 +401,51 @@ class _ReceptionistInstructionsTabState
               : const Text('Save'),
         ),
       ],
+    );
+  }
+}
+
+class _SettingsSection extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _SettingsSection({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(EchoDeskSpacing.md),
+      decoration: BoxDecoration(
+        color: EchoDeskColors.surface,
+        borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+        border: Border.all(color: EchoDeskColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(height: EchoDeskSpacing.xs),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: EchoDeskColors.muted,
+                ),
+          ),
+          const SizedBox(height: EchoDeskSpacing.sm + 4),
+          child,
+        ],
+      ),
     );
   }
 }
