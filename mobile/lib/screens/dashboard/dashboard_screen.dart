@@ -7,6 +7,7 @@ import '../../models/receptionist.dart';
 import '../../models/user_profile.dart';
 import '../../services/appointment_service.dart';
 import '../../services/dashboard_service.dart';
+import '../../theme/echodesk_theme.dart';
 import '../../utils/appointment_formatters.dart';
 import '../../utils/call_formatters.dart';
 import '../../widgets/confirm_sign_out.dart';
@@ -27,7 +28,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final DashboardService _dashboardService = const DashboardService();
   Map<String, dynamic>? _profile;
   List<Receptionist> _receptionists = [];
-  int _totalReceptionists = 0;
   int _activeReceptionists = 0;
   int _totalUsageMinutes = 0;
   int? _includedMinutes;
@@ -122,7 +122,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _profile = data.profile;
         _receptionists = data.receptionists.take(6).toList();
-        _totalReceptionists = data.totalReceptionists;
         _activeReceptionists = data.activeReceptionists;
         _totalUsageMinutes = data.totalUsageMinutes;
         _includedMinutes = data.includedMinutes;
@@ -262,7 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _buildUpgradeCard(context),
               ] else ...[
                 _buildStatsGrid(profile),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 _buildRecentCallsSection(context),
                 const SizedBox(height: 24),
                 _buildUpcomingAppointmentsSection(context),
@@ -357,6 +356,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildStatsGrid(UserProfile profile) {
+    final minutesValue = _includedMinutes != null
+        ? '$_totalUsageMinutes / $_includedMinutes'
+        : '$_totalUsageMinutes';
+    final remainingText = _remainingMinutes != null && _remainingMinutes! > 0
+        ? '$_remainingMinutes min remaining'
+        : null;
+    final overageText = _overageMinutes > 0 ? '$_overageMinutes overage' : null;
+    final overageWarning = _includedMinutes != null &&
+        _totalUsageMinutes >= _includedMinutes! &&
+        _totalUsageMinutes > 0;
+    final lowMinutes = _remainingMinutes != null &&
+        _remainingMinutes! > 0 &&
+        _remainingMinutes! <= 30;
+    final showPhone = profile.hasPhone &&
+        (profile.phone?.trim().isNotEmpty ?? false);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -369,69 +384,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const Spacer(),
             if (profile.isActive)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade100,
-                  borderRadius: BorderRadius.circular(8),
+                  color: EchoDeskColors.brandSoft,
+                  borderRadius: BorderRadius.circular(EchoDeskRadii.sm),
                 ),
                 child: Text(
                   'Active',
                   style: TextStyle(
-                    color: Colors.green.shade800,
+                    color: EchoDeskColors.success,
                     fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
                 ),
               ),
           ],
         ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
+        const SizedBox(height: EchoDeskSpacing.sm + 4),
+        // Primary: usage for this billing period
+        _OverviewMetricCard(
+          label: 'Minutes this period',
+          value: minutesValue,
+          emphasize: true,
+          subtext: overageText ??
+              (overageWarning
+                  ? 'Over cap; overage may be billed at \$0.25/min.'
+                  : remainingText),
+          subtextColor: overageText != null || overageWarning
+              ? EchoDeskColors.warning
+              : (lowMinutes
+                  ? EchoDeskColors.warning
+                  : EchoDeskColors.success),
+        ),
+        const SizedBox(height: EchoDeskSpacing.sm + 2),
+        // Secondary: setup health
+        Row(
           children: [
-            _StatCard(
-              label: 'Total Calls',
-              value: '$_totalCalls',
+            Expanded(
+              child: _OverviewMetricCard(
+                label: 'Active receptionists',
+                value: '$_activeReceptionists',
+              ),
             ),
-            _StatCard(
-              label: 'Total Minutes',
-              value: _totalCallMinutes.toStringAsFixed(1),
-            ),
-            _StatCard(
-              label: 'Total Receptionists',
-              value: '$_totalReceptionists',
-            ),
-            _StatCard(
-              label: 'Active Receptionists',
-              value: '$_activeReceptionists',
-            ),
-            _StatCard(
-              label: 'Calendar',
-              value: profile.hasCalendar ? 'Connected' : 'Not connected',
-            ),
-            _StatCard(
-              label: 'Default phone',
-              value: profile.hasPhone ? (profile.phone ?? '') : 'Not set',
-            ),
-            _StatCard(
-              label: 'Minutes this period',
-              value: _includedMinutes != null
-                  ? '$_totalUsageMinutes / $_includedMinutes'
-                  : '$_totalUsageMinutes',
-              remainingSubtext:
-                  _remainingMinutes != null && _remainingMinutes! > 0
-                      ? '$_remainingMinutes min remaining'
-                      : null,
-              overageSubtext:
-                  _overageMinutes > 0 ? '$_overageMinutes overage' : null,
-              overageWarning: _includedMinutes != null &&
-                  _totalUsageMinutes >= _includedMinutes! &&
-                  _totalUsageMinutes > 0,
-              lowMinutesWarning: _remainingMinutes != null &&
-                  _remainingMinutes! > 0 &&
-                  _remainingMinutes! <= 30,
+            const SizedBox(width: EchoDeskSpacing.sm + 2),
+            Expanded(
+              child: _OverviewMetricCard(
+                label: 'Calendar',
+                value: profile.hasCalendar ? 'Connected' : 'Not connected',
+                valueColor: profile.hasCalendar
+                    ? EchoDeskColors.success
+                    : EchoDeskColors.warning,
+              ),
             ),
           ],
+        ),
+        if (showPhone) ...[
+          const SizedBox(height: EchoDeskSpacing.sm + 2),
+          _OverviewMetricCard(
+            label: 'Default phone',
+            value: profile.phone!.trim(),
+            quiet: true,
+          ),
+        ],
+        // Demoted: lifetime volume as a quiet footer, not peer cards
+        const SizedBox(height: EchoDeskSpacing.sm + 4),
+        Text(
+          '$_totalCalls calls · ${_totalCallMinutes.toStringAsFixed(1)} min lifetime',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: EchoDeskColors.soft,
+              ),
         ),
       ],
     );
@@ -441,8 +463,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Recent Calls', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 12),
+        Text(
+          'Recent Calls',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: EchoDeskSpacing.sm),
         if (_recentCalls.isEmpty)
           const EmptyStateView(
             icon: Icons.phone_missed_outlined,
@@ -452,7 +479,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             asCard: true,
           )
         else
-          ..._recentCalls.take(5).map((call) {
+          ..._recentCalls.take(3).map((call) {
             final start = call['started_at'] != null
                 ? DateTime.tryParse(call['started_at'] as String)
                 : null;
@@ -461,21 +488,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 call['to_number'] as String? ??
                 '';
             final recId = call['receptionist_id'] as String?;
+            final canOpen = recId != null;
             return Card(
-              margin: const EdgeInsets.only(bottom: 8),
+              margin: const EdgeInsets.only(bottom: 6),
               child: ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
                 title: Text(
                   formatPhoneForDisplay(fromNum, mask: true),
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
                 subtitle: Text(
                   '${formatCallTimestamp(start)} · ${formatCallDuration(dur)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: EchoDeskColors.muted,
                       ),
                 ),
-                trailing: const Icon(Icons.chevron_right, size: 20),
-                onTap: recId != null
+                trailing: canOpen
+                    ? Icon(Icons.chevron_right,
+                        size: 18, color: EchoDeskColors.soft)
+                    : null,
+                onTap: canOpen
                     ? () async {
                         await context.push(
                           '/receptionists/$recId/calls/${call['id']}',
@@ -645,78 +682,79 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _StatCard extends StatelessWidget {
+class _OverviewMetricCard extends StatelessWidget {
   final String label;
   final String value;
-  final String? remainingSubtext;
-  final String? overageSubtext;
-  final bool overageWarning;
-  final bool lowMinutesWarning;
+  final String? subtext;
+  final Color? subtextColor;
+  final Color? valueColor;
+  final bool emphasize;
+  final bool quiet;
 
-  const _StatCard({
+  const _OverviewMetricCard({
     required this.label,
     required this.value,
-    this.remainingSubtext,
-    this.overageSubtext,
-    this.overageWarning = false,
-    this.lowMinutesWarning = false,
+    this.subtext,
+    this.subtextColor,
+    this.valueColor,
+    this.emphasize = false,
+    this.quiet = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 160,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: Theme.of(context).textTheme.bodySmall),
+    final valueStyle = emphasize
+        ? Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: valueColor ?? EchoDeskColors.ink,
+              height: 1.15,
+            )
+        : Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: valueColor ?? EchoDeskColors.ink,
+              height: 1.2,
+            );
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: EchoDeskSpacing.md,
+          vertical: quiet ? 12 : (emphasize ? 16 : 14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: EchoDeskColors.muted,
+                    fontWeight: FontWeight.w500,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: quiet
+                  ? Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: EchoDeskColors.ink,
+                      )
+                  : valueStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (subtext != null && subtext!.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
-                value,
-                style: Theme.of(context).textTheme.titleMedium,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                subtext!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: subtextColor ?? EchoDeskColors.muted,
+                      fontWeight: FontWeight.w500,
+                    ),
               ),
-              if (overageSubtext != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    overageSubtext!,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.amber.shade700,
-                    ),
-                  ),
-                )
-              else if (overageWarning)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    'Over cap; overage may be billed at \$0.25/min.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.amber.shade700,
-                    ),
-                  ),
-                )
-              else if (remainingSubtext != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    remainingSubtext!,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: lowMinutesWarning
-                          ? Colors.orange.shade700
-                          : Colors.green.shade700,
-                    ),
-                  ),
-                ),
             ],
-          ),
+          ],
         ),
       ),
     );
