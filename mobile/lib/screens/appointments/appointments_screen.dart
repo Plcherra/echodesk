@@ -6,6 +6,8 @@ import '../../services/appointment_service.dart';
 import '../../utils/appointment_formatters.dart';
 import '../../widgets/appointment_day_schedule.dart';
 import '../../widgets/constrained_scaffold_body.dart';
+import '../../widgets/main_shell.dart';
+import '../../widgets/state_views.dart';
 import '../../widgets/status_chip.dart';
 
 class AppointmentsScreen extends StatefulWidget {
@@ -40,6 +42,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
 
   String? _effectiveReceptionistIdForToday;
   _TodayContext _todayContext = _TodayContext.resolving;
+  int? _lastShellTabIndex;
 
   @override
   void initState() {
@@ -51,6 +54,20 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
     );
     _tabController.addListener(_onTabChanged);
     _bootstrap();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final tabIndex = MainShellTabIndex.maybeOf(context);
+    if (tabIndex == null) return;
+    // Appointments is shell index 2 — refresh list + badge when tab regains focus.
+    if (_lastShellTabIndex != null &&
+        tabIndex == 2 &&
+        _lastShellTabIndex != 2) {
+      _refreshAll();
+    }
+    _lastShellTabIndex = tabIndex;
   }
 
   int _initialTabIndex() {
@@ -79,6 +96,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
   Future<void> _bootstrap() async {
     await _resolveTodayReceptionist();
     if (!mounted) return;
+    await _refreshAll();
+  }
+
+  Future<void> _refreshAll() async {
     await _load();
     await _refreshNeedsReviewCount();
   }
@@ -354,7 +375,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
 
     if (_todayItems.isEmpty) {
       return RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: _refreshAll,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
@@ -368,7 +389,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _refreshAll,
       child: AppointmentDayScheduleListView(appointments: _todayItems),
     );
   }
@@ -407,47 +428,25 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
   }
 
   Widget _buildEmptyToday() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.event_available, size: 48, color: Colors.grey.shade400),
-          const SizedBox(height: 12),
-          Text('Nothing scheduled', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 4),
-          Text(
-            'No appointments for this day.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    return const EmptyStateView(
+      icon: Icons.event_available,
+      title: 'Nothing scheduled',
+      subtitle: 'No appointments for this day.',
     );
   }
 
   Widget _buildListBody({required String emptyMessage}) {
     if (_appointments.isEmpty) {
       return RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: _refreshAll,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
             SizedBox(
               height: MediaQuery.of(context).size.height * 0.45,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(
-                    emptyMessage,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
+              child: EmptyStateView(
+                icon: Icons.event_outlined,
+                title: emptyMessage,
               ),
             ),
           ],
@@ -456,7 +455,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _refreshAll,
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         itemCount: _appointments.length,
@@ -466,10 +465,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
             appointment: apt,
             receptionistName: _receptionists[apt['receptionist_id']] ?? '—',
             onTap: () => context.push('/appointments/${apt['id']}').then((_) {
-              // Reflect any confirm/reject made on the detail screen immediately.
+              // Reflect any confirm/cancel made on the detail screen immediately.
               if (mounted) {
-                _load();
-                _refreshNeedsReviewCount();
+                _refreshAll();
               }
             }),
           );
@@ -480,33 +478,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
 
   Widget _buildError() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'Could not load appointments',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _error!,
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-              maxLines: 5,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _load,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
-        ),
+      child: ErrorStateView(
+        title: 'Could not load appointments',
+        message: _error,
+        onRetry: _refreshAll,
       ),
     );
   }

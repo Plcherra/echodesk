@@ -8,6 +8,7 @@ import '../../models/receptionist.dart';
 import '../../strings.dart';
 import '../../services/api_client.dart';
 import '../../widgets/constrained_scaffold_body.dart';
+import '../../widgets/state_views.dart';
 
 class ReceptionistsScreen extends StatefulWidget {
   const ReceptionistsScreen({super.key});
@@ -179,7 +180,13 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text('Error: $_error'))
+                ? Center(
+                    child: ErrorStateView(
+                      title: 'Could not load receptionists',
+                      message: _error,
+                      onRetry: _load,
+                    ),
+                  )
                 : !_isSubscribed
                     ? _buildUpgradePrompt()
                     : RefreshIndicator(
@@ -335,18 +342,14 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text('No receptionists yet.'),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: _navigateToCreate,
-            icon: const Icon(Icons.add),
-            label: const Text('Create Receptionist'),
-          ),
-        ],
+    return EmptyStateView(
+      icon: Icons.support_agent,
+      title: 'No receptionists yet',
+      subtitle: 'Create your first AI receptionist to answer on your business line.',
+      action: FilledButton.icon(
+        onPressed: _navigateToCreate,
+        icon: const Icon(Icons.add),
+        label: const Text('Create Receptionist'),
       ),
     );
   }
