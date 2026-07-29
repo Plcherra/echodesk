@@ -26,6 +26,7 @@ class ActiveCallScreen extends StatefulWidget {
 class _ActiveCallScreenState extends State<ActiveCallScreen> {
   WebSocketChannel? _channel;
   String _status = 'Connecting...';
+  bool _ending = false;
 
   @override
   void initState() {
@@ -78,8 +79,82 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
   }
 
   Future<void> _hangup() async {
-    await CallService().endCall(widget.callSid);
-    if (mounted) context.pop();
+    if (_ending) return;
+    setState(() => _ending = true);
+    try {
+      await CallService().endCall(widget.callSid);
+      if (mounted) context.pop();
+    } finally {
+      if (mounted) setState(() => _ending = false);
+    }
+  }
+
+  /// End asks for confirmation so a stray tap doesn't hang up mid-call.
+  Future<void> _confirmHangup() async {
+    if (_ending) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('End this call?'),
+        content: const Text(
+          'This hangs up the call for everyone. The AI receptionist will stop '
+          'talking to the caller.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Keep talking'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('End call'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await _hangup();
+  }
+
+  /// Back must not silently leave and strand call UI / stream state.
+  /// Offer Stay, Leave screen only, or End call.
+  Future<void> _onBackPressed() async {
+    if (_ending) return;
+    final action = await showDialog<_LeaveAction>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Leave active call?'),
+        content: const Text(
+          'Leaving this screen does not hang up by itself. Choose whether to '
+          'keep listening, leave the screen, or end the call.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(_LeaveAction.stay),
+            child: const Text('Stay'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(_LeaveAction.leave),
+            child: const Text('Leave screen'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(_LeaveAction.end),
+            child: const Text('End call'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || action == null || action == _LeaveAction.stay) return;
+    if (action == _LeaveAction.end) {
+      await _hangup();
+      return;
+    }
+    context.pop();
   }
 
   @override
@@ -90,59 +165,74 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Active Call'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _onBackPressed();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Active Call'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _ending ? null : _onBackPressed,
+          ),
         ),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Icon(Icons.phone_in_talk, size: 64, color: Colors.green),
-              const SizedBox(height: 24),
-              Text(
-                'Call in progress',
-                style: Theme.of(context).textTheme.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              if (widget.caller.isNotEmpty)
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Icon(Icons.phone_in_talk, size: 64, color: Colors.green),
+                const SizedBox(height: 24),
                 Text(
-                  'From: ${widget.caller}',
-                  style: Theme.of(context).textTheme.bodyLarge,
+                  'Call in progress',
+                  style: Theme.of(context).textTheme.headlineSmall,
                   textAlign: TextAlign.center,
                 ),
-              const SizedBox(height: 24),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    _status,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                const SizedBox(height: 8),
+                if (widget.caller.isNotEmpty)
+                  Text(
+                    'From: ${widget.caller}',
+                    style: Theme.of(context).textTheme.bodyLarge,
                     textAlign: TextAlign.center,
                   ),
+                const SizedBox(height: 24),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      _status,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ),
-              ),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: _hangup,
-                icon: const Icon(Icons.call_end),
-                label: const Text('End'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
+                const Spacer(),
+                FilledButton.icon(
+                  onPressed: _ending ? null : _confirmHangup,
+                  icon: _ending
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.call_end),
+                  label: Text(_ending ? 'Ending…' : 'End'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
+
+enum _LeaveAction { stay, leave, end }
