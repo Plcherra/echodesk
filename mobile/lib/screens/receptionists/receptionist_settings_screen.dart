@@ -291,313 +291,386 @@ class _ServicesTabState extends State<_ServicesTab> {
     final createdOrUpdated = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (modalContext, setModalState) => AlertDialog(
-          title: Text(service == null ? 'Add service' : 'Edit service'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Basics',
-                  style: Theme.of(modalContext).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+        builder: (modalContext, setModalState) {
+          final media = MediaQuery.of(modalContext);
+          final maxHeight = media.size.height * 0.88;
+          final sectionTitleStyle = Theme.of(modalContext)
+              .textTheme
+              .titleSmall
+              ?.copyWith(fontWeight: FontWeight.w600);
+          const fieldGap = SizedBox(height: EchoDeskSpacing.sm);
+          const sectionGap = SizedBox(height: EchoDeskSpacing.sm);
+          const panelPadding = EdgeInsets.fromLTRB(
+            EchoDeskSpacing.sm + 2,
+            EchoDeskSpacing.sm,
+            EchoDeskSpacing.sm + 2,
+            EchoDeskSpacing.sm,
+          );
+
+          Widget sectionPanel({
+            required Color color,
+            required List<Widget> children,
+          }) {
+            return Container(
+              width: double.infinity,
+              padding: panelPadding,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+                border: Border.all(color: EchoDeskColors.line),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: children,
+              ),
+            );
+          }
+
+          InputDecoration denseDecoration(String label, {bool filled = false}) {
+            return InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+              isDense: true,
+              filled: filled,
+              fillColor: filled ? EchoDeskColors.surface : null,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+            );
+          }
+
+          Future<void> saveService() async {
+            final name = nameController.text.trim();
+            if (name.isEmpty) return;
+
+            final duration = int.tryParse(durationController.text.trim());
+            final priceDollars =
+                double.tryParse(priceController.text.trim());
+            final priceCents =
+                priceDollars != null ? (priceDollars * 100).round() : null;
+
+            final payload = <String, dynamic>{
+              'name': name,
+              'description': descriptionController.text.trim(),
+              'requires_location': requiresLocation,
+              'default_location_type':
+                  requiresLocation ? locationType : null,
+              'followup_mode': followupMode,
+              'followup_message_template':
+                  followupTemplateController.text.trim().isEmpty
+                      ? null
+                      : followupTemplateController.text.trim(),
+              'payment_link': paymentLinkController.text.trim().isEmpty
+                  ? null
+                  : paymentLinkController.text.trim(),
+              'meeting_instructions':
+                  meetingInstructionsController.text.trim().isEmpty
+                      ? null
+                      : meetingInstructionsController.text.trim(),
+              'owner_selected_platform':
+                  ownerSelectedPlatformController.text.trim().isEmpty
+                      ? null
+                      : ownerSelectedPlatformController.text.trim(),
+              'internal_followup_notes':
+                  internalFollowupNotesController.text.trim().isEmpty
+                      ? null
+                      : internalFollowupNotesController.text.trim(),
+            };
+            if (duration != null) payload['duration_minutes'] = duration;
+            if (priceCents != null) payload['price_cents'] = priceCents;
+
+            try {
+              if (service == null) {
+                await Supabase.instance.client.from('services').insert({
+                  ...payload,
+                  'receptionist_id': widget.receptionistId,
+                });
+              } else {
+                await Supabase.instance.client
+                    .from('services')
+                    .update(payload)
+                    .eq('id', service['id'])
+                    .eq('receptionist_id', widget.receptionistId);
+              }
+              if (!modalContext.mounted) return;
+              Navigator.of(modalContext).pop(true);
+            } catch (_) {
+              if (!modalContext.mounted) return;
+              ScaffoldMessenger.of(modalContext).showSnackBar(
+                const SnackBar(content: Text('Could not save service')),
+              );
+            }
+          }
+
+          return Dialog(
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 440,
+                maxHeight: maxHeight,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      EchoDeskSpacing.md,
+                      EchoDeskSpacing.md,
+                      EchoDeskSpacing.md,
+                      EchoDeskSpacing.sm,
+                    ),
+                    child: Text(
+                      service == null ? 'Add service' : 'Edit service',
+                      style: Theme.of(modalContext)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(
+                        EchoDeskSpacing.md,
+                        0,
+                        EchoDeskSpacing.md,
+                        EchoDeskSpacing.sm,
                       ),
-                ),
-                const SizedBox(height: EchoDeskSpacing.sm),
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Name',
-                    border: OutlineInputBorder(),
-                  ),
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: EchoDeskSpacing.md),
-                TextField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: EchoDeskSpacing.md),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: durationController,
-                        decoration: const InputDecoration(
-                          labelText: 'Duration (min)',
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          sectionPanel(
+                            color: EchoDeskColors.surfaceSoft,
+                            children: [
+                              Text('Basics', style: sectionTitleStyle),
+                              fieldGap,
+                              TextField(
+                                controller: nameController,
+                                decoration: denseDecoration('Name'),
+                                textInputAction: TextInputAction.next,
+                              ),
+                              fieldGap,
+                              TextField(
+                                controller: descriptionController,
+                                decoration: denseDecoration('Description'),
+                                maxLines: 2,
+                              ),
+                              fieldGap,
+                              Row(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: durationController,
+                                      decoration: denseDecoration(
+                                          'Duration (min)'),
+                                      keyboardType: TextInputType.number,
+                                    ),
+                                  ),
+                                  const SizedBox(width: EchoDeskSpacing.sm),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: priceController,
+                                      decoration:
+                                          denseDecoration(r'Price ($)'),
+                                      keyboardType:
+                                          const TextInputType
+                                              .numberWithOptions(
+                                        decimal: true,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          sectionGap,
+                          sectionPanel(
+                            color: EchoDeskColors.surfaceSoft,
+                            children: [
+                              Text('Location', style: sectionTitleStyle),
+                              const SizedBox(height: EchoDeskSpacing.xs),
+                              CheckboxListTile(
+                                title: const Text(
+                                  'Requires location',
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                                value: requiresLocation,
+                                onChanged: (v) => setModalState(
+                                  () => requiresLocation = v ?? false,
+                                ),
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                contentPadding: EdgeInsets.zero,
+                                visualDensity: VisualDensity.compact,
+                                dense: true,
+                              ),
+                              if (requiresLocation) ...[
+                                fieldGap,
+                                DropdownButtonFormField<String>(
+                                  // ignore: deprecated_member_use -- value is the current selection; initialValue is for uncontrolled form fields
+                                  value: locationType,
+                                  decoration: denseDecoration(
+                                    'Location type',
+                                    filled: true,
+                                  ),
+                                  isExpanded: true,
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 'customer_address',
+                                      child: Text('Customer address'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'phone_call',
+                                      child: Text('Phone call'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'video_meeting',
+                                      child: Text('Video meeting'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'custom',
+                                      child: Text('Custom text'),
+                                    ),
+                                  ],
+                                  onChanged: (v) => setModalState(
+                                    () => locationType =
+                                        v ?? 'customer_address',
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          sectionGap,
+                          sectionPanel(
+                            color: EchoDeskColors.brandSoft
+                                .withValues(alpha: 0.45),
+                            children: [
+                              Text('Follow-up', style: sectionTitleStyle),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Owner-controlled actions after a booking.',
+                                style: Theme.of(modalContext)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: EchoDeskColors.muted,
+                                    ),
+                              ),
+                              fieldGap,
+                              DropdownButtonFormField<String>(
+                                initialValue: followupMode,
+                                decoration: denseDecoration(
+                                  'Follow-up mode',
+                                  filled: true,
+                                ),
+                                isExpanded: true,
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'none',
+                                    child: Text('None'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'under_review',
+                                    child: Text('Under review'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'send_payment_link',
+                                    child: Text('Send payment link'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'send_custom_message',
+                                    child: Text('Send custom message'),
+                                  ),
+                                ],
+                                onChanged: (v) => setModalState(
+                                  () =>
+                                      followupMode = v ?? 'under_review',
+                                ),
+                              ),
+                              fieldGap,
+                              TextField(
+                                controller: followupTemplateController,
+                                decoration: denseDecoration(
+                                  'Follow-up message template (optional)',
+                                  filled: true,
+                                ),
+                                maxLines: 2,
+                              ),
+                              fieldGap,
+                              TextField(
+                                controller: paymentLinkController,
+                                decoration: denseDecoration(
+                                  'Payment link (optional)',
+                                  filled: true,
+                                ),
+                              ),
+                              fieldGap,
+                              TextField(
+                                controller:
+                                    ownerSelectedPlatformController,
+                                decoration: denseDecoration(
+                                  'Owner-selected platform (optional)',
+                                  filled: true,
+                                ),
+                              ),
+                              fieldGap,
+                              TextField(
+                                controller: meetingInstructionsController,
+                                decoration: denseDecoration(
+                                  'Meeting instructions (optional)',
+                                  filled: true,
+                                ),
+                                maxLines: 2,
+                              ),
+                              fieldGap,
+                              TextField(
+                                controller:
+                                    internalFollowupNotesController,
+                                decoration: denseDecoration(
+                                  'Internal follow-up notes (optional)',
+                                  filled: true,
+                                ),
+                                maxLines: 2,
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: EchoDeskSpacing.md),
-                    Expanded(
-                      child: TextField(
-                        controller: priceController,
-                        decoration: const InputDecoration(
-                          labelText: r'Price ($)',
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: EchoDeskSpacing.lg),
-                Container(
-                  padding: const EdgeInsets.all(EchoDeskSpacing.md),
-                  decoration: BoxDecoration(
-                    color: EchoDeskColors.surfaceSoft,
-                    borderRadius: BorderRadius.circular(EchoDeskRadii.md),
-                    border: Border.all(color: EchoDeskColors.line),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Location',
-                        style: Theme.of(modalContext)
-                            .textTheme
-                            .titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: EchoDeskSpacing.xs),
-                      CheckboxListTile(
-                        title: const Text('Requires location',
-                            style: TextStyle(fontSize: 14)),
-                        value: requiresLocation,
-                        onChanged: (v) => setModalState(
-                            () => requiresLocation = v ?? false),
-                        controlAffinity: ListTileControlAffinity.leading,
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                      ),
-                      if (requiresLocation) ...[
-                        const SizedBox(height: EchoDeskSpacing.sm),
-                        DropdownButtonFormField<String>(
-                          // ignore: deprecated_member_use -- value is the current selection; initialValue is for uncontrolled form fields
-                          value: locationType,
-                          decoration: const InputDecoration(
-                            labelText: 'Location type',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                            filled: true,
-                            fillColor: EchoDeskColors.surface,
-                          ),
-                          isExpanded: true,
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'customer_address',
-                              child: Text('Customer address'),
-                            ),
-                            DropdownMenuItem(
-                                value: 'phone_call',
-                                child: Text('Phone call')),
-                            DropdownMenuItem(
-                                value: 'video_meeting',
-                                child: Text('Video meeting')),
-                            DropdownMenuItem(
-                                value: 'custom', child: Text('Custom text')),
-                          ],
-                          onChanged: (v) => setModalState(
-                            () => locationType = v ?? 'customer_address',
-                          ),
+                  const Divider(height: 1, color: EchoDeskColors.line),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      EchoDeskSpacing.sm,
+                      EchoDeskSpacing.sm,
+                      EchoDeskSpacing.sm,
+                      EchoDeskSpacing.sm,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.of(modalContext).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: EchoDeskSpacing.sm),
+                        FilledButton(
+                          onPressed: saveService,
+                          child: const Text('Save'),
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: EchoDeskSpacing.md),
-                Container(
-                  padding: const EdgeInsets.all(EchoDeskSpacing.md),
-                  decoration: BoxDecoration(
-                    color: EchoDeskColors.brandSoft.withValues(alpha: 0.45),
-                    borderRadius: BorderRadius.circular(EchoDeskRadii.md),
-                    border: Border.all(color: EchoDeskColors.line),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Follow-up',
-                        style: Theme.of(modalContext)
-                            .textTheme
-                            .titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: EchoDeskSpacing.xs),
-                      Text(
-                        'Owner-controlled actions after a booking.',
-                        style:
-                            Theme.of(modalContext).textTheme.bodySmall?.copyWith(
-                                  color: EchoDeskColors.muted,
-                                ),
-                      ),
-                      const SizedBox(height: EchoDeskSpacing.md),
-                      DropdownButtonFormField<String>(
-                        initialValue: followupMode,
-                        decoration: const InputDecoration(
-                          labelText: 'Follow-up mode',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          filled: true,
-                          fillColor: EchoDeskColors.surface,
-                        ),
-                        isExpanded: true,
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'none', child: Text('None')),
-                          DropdownMenuItem(
-                              value: 'under_review',
-                              child: Text('Under review')),
-                          DropdownMenuItem(
-                              value: 'send_payment_link',
-                              child: Text('Send payment link')),
-                          DropdownMenuItem(
-                              value: 'send_custom_message',
-                              child: Text('Send custom message')),
-                        ],
-                        onChanged: (v) => setModalState(
-                            () => followupMode = v ?? 'under_review'),
-                      ),
-                      const SizedBox(height: EchoDeskSpacing.md),
-                      TextField(
-                        controller: followupTemplateController,
-                        decoration: const InputDecoration(
-                          labelText: 'Follow-up message template (optional)',
-                          border: OutlineInputBorder(),
-                          filled: true,
-                          fillColor: EchoDeskColors.surface,
-                        ),
-                        maxLines: 3,
-                      ),
-                      const SizedBox(height: EchoDeskSpacing.md),
-                      TextField(
-                        controller: paymentLinkController,
-                        decoration: const InputDecoration(
-                          labelText: 'Payment link (optional)',
-                          border: OutlineInputBorder(),
-                          filled: true,
-                          fillColor: EchoDeskColors.surface,
-                        ),
-                      ),
-                      const SizedBox(height: EchoDeskSpacing.md),
-                      TextField(
-                        controller: ownerSelectedPlatformController,
-                        decoration: const InputDecoration(
-                          labelText: 'Owner-selected platform (optional)',
-                          border: OutlineInputBorder(),
-                          filled: true,
-                          fillColor: EchoDeskColors.surface,
-                        ),
-                      ),
-                      const SizedBox(height: EchoDeskSpacing.md),
-                      TextField(
-                        controller: meetingInstructionsController,
-                        decoration: const InputDecoration(
-                          labelText: 'Meeting instructions (optional)',
-                          border: OutlineInputBorder(),
-                          filled: true,
-                          fillColor: EchoDeskColors.surface,
-                        ),
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: EchoDeskSpacing.md),
-                      TextField(
-                        controller: internalFollowupNotesController,
-                        decoration: const InputDecoration(
-                          labelText: 'Internal follow-up notes (optional)',
-                          border: OutlineInputBorder(),
-                          filled: true,
-                          fillColor: EchoDeskColors.surface,
-                        ),
-                        maxLines: 2,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(modalContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final name = nameController.text.trim();
-                if (name.isEmpty) return;
-
-                final duration = int.tryParse(durationController.text.trim());
-                final priceDollars =
-                    double.tryParse(priceController.text.trim());
-                final priceCents =
-                    priceDollars != null ? (priceDollars * 100).round() : null;
-
-                final payload = <String, dynamic>{
-                  'name': name,
-                  'description': descriptionController.text.trim(),
-                  'requires_location': requiresLocation,
-                  'default_location_type':
-                      requiresLocation ? locationType : null,
-                  'followup_mode': followupMode,
-                  'followup_message_template':
-                      followupTemplateController.text.trim().isEmpty
-                          ? null
-                          : followupTemplateController.text.trim(),
-                  'payment_link': paymentLinkController.text.trim().isEmpty
-                      ? null
-                      : paymentLinkController.text.trim(),
-                  'meeting_instructions':
-                      meetingInstructionsController.text.trim().isEmpty
-                          ? null
-                          : meetingInstructionsController.text.trim(),
-                  'owner_selected_platform':
-                      ownerSelectedPlatformController.text.trim().isEmpty
-                          ? null
-                          : ownerSelectedPlatformController.text.trim(),
-                  'internal_followup_notes':
-                      internalFollowupNotesController.text.trim().isEmpty
-                          ? null
-                          : internalFollowupNotesController.text.trim(),
-                };
-                if (duration != null) payload['duration_minutes'] = duration;
-                if (priceCents != null) payload['price_cents'] = priceCents;
-
-                try {
-                  if (service == null) {
-                    await Supabase.instance.client.from('services').insert({
-                      ...payload,
-                      'receptionist_id': widget.receptionistId,
-                    });
-                  } else {
-                    await Supabase.instance.client
-                        .from('services')
-                        .update(payload)
-                        .eq('id', service['id'])
-                        .eq('receptionist_id', widget.receptionistId);
-                  }
-                  if (!modalContext.mounted) return;
-                  Navigator.of(modalContext).pop(true);
-                } catch (_) {
-                  if (!modalContext.mounted) return;
-                  ScaffoldMessenger.of(modalContext).showSnackBar(
-                    const SnackBar(content: Text('Could not save service')),
-                  );
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
 
