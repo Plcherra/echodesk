@@ -9,8 +9,11 @@ import '../../services/appointment_service.dart';
 import '../../services/dashboard_service.dart';
 import '../../utils/appointment_formatters.dart';
 import '../../utils/call_formatters.dart';
+import '../../widgets/confirm_sign_out.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 import '../../widgets/loading_skeleton.dart';
+import '../../widgets/main_shell.dart';
+import '../../widgets/state_views.dart';
 import '../../widgets/status_chip.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -38,6 +41,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int? _remainingMinutes;
   bool _loading = true;
   String? _error;
+  /// Non-blocking: dashboard shell loaded, but appointments request failed.
+  String? _appointmentsError;
+  int? _lastShellTabIndex;
 
   @override
   void initState() {
@@ -45,11 +51,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final tabIndex = MainShellTabIndex.maybeOf(context);
+    if (tabIndex == null) return;
+    // Refresh when the user switches back to the Dashboard tab.
+    if (_lastShellTabIndex != null &&
+        tabIndex == 0 &&
+        _lastShellTabIndex != 0) {
+      _load(quiet: true);
+    }
+    _lastShellTabIndex = tabIndex;
+  }
+
+  Future<void> _pushAndRefresh(String location) async {
+    await context.push(location);
+    if (mounted) await _load(quiet: true);
+  }
+
+  Future<void> _load({bool quiet = false}) async {
+    if (!quiet) {
+      setState(() {
+        _loading = true;
+        _error = null;
+        _appointmentsError = null;
+      });
+    } else if (mounted) {
+      setState(() => _appointmentsError = null);
+    }
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) throw Exception('Not authenticated');
@@ -58,6 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       List<Map<String, dynamic>> upcoming = [];
       int needsReview = 0;
       Map<String, String> recNames = {};
+      String? appointmentsError;
       try {
         final aptData = await loadAppointments(limit: 30);
         final allApts =
@@ -83,7 +114,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (sa == null || sb == null) return 0;
           return sa.compareTo(sb);
         });
-      } catch (_) {}
+      } catch (e) {
+        appointmentsError = e.toString();
+      }
 
       if (!mounted) return;
       setState(() {
@@ -101,12 +134,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _upcomingAppointments = upcoming.take(5).toList();
         _needsReviewCount = needsReview;
         _receptionistNames = recNames;
+        _appointmentsError = appointmentsError;
         _loading = false;
       });
       if (!_loading && _error == null) {
         _maybeShowWelcomeOverlay();
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -147,7 +182,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: () {
               prefs.setBool(_kWelcomeSeenKey, true);
               Navigator.of(ctx).pop();
-              if (mounted) context.push('/receptionists/create');
+              if (mounted) _pushAndRefresh('/receptionists/create');
             },
             child: const Text('Create receptionist'),
           ),
@@ -185,33 +220,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('Dashboard')),
         body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
-                const SizedBox(height: 16),
-                Text(
-                  'Something went wrong',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _error!,
-                  style: Theme.of(context).textTheme.bodySmall,
-                  textAlign: TextAlign.center,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: _load,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
-                ),
-              ],
-            ),
+          child: ErrorStateView(
+            message: _error,
+            onRetry: _load,
           ),
         ),
       );
@@ -226,21 +237,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline),
-            onPressed: () => context.push('/help'),
+            onPressed: () => _pushAndRefresh('/help'),
           ),
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () => context.push('/settings'),
+            onPressed: () => _pushAndRefresh('/settings'),
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () => Supabase.instance.client.auth.signOut(),
+            onPressed: () => confirmSignOut(context),
           ),
         ],
       ),
       body: constrainedScaffoldBody(
         child: RefreshIndicator(
-          onRefresh: _load,
+          onRefresh: () => _load(quiet: true),
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             children: [
@@ -298,7 +309,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'Review, confirm, or edit appointments booked by your AI.',
         ),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => context.push(hasNeedsReview
+        onTap: () => _pushAndRefresh(hasNeedsReview
             ? '/appointments?status=needs_review'
             : '/appointments'),
       ),
@@ -314,7 +325,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'Connect calendar and create your first receptionist to set up your business line.',
         ),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => context.push('/onboarding'),
+        onTap: () => _pushAndRefresh('/onboarding'),
       ),
     );
   }
@@ -336,7 +347,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: () => context.push('/checkout'),
+              onPressed: () => _pushAndRefresh('/checkout'),
               child: const Text('Subscribe'),
             ),
           ],
@@ -433,11 +444,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Text('Recent Calls', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
         if (_recentCalls.isEmpty)
-          _EmptySection(
+          const EmptyStateView(
             icon: Icons.phone_missed_outlined,
             title: 'No calls yet',
             subtitle:
                 "When customers call your AI receptionist, they'll appear here.",
+            asCard: true,
           )
         else
           ..._recentCalls.take(5).map((call) {
@@ -464,10 +476,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 trailing: const Icon(Icons.chevron_right, size: 20),
                 onTap: recId != null
-                    ? () => context.push(
+                    ? () async {
+                        await context.push(
                           '/receptionists/$recId/calls/${call['id']}',
                           extra: call,
-                        )
+                        );
+                        if (mounted) await _load(quiet: true);
+                      }
                     : null,
               ),
             );
@@ -487,17 +502,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 style: Theme.of(context).textTheme.titleMedium),
             if (_upcomingAppointments.isNotEmpty)
               TextButton(
-                onPressed: () => context.push('/appointments'),
+                onPressed: () => _pushAndRefresh('/appointments'),
                 child: const Text('View all'),
               ),
           ],
         ),
         const SizedBox(height: 12),
-        if (_upcomingAppointments.isEmpty)
-          _EmptySection(
+        if (_appointmentsError != null)
+          Card(
+            color: Colors.red.shade50,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red.shade700),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Could not load appointments',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red.shade900,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _appointmentsError!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.red.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => _load(quiet: true),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else if (_upcomingAppointments.isEmpty)
+          const EmptyStateView(
             icon: Icons.event_available,
             title: 'No upcoming appointments',
             subtitle: 'Appointments booked by your AI will appear here.',
+            asCard: true,
           )
         else
           ..._upcomingAppointments.map((apt) {
@@ -531,7 +588,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                 ),
                 trailing: const Icon(Icons.chevron_right, size: 20),
-                onTap: () => context.push('/appointments/${apt['id']}'),
+                onTap: () => _pushAndRefresh('/appointments/${apt['id']}'),
               ),
             );
           }),
@@ -549,20 +606,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Text('Recent Receptionists',
                 style: Theme.of(context).textTheme.titleMedium),
             TextButton(
-              onPressed: () => context.push('/receptionists'),
+              onPressed: () => _pushAndRefresh('/receptionists'),
               child: const Text('View all'),
             ),
           ],
         ),
         const SizedBox(height: 12),
         if (_receptionists.isEmpty)
-          _EmptySection(
+          EmptyStateView(
             icon: Icons.support_agent,
             title: 'No receptionists yet',
             subtitle:
                 'Create your first AI receptionist to answer on your business line.',
+            asCard: true,
             action: TextButton(
-              onPressed: () => context.push('/receptionists/create'),
+              onPressed: () => _pushAndRefresh('/receptionists/create'),
               child: const Text('Add one'),
             ),
           )
@@ -579,52 +637,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                   ),
                   trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: () => context.push('/receptionists/${r.id}'),
+                  onTap: () => _pushAndRefresh('/receptionists/${r.id}'),
                 ),
               )),
       ],
-    );
-  }
-}
-
-class _EmptySection extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Widget? action;
-
-  const _EmptySection({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.action,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Icon(icon, size: 40, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
-            Text(title, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            if (action != null) ...[
-              const SizedBox(height: 12),
-              action!,
-            ],
-          ],
-        ),
-      ),
     );
   }
 }

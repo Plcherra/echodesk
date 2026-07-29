@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/api_client.dart';
 import '../../strings.dart';
+import '../../widgets/confirm_sign_out.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -177,7 +178,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: const Text('Sign Out'),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 0),
                   trailing: const Icon(Icons.logout, size: 20),
-                  onTap: () => Supabase.instance.client.auth.signOut(),
+                  onTap: () => confirmSignOut(context),
                 ),
               ],
             ),

@@ -4,11 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/api_client.dart';
 import '../../strings.dart';
+import '../../widgets/confirm_sign_out.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -183,7 +183,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () => Supabase.instance.client.auth.signOut(),
+            onPressed: () => confirmSignOut(context),
           ),
         ],
       ),
