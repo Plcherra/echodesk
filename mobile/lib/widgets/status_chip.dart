@@ -13,16 +13,23 @@ class StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color, bgColor) = statusStyle(status);
+    final fontSize = MediaQuery.textScalerOf(context)
+        .clamp(minScaleFactor: 1.0, maxScaleFactor: 1.4)
+        .scale(11)
+        .clamp(11.0, 16.0);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(EchoDeskRadii.sm),
       ),
       child: Text(
         label,
-        style:
-            TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }

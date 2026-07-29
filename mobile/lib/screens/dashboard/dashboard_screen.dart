@@ -236,14 +236,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline),
+            tooltip: 'Help',
             onPressed: () => _pushAndRefresh('/help'),
           ),
           IconButton(
             icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
             onPressed: () => _pushAndRefresh('/settings'),
           ),
           IconButton(
             icon: const Icon(Icons.logout),
+            tooltip: 'Sign out',
             onPressed: () => confirmSignOut(context),
           ),
         ],

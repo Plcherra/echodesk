@@ -693,6 +693,33 @@ def handle_create_appointment(
         ins_res = supabase.table("appointments").insert(insert_data).execute()
         if ins_res and getattr(ins_res, "data", None) and len(ins_res.data) > 0:
             appointment_id = ins_res.data[0].get("id")
+            # Best-effort owner push (never breaks booking).
+            if appointment_id and appointment_status == "needs_review":
+                try:
+                    owner_res = (
+                        supabase.table("receptionists")
+                        .select("user_id")
+                        .eq("id", receptionist_id)
+                        .limit(1)
+                        .execute()
+                    )
+                    owner_id = None
+                    if owner_res and owner_res.data:
+                        owner_id = owner_res.data[0].get("user_id")
+                    if owner_id:
+                        from push import send_appointment_created_push
+
+                        send_appointment_created_push(
+                            owner_id,
+                            str(appointment_id),
+                            status=appointment_status,
+                            service_name=service_name or summary,
+                            start_time=start_iso,
+                        )
+                except Exception as push_ex:
+                    logger.debug(
+                        "[CAL_BOOK] appointment push skipped: %s", push_ex
+                    )
     except Exception as ex:
         logger.warning("[CAL_BOOK] appointments insert failed (event already created): %s", ex)
 

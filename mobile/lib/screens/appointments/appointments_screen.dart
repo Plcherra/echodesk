@@ -704,6 +704,10 @@ class _AppointmentRow extends StatelessWidget {
 class _GenericBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final fontSize = MediaQuery.textScalerOf(context)
+        .clamp(minScaleFactor: 1.0, maxScaleFactor: 1.4)
+        .scale(11)
+        .clamp(11.0, 16.0);
     return Container(
       margin: const EdgeInsets.only(left: 6),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -719,7 +723,7 @@ class _GenericBadge extends StatelessWidget {
           Text(
             'Generic',
             style: TextStyle(
-              fontSize: 10,
+              fontSize: fontSize,
               fontWeight: FontWeight.w600,
               color: EchoDeskColors.warning,
             ),

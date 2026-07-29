@@ -125,6 +125,7 @@ class _CommunicationSetupScreenState extends State<CommunicationSetupScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
             onPressed: _loading ? null : _load,
           ),
         ],

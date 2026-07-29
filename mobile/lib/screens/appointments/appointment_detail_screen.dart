@@ -562,18 +562,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                     const SizedBox(height: 24),
                     Text('Transcript', style: Theme.of(context).textTheme.titleSmall),
                     const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: SelectableText(
-                        truncatePreview(transcript, maxLength: 500),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
+                    _ExpandableTranscript(transcript: transcript.trim()),
                   ],
                 ],
               ),
@@ -1015,6 +1004,59 @@ class _EditTextDialogState extends State<_EditTextDialog> {
           child: const Text('Save'),
         ),
       ],
+    );
+  }
+}
+
+class _ExpandableTranscript extends StatefulWidget {
+  final String transcript;
+
+  const _ExpandableTranscript({required this.transcript});
+
+  @override
+  State<_ExpandableTranscript> createState() => _ExpandableTranscriptState();
+}
+
+class _ExpandableTranscriptState extends State<_ExpandableTranscript> {
+  static const _previewLength = 500;
+  bool _expanded = false;
+
+  bool get _needsTruncate => widget.transcript.length > _previewLength;
+
+  @override
+  Widget build(BuildContext context) {
+    final display = (!_expanded && _needsTruncate)
+        ? truncatePreview(widget.transcript, maxLength: _previewLength)
+        : widget.transcript;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(EchoDeskRadii.sm),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SelectableText(
+            display,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          if (_needsTruncate) ...[
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => setState(() => _expanded = !_expanded),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                foregroundColor: EchoDeskColors.brand,
+              ),
+              child: Text(_expanded ? 'Show less' : 'View full'),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

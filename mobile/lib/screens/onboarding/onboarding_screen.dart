@@ -191,10 +191,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
             onPressed: () => context.push('/settings'),
           ),
           IconButton(
             icon: const Icon(Icons.logout),
+            tooltip: 'Sign out',
             onPressed: () => confirmSignOut(context),
           ),
         ],

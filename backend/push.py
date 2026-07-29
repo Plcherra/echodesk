@@ -141,3 +141,72 @@ def send_call_ended_push(
     except Exception as e:
         logger.error("FCM call_ended send failed: %s", e)
         return 0
+
+
+def send_appointment_created_push(
+    user_id: str,
+    appointment_id: str,
+    *,
+    status: str = "needs_review",
+    service_name: str | None = None,
+    start_time: str | None = None,
+) -> int:
+    """
+    Notify the owner that a new appointment was booked.
+    Deep-link payload opens Needs Review (or appointment detail).
+    """
+    messaging = _get_messaging()
+    if not messaging:
+        logger.warning("FCM not configured (FIREBASE_SERVICE_ACCOUNT_KEY)")
+        return 0
+
+    supabase = create_service_role_client()
+    res = supabase.table("user_push_tokens").select("token").eq("user_id", user_id).execute()
+    tokens = [r["token"] for r in (res.data or []) if r.get("token")]
+    if not tokens:
+        logger.info("No push tokens for user %s", user_id)
+        return 0
+
+    label = (service_name or "").strip() or "Appointment"
+    body = f"{label} needs your review" if status == "needs_review" else f"{label} booked"
+    if start_time:
+        body = f"{body} · {start_time}"
+
+    data = {
+        "type": "appointment_created",
+        "appointment_id": appointment_id or "",
+        "status": status or "needs_review",
+        "deep_link": "/appointments?status=needs_review"
+        if status == "needs_review"
+        else (f"/appointments/{appointment_id}" if appointment_id else "/appointments"),
+    }
+    data = {k: str(v) for k, v in data.items()}
+
+    message = messaging.MulticastMessage(
+        tokens=tokens,
+        notification=messaging.Notification(
+            title="New appointment",
+            body=body,
+        ),
+        data=data,
+        android=messaging.AndroidConfig(
+            priority="high",
+            notification=messaging.AndroidNotification(channel_id="echodesk_appointments"),
+        ),
+        apns=messaging.APNSConfig(
+            payload=messaging.APNSPayload(aps=messaging.Aps(sound="default")),
+        ),
+    )
+
+    try:
+        result = messaging.send_each_for_multicast(message)
+        logger.info(
+            "FCM appointment_created sent: %d/%d appointment_id=%s",
+            result.success_count,
+            len(tokens),
+            appointment_id,
+        )
+        return result.success_count
+    except Exception as e:
+        logger.error("FCM appointment_created send failed: %s", e)
+        return 0

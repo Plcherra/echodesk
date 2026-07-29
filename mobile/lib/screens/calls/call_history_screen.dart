@@ -4,8 +4,8 @@ import '../../services/call_history_service.dart';
 import '../../utils/call_formatters.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 import '../../widgets/loading_skeleton.dart';
+import '../../widgets/outcome_chip.dart';
 import '../../widgets/state_views.dart';
-import '../../theme/echodesk_theme.dart';
 
 class CallHistoryScreen extends StatefulWidget {
   final String receptionistId;
@@ -216,7 +216,7 @@ class _CallRow extends StatelessWidget {
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ),
-            _OutcomeChip(label: outcome),
+            OutcomeChip(label: outcome),
           ],
         ),
         subtitle: Column(
@@ -264,45 +264,4 @@ class _CallRow extends StatelessWidget {
     return status == 'available';
   }
 
-}
-
-class _OutcomeChip extends StatelessWidget {
-  final String label;
-
-  const _OutcomeChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final (color, bgColor) = _colorsForOutcome(label);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
-    );
-  }
-
-  (Color, Color) _colorsForOutcome(String label) {
-    switch (label) {
-      case 'Booked':
-        return (EchoDeskColors.success, EchoDeskColors.successSoft);
-      case 'Completed':
-        return (EchoDeskColors.info, EchoDeskColors.infoSoft);
-      case 'Short Call':
-        return (EchoDeskColors.warning, EchoDeskColors.warningSoft);
-      case 'Missed':
-        return (EchoDeskColors.danger, EchoDeskColors.dangerSoft);
-      default:
-        return (EchoDeskColors.muted, EchoDeskColors.surfaceMuted);
-    }
-  }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class EchoDeskColors {
@@ -48,6 +49,17 @@ class EchoDeskRadii {
 class EchoDeskTheme {
   EchoDeskTheme._();
 
+  /// SF Pro on Apple platforms; Roboto elsewhere (Android / web fallback).
+  static String get fontFamily {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return '.SF Pro Text';
+      default:
+        return 'Roboto';
+    }
+  }
+
   static ThemeData light() {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: EchoDeskColors.brand,
@@ -74,14 +86,14 @@ class EchoDeskTheme {
       colorScheme: colorScheme,
       useMaterial3: true,
       scaffoldBackgroundColor: EchoDeskColors.background,
-      fontFamily: '.SF Pro Text',
+      fontFamily: fontFamily,
     );
 
     final textTheme = base.textTheme
         .apply(
           bodyColor: EchoDeskColors.ink,
           displayColor: EchoDeskColors.ink,
-          fontFamily: '.SF Pro Text',
+          fontFamily: fontFamily,
         )
         .copyWith(
           displaySmall: base.textTheme.displaySmall?.copyWith(

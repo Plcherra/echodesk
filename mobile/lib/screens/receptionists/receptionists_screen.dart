@@ -174,6 +174,7 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
             onPressed: () => context.push('/settings'),
           ),
         ],
@@ -201,7 +202,15 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
                             const SizedBox(height: 24),
                             if (_receptionists.isEmpty)
                               _buildEmptyState()
-                            else
+                            else ...[
+                              Text(
+                                'Tap the phone icon or long-press a row to place an outbound call.',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: EchoDeskColors.soft),
+                              ),
+                              const SizedBox(height: EchoDeskSpacing.sm),
                               ..._receptionists.map((r) {
                                 final isActive =
                                     r.status == null || r.status == 'active';
@@ -240,7 +249,14 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
                                           child: Text(
                                             r.status ?? 'active',
                                             style: TextStyle(
-                                              fontSize: 11,
+                                              fontSize: MediaQuery
+                                                      .textScalerOf(context)
+                                                  .clamp(
+                                                    minScaleFactor: 1.0,
+                                                    maxScaleFactor: 1.4,
+                                                  )
+                                                  .scale(11)
+                                                  .clamp(11.0, 16.0),
                                               fontWeight: FontWeight.w600,
                                               color: isActive
                                                   ? EchoDeskColors.success
@@ -259,10 +275,26 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
                                             color: EchoDeskColors.muted,
                                           ),
                                     ),
-                                    trailing: Icon(
-                                      Icons.chevron_right,
-                                      size: 18,
-                                      color: EchoDeskColors.soft,
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.phone_outlined,
+                                            size: 20,
+                                          ),
+                                          tooltip: 'Place outbound call',
+                                          visualDensity: VisualDensity.compact,
+                                          onPressed: () =>
+                                              _showOutboundCallSheet(
+                                                  context, r),
+                                        ),
+                                        Icon(
+                                          Icons.chevron_right,
+                                          size: 18,
+                                          color: EchoDeskColors.soft,
+                                        ),
+                                      ],
                                     ),
                                     onTap: () =>
                                         context.push('/receptionists/${r.id}'),
@@ -271,6 +303,7 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
                                   ),
                                 );
                               }),
+                            ],
                           ],
                         ),
                       ),

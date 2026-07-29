@@ -10,6 +10,7 @@ import 'services/api_client.dart';
 import 'services/call_service.dart';
 import 'services/deep_link_handler.dart';
 import 'services/pending_plan_service.dart';
+import 'services/push_service.dart';
 import 'theme/echodesk_theme.dart';
 
 class EchodeskApp extends StatefulWidget {
@@ -50,6 +51,10 @@ class _EchodeskAppState extends State<EchodeskApp> {
           ? '/call/$callSid'
           : '/call/$callSid?${Uri(queryParameters: q).query}';
       _router.go(path);
+    };
+    PushService().onNavigate = (route) {
+      if (route.isEmpty) return;
+      _router.go(route);
     };
     _deepLinkHandler.init(
       (msg) {

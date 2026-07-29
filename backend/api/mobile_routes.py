@@ -1140,11 +1140,19 @@ async def receptionist_calendar_status(request: Request, receptionist_id: str):
     u = user_row.data or {}
 
     connected_email = u.get("calendar_id") or u.get("email")
+    # Prefer email-shaped values for "Connected as" (not opaque calendar ids).
+    if isinstance(connected_email, str) and "@" not in connected_email:
+        connected_email = u.get("email") or connected_email
     booking_calendar_id = (rec_data.get("calendar_id") or u.get("calendar_id") or "primary").strip()
     mode = (rec_data.get("mode") or "personal").strip()
 
-    # For now, label is just the ID; can be enhanced later by querying Google Calendar list.
-    booking_calendar_label = booking_calendar_id
+    # Prefer a friendly label when the id is opaque.
+    if booking_calendar_id == "primary":
+        booking_calendar_label = "Primary"
+    elif "@" in booking_calendar_id:
+        booking_calendar_label = booking_calendar_id
+    else:
+        booking_calendar_label = "Connected calendar"
 
     return {
         "connected_google_email": connected_email,

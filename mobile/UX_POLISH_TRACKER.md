@@ -11,7 +11,7 @@ Source: mobile UX audit + polish passes on `main`.
 | **P1** | Dashboard Overview cleanup | **Done** (+ hierarchy refinement) |
 | **P2** | Remaining polish (former leftover P1) | **Done** (after #14) |
 | **P3** | Receptionist Area Redesign | **Done** |
-| **P4** | Nice-to-have (former P3) | **In progress** — quick wins done |
+| **P4** | Nice-to-have (former P3) | **Done** |
 
 **How many P levels?** Five: **P0**, **P1**, **P2**, **P3**, **P4**.
 
@@ -23,7 +23,7 @@ Source: mobile UX audit + polish passes on `main`.
 
 **Is P3 finished?** Yes (2026-07-28). Rebuild and run [P3 manual smoke tests](#p3-manual-smoke-tests).
 
-**Is P4 finished?** No — quick wins (25, 31, 32 + delete SnackBars) done; medium/lower items remain.
+**Is P4 finished?** Yes (2026-07-29). Rebuild and run [P4 manual smoke tests](#p4-manual-smoke-tests).
 
 ### Rebuild (Mac)
 
@@ -199,23 +199,23 @@ Finished 2026-07-28.
 
 ---
 
-## P4 — Nice-to-have (former P3) — IN PROGRESS
+## P4 — Nice-to-have (former P3) — DONE
 
-Started 2026-07-29. Quick wins first.
+Started 2026-07-29. Finished 2026-07-29.
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
 | 25 | Brand casing: “Echodesk” → “EchoDesk” in welcome copy | Done | Welcome, reset password, MaterialApp title, push/call appName, iOS/Android labels |
-| 26 | Generic badge min text size / TextScaler | Todo | |
-| 27 | Semantics / text-scale spot-check on icon buttons | Todo | |
-| 28 | `.SF Pro Text` on Android — platform/bundled font | Todo | |
-| 29 | Shared `_OutcomeChip` (call history + receptionist detail) | Todo | |
-| 30 | Appointment transcript expand / “View full” | Todo | |
+| 26 | Generic badge min text size / TextScaler | Done | StatusChip, OutcomeChip, GenericBadge, list badges clamp 11–16 |
+| 27 | Semantics / text-scale spot-check on icon buttons | Done | Tooltips on Dashboard/Onboarding/Settings/Receptionists icon actions |
+| 28 | `.SF Pro Text` on Android — platform/bundled font | Done | SF Pro on Apple; Roboto elsewhere |
+| 29 | Shared `_OutcomeChip` (call history + receptionist detail) | Done | `widgets/outcome_chip.dart` |
+| 30 | Appointment transcript expand / “View full” | Done | Expand/collapse past 500 chars |
 | 31 | Onboarding error state matches shared ErrorStateView | Done | Same Retry layout as other screens |
 | 32 | Checkout `Navigator.pop` → `context.pop()` | Done | go_router |
-| 33 | Receptionist long-press-to-call discoverability | Todo | |
-| 34 | Settings calendar subtitle shows Google email, not raw calendar id | Todo | |
-| 35 | Push deep-link for new appointment → Needs review | Todo | |
+| 33 | Receptionist long-press-to-call discoverability | Done | Phone icon + list hint; long-press kept |
+| 34 | Settings calendar subtitle shows Google email, not raw calendar id | Done | Email-shaped id or account email; booking label friendly |
+| 35 | Push deep-link for new appointment → Needs review | Done | Backend FCM + mobile `onNavigate` → `/appointments?status=needs_review` |
 | — | Delete success SnackBars (services / locations / promos) | Done | Matches receptionist delete feedback |
 
 ### P4 manual smoke tests
@@ -224,6 +224,14 @@ Started 2026-07-29. Quick wins first.
 2. **Checkout Back** — Failed checkout → Back uses go_router pop (no stack glitch).
 3. **Onboarding error** — Force setup load failure → shared ErrorStateView + Retry.
 4. **Delete feedback** — Delete a service / location / promo → success SnackBar before list reloads.
+5. **Outcome chip** — Call history / receptionist detail / call detail use the same chip colors.
+6. **Transcript** — Long appointment transcript shows **View full** / **Show less**.
+7. **Calendar subtitle** — Settings Google Calendar shows “Connected as you@gmail.com” (not opaque id).
+8. **Outbound call** — Receptionists list shows phone icon + hint; tap/long-press opens call sheet.
+9. **Badge text scale** — Large accessibility text still keeps chips readable (min ~11).
+10. **Icon tooltips** — Long-press Help / Settings / Sign out shows tooltip.
+11. **Android font** — Body text uses Roboto (not missing SF Pro glyphs).
+12. **Appointment push** — New needs_review booking notification opens Appointments → Needs review.
 
 ---
 
@@ -252,4 +260,4 @@ Started 2026-07-29. Quick wins first.
 - **P1** — Dashboard Overview cleanup (done)
 - **P2** — remaining polish (done)
 - **P3** — Receptionist Area Redesign (done)
-- **P4** — nice-to-have
+- **P4** — nice-to-have (done)

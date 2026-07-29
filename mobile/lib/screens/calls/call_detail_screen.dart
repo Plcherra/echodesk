@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../services/call_history_service.dart';
 import '../../utils/call_formatters.dart';
 import '../../widgets/constrained_scaffold_body.dart';
+import '../../widgets/outcome_chip.dart';
 import '../../widgets/state_views.dart';
 import '../../theme/echodesk_theme.dart';
 
@@ -192,7 +193,10 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           children: [
             // Header: outcome chip + date/duration
-            _OutcomeChip(label: outcome),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutcomeChip(label: outcome, prominent: true),
+            ),
             if (metaParts.isNotEmpty) ...[
               const SizedBox(height: EchoDeskSpacing.sm),
               Text(
@@ -637,6 +641,10 @@ class _RecordingStatusChip extends StatelessWidget {
     final (color, bgColor) = isAvailable
         ? (EchoDeskColors.success, EchoDeskColors.successSoft)
         : _colorsForStatus(label);
+    final fontSize = MediaQuery.textScalerOf(context)
+        .clamp(minScaleFactor: 1.0, maxScaleFactor: 1.4)
+        .scale(12)
+        .clamp(11.0, 16.0);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
@@ -646,7 +654,7 @@ class _RecordingStatusChip extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 12,
+          fontSize: fontSize,
           fontWeight: FontWeight.w600,
           color: color,
         ),
@@ -659,50 +667,6 @@ class _RecordingStatusChip extends StatelessWidget {
       case 'Processing':
         return (EchoDeskColors.warning, EchoDeskColors.warningSoft);
       case 'Failed':
-        return (EchoDeskColors.danger, EchoDeskColors.dangerSoft);
-      default:
-        return (EchoDeskColors.muted, EchoDeskColors.surfaceMuted);
-    }
-  }
-}
-
-class _OutcomeChip extends StatelessWidget {
-  final String label;
-
-  const _OutcomeChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final (color, bgColor) = _colorsForOutcome(label);
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(EchoDeskRadii.sm),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
-        ),
-      ),
-    );
-  }
-
-  (Color, Color) _colorsForOutcome(String label) {
-    switch (label) {
-      case 'Booked':
-        return (EchoDeskColors.success, EchoDeskColors.successSoft);
-      case 'Completed':
-        return (EchoDeskColors.info, EchoDeskColors.infoSoft);
-      case 'Short Call':
-        return (EchoDeskColors.warning, EchoDeskColors.warningSoft);
-      case 'Missed':
         return (EchoDeskColors.danger, EchoDeskColors.dangerSoft);
       default:
         return (EchoDeskColors.muted, EchoDeskColors.surfaceMuted);

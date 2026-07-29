@@ -55,6 +55,9 @@ class PushService {
 
   void Function(String title, String body)? onForegroundNotification;
 
+  /// Navigate when an appointment (or other non-call) notification is opened.
+  void Function(String route)? onNavigate;
+
   Future<void> initialize() async {
     if (_initialized) return;
     if (!Platform.isAndroid && !Platform.isIOS) return;
@@ -78,21 +81,25 @@ class PushService {
       );
 
       if (Platform.isAndroid) {
-        const channel = AndroidNotificationChannel(
+        const callChannel = AndroidNotificationChannel(
           'echodesk_calls',
           'Call Alerts',
           description: 'Notifications for incoming and ended calls',
           importance: Importance.high,
         );
-        await _localNotifications
+        const appointmentChannel = AndroidNotificationChannel(
+          'echodesk_appointments',
+          'Appointment Alerts',
+          description: 'Notifications for new appointments needing review',
+          importance: Importance.high,
+        );
+        final androidPlugin = _localNotifications
             .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>()
-            ?.createNotificationChannel(channel);
+                AndroidFlutterLocalNotificationsPlugin>();
+        await androidPlugin?.createNotificationChannel(callChannel);
+        await androidPlugin?.createNotificationChannel(appointmentChannel);
         // Android 13+: request POST_NOTIFICATIONS at runtime
-        await _localNotifications
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>()
-            ?.requestNotificationsPermission();
+        await androidPlugin?.requestNotificationsPermission();
       }
 
       await _requestPermission();
@@ -181,6 +188,21 @@ class PushService {
         receptionistId: receptionistId,
         caller: caller,
       );
+      return;
+    }
+
+    if (type == 'appointment_created' || type == 'new_appointment') {
+      final deepLink = data['deep_link'] as String?;
+      final appointmentId = data['appointment_id'] as String?;
+      final status = data['status'] as String?;
+      final route = (deepLink != null && deepLink.isNotEmpty)
+          ? deepLink
+          : (status == 'needs_review' || status == null)
+              ? '/appointments?status=needs_review'
+              : (appointmentId != null && appointmentId.isNotEmpty)
+                  ? '/appointments/$appointmentId'
+                  : '/appointments';
+      onNavigate?.call(route);
     }
   }
 
@@ -189,15 +211,20 @@ class PushService {
     String body,
     Map<String, dynamic> data,
   ) async {
-    const androidDetails = AndroidNotificationDetails(
-      'echodesk_calls',
-      'Call Alerts',
-      channelDescription: 'Notifications for incoming and ended calls',
+    final type = data['type'] as String? ?? data['notification_type'] as String?;
+    final isAppointment =
+        type == 'appointment_created' || type == 'new_appointment';
+    final androidDetails = AndroidNotificationDetails(
+      isAppointment ? 'echodesk_appointments' : 'echodesk_calls',
+      isAppointment ? 'Appointment Alerts' : 'Call Alerts',
+      channelDescription: isAppointment
+          ? 'Notifications for new appointments needing review'
+          : 'Notifications for incoming and ended calls',
       importance: Importance.high,
       priority: Priority.high,
     );
     const iosDetails = DarwinNotificationDetails();
-    const details = NotificationDetails(
+    final details = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );

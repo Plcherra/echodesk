@@ -139,8 +139,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 title: const Text('Google Calendar'),
                 subtitle: Text(
-                  _calendarInfo!['connected_google_email'] != null
-                      ? 'Connected as ${_calendarInfo!['connected_google_email']}'
+                  _calendarInfo!['calendar_connected'] == true
+                      ? (_calendarInfo!['connected_google_email'] != null
+                          ? 'Connected as ${_calendarInfo!['connected_google_email']}'
+                          : 'Connected')
                       : 'Not connected',
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0),
@@ -316,19 +318,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .eq('id', user.id)
           .maybeSingle();
       if (!mounted) return;
+      final calendarId = res?['calendar_id'] as String?;
+      final accountEmail = res?['email'] as String?;
+      final hasToken =
+          (res?['calendar_refresh_token'] as String?)?.isNotEmpty == true;
+      final connected =
+          hasToken || (calendarId != null && calendarId.isNotEmpty);
+      final googleEmail = _displayGoogleEmail(calendarId, accountEmail);
       setState(() {
         _calendarInfo = {
-          'connected_google_email':
-              (res?['calendar_id'] as String?) ?? (res?['email'] as String?),
-          'booking_calendar_id': (res?['calendar_id'] as String?) ?? 'primary',
-          'booking_calendar_label':
-              (res?['calendar_id'] as String?) ?? 'primary',
+          'connected_google_email': connected ? googleEmail : null,
+          'calendar_connected': connected,
+          'booking_calendar_id': calendarId ?? 'primary',
+          'booking_calendar_label': _bookingCalendarLabel(calendarId),
         };
       });
     } catch (_) {
       if (!mounted) return;
       setState(() => _calendarInfo = null);
     }
+  }
+
+  /// Prefer an email-shaped calendar_id (Google account), else signup email.
+  static String? _displayGoogleEmail(String? calendarId, String? accountEmail) {
+    if (calendarId != null && calendarId.contains('@')) return calendarId;
+    if (accountEmail != null && accountEmail.contains('@')) return accountEmail;
+    return null;
+  }
+
+  static String _bookingCalendarLabel(String? calendarId) {
+    if (calendarId == null || calendarId.isEmpty) return 'primary';
+    if (calendarId == 'primary') return 'Primary';
+    if (calendarId.contains('@')) return calendarId;
+    return 'Connected calendar';
   }
 }
 
