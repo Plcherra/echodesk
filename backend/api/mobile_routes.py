@@ -55,6 +55,7 @@ from communication.ensure import (
 from api.mobile.agenda import router as agenda_router
 from api.mobile.dashboard import router as dashboard_router
 from api.mobile.call_logs_projection import (
+    fetch_call_log_by_id_with_fallback,
     fetch_call_logs_with_fallback,
     is_missing_column_error,
 )
@@ -1683,6 +1684,65 @@ async def get_call_history(request: Request, receptionist_id: str):
         response["degraded_reason"] = (
             "schema_fallback_active: optional call columns unavailable; apply migrations 031 and 032"
         )
+        response["select_mode"] = select_mode
+    return response
+
+
+@router.get("/receptionists/{receptionist_id}/calls/{call_id}")
+async def get_call_detail(request: Request, receptionist_id: str, call_id: str):
+    """Fetch a single call for cold open / deep link when list extra is missing."""
+    user, supabase = _require_auth(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    err = _assert_receptionist_ownership(receptionist_id, user["id"], supabase)
+    if err:
+        return JSONResponse({"error": err}, status_code=404)
+
+    try:
+        call, select_mode, _degraded_reason = fetch_call_log_by_id_with_fallback(
+            supabase=supabase,
+            receptionist_id=receptionist_id,
+            call_id=call_id,
+            diag_tag="call-detail",
+        )
+    except RuntimeError:
+        return JSONResponse(
+            {
+                "error": "Call details unavailable due to schema mismatch",
+                "code": "call_history_schema_mismatch",
+            },
+            status_code=503,
+        )
+    except Exception as e:
+        logger.exception(
+            "[CALL_DIAG] call-detail failed receptionist_id=%s call_id=%s: %s",
+            receptionist_id,
+            call_id,
+            e,
+        )
+        return JSONResponse({"error": "Failed to load call"}, status_code=500)
+
+    if not call:
+        return JSONResponse({"error": "Call not found"}, status_code=404)
+
+    try:
+        apt_rows = (
+            supabase.table("appointments")
+            .select("id, call_log_id")
+            .eq("call_log_id", call_id)
+            .limit(1)
+            .execute()
+        )
+        rows = apt_rows.data if apt_rows and isinstance(apt_rows.data, list) else []
+        if rows and rows[0].get("id"):
+            call["appointment_id"] = rows[0]["id"]
+    except Exception:
+        pass
+
+    response = {"call": call}
+    if select_mode != "full":
+        response["degraded"] = True
         response["select_mode"] = select_mode
     return response
 

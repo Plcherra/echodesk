@@ -55,6 +55,51 @@ def sanitize_call_rows(rows: list[Any]) -> list[dict[str, Any]]:
     return out
 
 
+def fetch_call_log_by_id_with_fallback(
+    *,
+    supabase,
+    receptionist_id: str,
+    call_id: str,
+    diag_tag: str = "call-detail",
+) -> tuple[dict[str, Any] | None, str, str | None]:
+    """
+    Fetch a single call_log row using full -> extended -> core projection fallback.
+    Returns (row_or_none, select_mode, degraded_reason).
+    None row means not found (query succeeded).
+    """
+    degraded_reason: str | None = None
+    for mode, select_clause in (
+        ("full", CALL_LOGS_FULL_SELECT),
+        ("extended", CALL_LOGS_EXTENDED_SELECT),
+        ("core", CALL_LOGS_CORE_SELECT),
+    ):
+        try:
+            result = (
+                supabase.table("call_logs")
+                .select(select_clause)
+                .eq("id", call_id)
+                .eq("receptionist_id", receptionist_id)
+                .limit(1)
+                .execute()
+            )
+            rows = result.data if result and result.data is not None else []
+            sanitized = sanitize_call_rows(rows)
+            return (sanitized[0] if sanitized else None), mode, degraded_reason
+        except Exception as e:
+            if is_missing_column_error(e):
+                degraded_reason = str(e)[:220]
+                logger.warning(
+                    "[CALL_HISTORY_SCHEMA_FALLBACK] tag=%s mode=%s call_id=%s error=%s",
+                    diag_tag,
+                    mode,
+                    call_id,
+                    degraded_reason,
+                )
+                continue
+            raise
+    raise RuntimeError("call_logs schema mismatch: no compatible projection")
+
+
 def fetch_call_logs_with_fallback(
     *,
     supabase,

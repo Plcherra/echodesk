@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../services/call_history_service.dart';
 import '../../utils/call_formatters.dart';
 import '../../widgets/constrained_scaffold_body.dart';
+import '../../widgets/state_views.dart';
 
 /// Recording status from backend: available | processing | not_recorded | failed
 /// null/absent = not_recorded
@@ -50,6 +51,49 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
   bool _recordingExpired = false;
   bool _recordingActionBusy = false;
 
+  Map<String, dynamic>? _call;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _call = widget.callData;
+    if (_call == null) {
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final call = await loadCallDetail(
+        receptionistId: widget.receptionistId,
+        callId: widget.callId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _call = call;
+        _loading = false;
+      });
+    } on CallHistoryApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _audioPlayer.dispose();
@@ -58,7 +102,20 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final call = widget.callData;
+    if (_loading) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text('Call details'),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final call = _call;
     if (call == null) {
       return Scaffold(
         appBar: AppBar(
@@ -66,8 +123,16 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.pop(),
           ),
+          title: const Text('Call details'),
         ),
-        body: const Center(child: Text('Call not found')),
+        body: Center(
+          child: ErrorStateView(
+            title: 'Call not found',
+            message: _error ??
+                'This call could not be loaded. Go back and try again.',
+            onRetry: _load,
+          ),
+        ),
       );
     }
 

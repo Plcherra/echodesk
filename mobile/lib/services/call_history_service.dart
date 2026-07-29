@@ -82,6 +82,37 @@ Future<String> fetchCallRecordingUrl({
   throw CallHistoryApiException(res.statusCode, message);
 }
 
+/// Load a single call by id (cold open / deep link when route extra is missing).
+Future<Map<String, dynamic>> loadCallDetail({
+  required String receptionistId,
+  required String callId,
+}) async {
+  final res = await ApiClient.get(
+    '/api/mobile/receptionists/$receptionistId/calls/$callId',
+  );
+  if (res.statusCode >= 200 && res.statusCode < 300 && res.body.isNotEmpty) {
+    final decoded = jsonDecode(res.body) as Map<String, dynamic>?;
+    final call = decoded?['call'];
+    if (call is Map<String, dynamic>) {
+      return call;
+    }
+    if (call is Map) {
+      return Map<String, dynamic>.from(call);
+    }
+  }
+  var message = 'Call not found';
+  if (res.body.isNotEmpty) {
+    try {
+      final decoded = jsonDecode(res.body) as Map<String, dynamic>?;
+      final err = (decoded?['error'] as String?)?.trim();
+      if (err != null && err.isNotEmpty) {
+        message = err;
+      }
+    } catch (_) {}
+  }
+  throw CallHistoryApiException(res.statusCode, message);
+}
+
 /// Load call history for a receptionist.
 Future<List<Map<String, dynamic>>> loadCallHistory(
   String receptionistId, {
