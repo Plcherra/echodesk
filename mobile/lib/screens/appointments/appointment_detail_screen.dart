@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../services/appointment_service.dart';
 import '../../utils/appointment_formatters.dart';
 import '../../widgets/constrained_scaffold_body.dart';
+import '../../theme/echodesk_theme.dart';
 
 class AppointmentDetailScreen extends StatefulWidget {
   final String appointmentId;
@@ -517,19 +518,19 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                 children: [
                   if (isGeneric)
                     Card(
-                      color: Colors.amber.shade50,
+                      color: EchoDeskColors.warningSoft,
                       child: Padding(
                         padding: const EdgeInsets.all(12),
                         child: Row(
                           children: [
-                            Icon(Icons.warning_amber, color: Colors.amber.shade800),
+                            Icon(Icons.warning_amber, color: EchoDeskColors.warning),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 'Generic appointment — service/details not fully confirmed',
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: Colors.amber.shade900,
+                                  color: EchoDeskColors.warning,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -593,7 +594,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                           padding: const EdgeInsets.only(bottom: 8),
                           child: _StatusNote(
                             icon: Icons.check_circle,
-                            color: Colors.green.shade700,
+                            color: EchoDeskColors.success,
                             text: 'This appointment is confirmed.',
                           ),
                         ),
@@ -856,7 +857,7 @@ class _ActionTile extends StatelessWidget {
                   ),
             )
           : null,
-      trailing: Icon(Icons.chevron_right, size: 20, color: Colors.grey.shade400),
+      trailing: Icon(Icons.chevron_right, size: 20, color: EchoDeskColors.soft),
       onTap: onTap,
     );
   }

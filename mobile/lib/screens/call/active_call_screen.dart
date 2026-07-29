@@ -4,6 +4,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../config/env.dart';
 import '../../services/call_service.dart';
+import '../../theme/echodesk_theme.dart';
 
 /// Screen shown when user taps Accept on incoming call UI.
 /// Displays call info and can connect to WebSocket stream for listen-in.
@@ -185,7 +186,7 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.phone_in_talk, size: 64, color: Colors.green),
+                const Icon(Icons.phone_in_talk, size: 64, color: EchoDeskColors.success),
                 const SizedBox(height: 24),
                 Text(
                   'Call in progress',
@@ -222,7 +223,7 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
                       : const Icon(Icons.call_end),
                   label: Text(_ending ? 'Ending…' : 'End'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.red,
+                    backgroundColor: EchoDeskColors.danger,
                     foregroundColor: Colors.white,
                   ),
                 ),

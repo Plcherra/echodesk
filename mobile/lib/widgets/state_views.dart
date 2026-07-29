@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/echodesk_theme.dart';
+
 /// Shared empty-state block used across list screens (dashboard sections,
 /// appointments tabs, receptionists). Keeps icon + title + subtitle consistent.
 class EmptyStateView extends StatelessWidget {
@@ -26,7 +28,7 @@ class EmptyStateView extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 48, color: Colors.grey.shade400),
+          Icon(icon, size: 48, color: EchoDeskColors.soft),
           const SizedBox(height: 12),
           Text(title, style: Theme.of(context).textTheme.titleSmall),
           if (subtitle != null && subtitle!.isNotEmpty) ...[
@@ -80,7 +82,7 @@ class ErrorStateView extends StatelessWidget {
           Icon(
             Icons.error_outline,
             size: compact ? 32 : 48,
-            color: Colors.red.shade400,
+            color: EchoDeskColors.danger,
           ),
           SizedBox(height: compact ? 8 : 16),
           Text(

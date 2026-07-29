@@ -17,8 +17,13 @@ class EchoDeskColors {
   static const Color brandSoft = Color(0xFFE6F3F2);
   static const Color accent = Color(0xFF57609A);
   static const Color success = Color(0xFF4F8663);
+  static const Color successSoft = Color(0xFFDCEBE1);
   static const Color warning = Color(0xFFA87635);
   static const Color warningSoft = Color(0xFFFFE6B8);
+  static const Color danger = Color(0xFF9B3A3A);
+  static const Color dangerSoft = Color(0xFFF3DEDE);
+  static const Color info = Color(0xFF3D5A80);
+  static const Color infoSoft = Color(0xFFE4EAF2);
 }
 
 class EchoDeskSpacing {

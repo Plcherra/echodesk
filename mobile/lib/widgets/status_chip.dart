@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/echodesk_theme.dart';
+
 /// Small pill showing an appointment's status (Confirmed, Needs Review,
 /// Cancelled, Completed). Shared so the label looks identical everywhere
 /// (dashboard cards + appointments list).
@@ -29,15 +31,15 @@ class StatusChip extends StatelessWidget {
   static (String, Color, Color) statusStyle(String s) {
     switch (s) {
       case 'confirmed':
-        return ('Confirmed', Colors.green.shade800, Colors.green.shade100);
+        return ('Confirmed', EchoDeskColors.success, EchoDeskColors.successSoft);
       case 'needs_review':
-        return ('Needs Review', Colors.orange.shade800, Colors.orange.shade100);
+        return ('Needs Review', EchoDeskColors.warning, EchoDeskColors.warningSoft);
       case 'cancelled':
-        return ('Cancelled', Colors.red.shade800, Colors.red.shade100);
+        return ('Cancelled', EchoDeskColors.danger, EchoDeskColors.dangerSoft);
       case 'completed':
-        return ('Completed', Colors.blue.shade800, Colors.blue.shade100);
+        return ('Completed', EchoDeskColors.info, EchoDeskColors.infoSoft);
       default:
-        return ('—', Colors.grey.shade700, Colors.grey.shade200);
+        return ('—', EchoDeskColors.muted, EchoDeskColors.surfaceMuted);
     }
   }
 }

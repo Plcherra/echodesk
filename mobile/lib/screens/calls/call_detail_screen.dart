@@ -9,6 +9,7 @@ import '../../services/call_history_service.dart';
 import '../../utils/call_formatters.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 import '../../widgets/state_views.dart';
+import '../../theme/echodesk_theme.dart';
 
 /// Recording status from backend: available | processing | not_recorded | failed
 /// null/absent = not_recorded
@@ -579,7 +580,7 @@ class _RecordingStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (color, bgColor) = isAvailable
-        ? (Colors.green.shade800, Colors.green.shade100)
+        ? (EchoDeskColors.success, EchoDeskColors.successSoft)
         : _colorsForStatus(label);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -597,11 +598,11 @@ class _RecordingStatusChip extends StatelessWidget {
   (Color, Color) _colorsForStatus(String label) {
     switch (label) {
       case 'Processing':
-        return (Colors.orange.shade800, Colors.orange.shade100);
+        return (EchoDeskColors.warning, EchoDeskColors.warningSoft);
       case 'Failed':
-        return (Colors.red.shade800, Colors.red.shade100);
+        return (EchoDeskColors.danger, EchoDeskColors.dangerSoft);
       default:
-        return (Colors.grey.shade700, Colors.grey.shade200);
+        return (EchoDeskColors.muted, EchoDeskColors.surfaceMuted);
     }
   }
 }
