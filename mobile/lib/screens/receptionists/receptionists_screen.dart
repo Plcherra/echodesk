@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/receptionist.dart';
 import '../../strings.dart';
 import '../../services/api_client.dart';
+import '../../theme/echodesk_theme.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 import '../../widgets/loading_skeleton.dart';
 import '../../widgets/state_views.dart';
@@ -201,39 +202,75 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
                             if (_receptionists.isEmpty)
                               _buildEmptyState()
                             else
-                              ..._receptionists.map(
-                                (r) => Card(
-                                  margin: const EdgeInsets.only(bottom: 8),
+                              ..._receptionists.map((r) {
+                                final isActive =
+                                    r.status == null || r.status == 'active';
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 6),
                                   child: ListTile(
-                                    title: Text(r.name),
-                                    subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
+                                    dense: true,
+                                    visualDensity: VisualDensity.compact,
+                                    contentPadding:
+                                        const EdgeInsets.symmetric(
+                                            horizontal: 14, vertical: 6),
+                                    title: Row(
                                       children: [
-                                        Text(
-                                          'Uses business line',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .labelSmall
-                                              ?.copyWith(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurfaceVariant,
-                                              ),
+                                        Expanded(
+                                          child: Text(
+                                            r.name,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                          ),
                                         ),
-                                        Text(r.displayPhone),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: isActive
+                                                ? EchoDeskColors.successSoft
+                                                : EchoDeskColors.surfaceMuted,
+                                            borderRadius:
+                                                BorderRadius.circular(
+                                                    EchoDeskRadii.sm),
+                                          ),
+                                          child: Text(
+                                            r.status ?? 'active',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: isActive
+                                                  ? EchoDeskColors.success
+                                                  : EchoDeskColors.muted,
+                                            ),
+                                          ),
+                                        ),
                                       ],
                                     ),
-                                    isThreeLine: true,
-                                    trailing: const Icon(Icons.chevron_right),
+                                    subtitle: Text(
+                                      r.displayPhone,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: EchoDeskColors.muted,
+                                          ),
+                                    ),
+                                    trailing: Icon(
+                                      Icons.chevron_right,
+                                      size: 18,
+                                      color: EchoDeskColors.soft,
+                                    ),
                                     onTap: () =>
                                         context.push('/receptionists/${r.id}'),
                                     onLongPress: () =>
                                         _showOutboundCallSheet(context, r),
                                   ),
-                                ),
-                              ),
+                                );
+                              }),
                           ],
                         ),
                       ),
@@ -269,17 +306,24 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
     final currentStep = !_hasCalendar ? 1 : 2;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(EchoDeskSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Create receptionist'),
-            const SizedBox(height: 4),
-            const Text(
-              'Complete each step. Calendar is required for booking and availability.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+            Text(
+              'Create receptionist',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: EchoDeskSpacing.xs),
+            Text(
+              'Complete each step. Calendar is required for booking and availability.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: EchoDeskColors.muted,
+                  ),
+            ),
+            const SizedBox(height: EchoDeskSpacing.md),
             Row(
               children: [
                 _StepCircle(
@@ -290,8 +334,9 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
                 Expanded(
                   child: Container(
                     height: 2,
-                    color:
-                        currentStep > 1 ? Colors.green : Colors.grey.shade300,
+                    color: currentStep > 1
+                        ? EchoDeskColors.success
+                        : EchoDeskColors.line,
                   ),
                 ),
                 _StepCircle(
@@ -301,22 +346,34 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: EchoDeskSpacing.sm),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Connect Calendar', style: TextStyle(fontSize: 10)),
-                const Text('Create Receptionist',
-                    style: TextStyle(fontSize: 10)),
+                Text(
+                  'Connect Calendar',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: EchoDeskColors.muted,
+                      ),
+                ),
+                Text(
+                  'Create Receptionist',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: EchoDeskColors.muted,
+                      ),
+                ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: EchoDeskSpacing.md),
             if (currentStep == 1)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Step 1: Connect Google Calendar'),
-                  const SizedBox(height: 8),
+                  Text(
+                    'Step 1: Connect Google Calendar',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: EchoDeskSpacing.sm),
                   FilledButton(
                     onPressed: () => context.push('/settings'),
                     child: const Text('Connect in Settings'),
@@ -327,8 +384,11 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Step 2: Create your receptionist'),
-                  const SizedBox(height: 8),
+                  Text(
+                    'Step 2: Create your receptionist',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: EchoDeskSpacing.sm),
                   FilledButton.icon(
                     onPressed: _navigateToCreate,
                     icon: const Icon(Icons.add),
@@ -372,15 +432,16 @@ class _StepCircle extends StatelessWidget {
     return CircleAvatar(
       radius: 16,
       backgroundColor: done
-          ? Colors.green
+          ? EchoDeskColors.success
           : current
-              ? Theme.of(context).colorScheme.primary
-              : Colors.grey.shade300,
+              ? EchoDeskColors.brand
+              : EchoDeskColors.surfaceMuted,
       child: Text(
         done ? '✓' : label,
         style: TextStyle(
-          color: done || current ? Colors.white : Colors.grey.shade700,
+          color: done || current ? Colors.white : EchoDeskColors.muted,
           fontSize: 12,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
