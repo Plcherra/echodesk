@@ -161,6 +161,11 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
         (defaultTargetPlatform == TargetPlatform.iOS ||
             defaultTargetPlatform == TargetPlatform.android);
 
+    final metaParts = <String>[
+      formatCallTimestamp(start),
+      formatCallDuration(dur),
+    ].where((s) => s.isNotEmpty && s != '—').toList();
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -186,29 +191,35 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           children: [
-            _DetailRow(label: 'Date & time', value: formatCallTimestamp(start)),
-            _DetailRow(label: 'Duration', value: formatCallDuration(dur)),
-            _DetailRow(label: 'Outcome', value: outcome),
-            if (fromNumber.isNotEmpty)
-              _DetailRow(
-                label: 'From',
-                value: formatPhoneForDisplay(fromNumber),
-                onTap: () => _copyAndNotify(context, fromNumber),
+            // Header: outcome chip + date/duration
+            _OutcomeChip(label: outcome),
+            if (metaParts.isNotEmpty) ...[
+              const SizedBox(height: EchoDeskSpacing.sm),
+              Text(
+                metaParts.join(' · '),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: EchoDeskColors.muted,
+                    ),
               ),
-            if (toNumber.isNotEmpty)
-              _DetailRow(
-                label: 'To',
-                value: formatPhoneForDisplay(toNumber),
-                onTap: () => _copyAndNotify(context, toNumber),
+            ],
+
+            if (fromNumber.isNotEmpty || toNumber.isNotEmpty) ...[
+              const SizedBox(height: EchoDeskSpacing.md),
+              _CallerInfoBlock(
+                fromNumber: fromNumber,
+                toNumber: toNumber,
+                onCopy: (number) => _copyAndNotify(context, number),
               ),
-            const SizedBox(height: 20),
+            ],
+
+            const SizedBox(height: EchoDeskSpacing.lg),
             _buildQuickActions(
               context: context,
               fromNumber: fromNumber,
               isPhoneDevice: isPhoneDevice,
               appointmentId: appointmentId,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: EchoDeskSpacing.lg),
             _buildRecordingAndTranscriptSection(
               context: context,
               recordingStatus: effectiveRecordingStatus,
@@ -233,27 +244,27 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
   }) {
     final actions = <Widget>[
       if (fromNumber.isNotEmpty)
-        FilledButton.tonalIcon(
-          onPressed: () => _copyAndNotify(context, fromNumber),
-          icon: const Icon(Icons.copy, size: 18),
-          label: const Text('Copy number'),
+        _ActionTile(
+          icon: Icons.copy_outlined,
+          label: 'Copy number',
+          onTap: () => _copyAndNotify(context, fromNumber),
         ),
       if (fromNumber.isNotEmpty && isPhoneDevice)
-        FilledButton.tonalIcon(
-          onPressed: () async {
+        _ActionTile(
+          icon: Icons.phone_outlined,
+          label: 'Call back',
+          onTap: () async {
             final uri = Uri.parse('tel:$fromNumber');
             if (await canLaunchUrl(uri)) {
               await launchUrl(uri, mode: LaunchMode.externalApplication);
             }
           },
-          icon: const Icon(Icons.phone, size: 18),
-          label: const Text('Call back'),
         ),
       if (appointmentId != null && appointmentId.isNotEmpty)
-        FilledButton.tonalIcon(
-          onPressed: () => context.push('/appointments/$appointmentId'),
-          icon: const Icon(Icons.event, size: 18),
-          label: const Text('View appointment'),
+        _ActionTile(
+          icon: Icons.event_outlined,
+          label: 'View appointment',
+          onTap: () => context.push('/appointments/$appointmentId'),
         ),
     ];
     if (actions.isEmpty) return const SizedBox.shrink();
@@ -262,10 +273,23 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
       children: [
         Text(
           'Quick actions',
-          style: Theme.of(context).textTheme.titleSmall,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
         ),
-        const SizedBox(height: 8),
-        Wrap(spacing: 8, runSpacing: 8, children: actions),
+        const SizedBox(height: EchoDeskSpacing.sm),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final tileWidth = (constraints.maxWidth - EchoDeskSpacing.sm) / 2;
+            return Wrap(
+              spacing: EchoDeskSpacing.sm,
+              runSpacing: EchoDeskSpacing.sm,
+              children: actions
+                  .map((w) => SizedBox(width: tileWidth, child: w))
+                  .toList(),
+            );
+          },
+        ),
       ],
     );
   }
@@ -296,7 +320,7 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(child: _buildTranscriptCard(context, transcript!)),
-            const SizedBox(width: 16),
+            const SizedBox(width: EchoDeskSpacing.md),
             Expanded(child: recordingCard),
           ],
         );
@@ -305,7 +329,7 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildTranscriptCard(context, transcript!),
-          const SizedBox(height: 16),
+          const SizedBox(height: EchoDeskSpacing.md),
           recordingCard,
         ],
       );
@@ -322,19 +346,24 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
       children: [
         Text(
           'Transcript',
-          style: Theme.of(context).textTheme.titleSmall,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: EchoDeskSpacing.sm),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(8),
+            color: EchoDeskColors.surface,
+            borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+            border: Border.all(color: EchoDeskColors.line),
           ),
           child: SelectableText(
             transcript,
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: EchoDeskColors.ink,
+                ),
           ),
         ),
       ],
@@ -390,60 +419,86 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
       children: [
         Text(
           'Recording',
-          style: Theme.of(context).textTheme.titleSmall,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: EchoDeskSpacing.sm),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(8),
+            color: EchoDeskColors.surface,
+            borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+            border: Border.all(color: EchoDeskColors.line),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  _RecordingStatusChip(label: statusLabel, isAvailable: hasRecording),
+                  _RecordingStatusChip(
+                    label: statusLabel,
+                    isAvailable: hasRecording,
+                  ),
                   if (recordingDuration != null && recordingDuration > 0) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: EchoDeskSpacing.sm),
                     Text(
                       formatCallDuration(recordingDuration),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: EchoDeskColors.muted,
                           ),
                     ),
                   ],
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: EchoDeskSpacing.sm),
               Text(
                 statusExplanation,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: EchoDeskColors.muted,
                     ),
               ),
               if (hasRecording) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: EchoDeskSpacing.md),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: EchoDeskSpacing.sm,
+                  runSpacing: EchoDeskSpacing.sm,
                   children: [
-                    FilledButton.icon(
+                    OutlinedButton.icon(
                       onPressed: _recordingActionBusy
                           ? null
                           : (_isPlaying ? _stopPlaying : _playRecording),
-                      icon: Icon(_isPlaying ? Icons.stop : Icons.play_arrow, size: 18),
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: EchoDeskColors.brand,
+                        side: const BorderSide(color: EchoDeskColors.line),
+                      ),
+                      icon: Icon(
+                        _isPlaying ? Icons.stop : Icons.play_arrow,
+                        size: 18,
+                      ),
                       label: Text(_isPlaying ? 'Stop' : 'Play'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: _recordingActionBusy ? null : _downloadRecording,
+                      onPressed:
+                          _recordingActionBusy ? null : _downloadRecording,
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: EchoDeskColors.ink,
+                        side: const BorderSide(color: EchoDeskColors.line),
+                      ),
                       icon: const Icon(Icons.download, size: 18),
                       label: const Text('Download'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: _recordingActionBusy ? null : _copyRecordingLink,
+                      onPressed:
+                          _recordingActionBusy ? null : _copyRecordingLink,
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: EchoDeskColors.ink,
+                        side: const BorderSide(color: EchoDeskColors.line),
+                      ),
                       icon: const Icon(Icons.link, size: 18),
                       label: const Text('Copy link'),
                     ),
@@ -586,11 +641,15 @@ class _RecordingStatusChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(EchoDeskRadii.sm),
       ),
       child: Text(
         label,
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }
@@ -607,46 +666,180 @@ class _RecordingStatusChip extends StatelessWidget {
   }
 }
 
-class _DetailRow extends StatelessWidget {
+class _OutcomeChip extends StatelessWidget {
   final String label;
-  final String value;
-  final VoidCallback? onTap;
 
-  const _DetailRow({
-    required this.label,
-    required this.value,
-    this.onTap,
+  const _OutcomeChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, bgColor) = _colorsForOutcome(label);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(EchoDeskRadii.sm),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ),
+    );
+  }
+
+  (Color, Color) _colorsForOutcome(String label) {
+    switch (label) {
+      case 'Booked':
+        return (EchoDeskColors.success, EchoDeskColors.successSoft);
+      case 'Completed':
+        return (EchoDeskColors.info, EchoDeskColors.infoSoft);
+      case 'Short Call':
+        return (EchoDeskColors.warning, EchoDeskColors.warningSoft);
+      case 'Missed':
+        return (EchoDeskColors.danger, EchoDeskColors.dangerSoft);
+      default:
+        return (EchoDeskColors.muted, EchoDeskColors.surfaceMuted);
+    }
+  }
+}
+
+class _CallerInfoBlock extends StatelessWidget {
+  final String fromNumber;
+  final String toNumber;
+  final void Function(String number) onCopy;
+
+  const _CallerInfoBlock({
+    required this.fromNumber,
+    required this.toNumber,
+    required this.onCopy,
   });
 
   @override
   Widget build(BuildContext context) {
-    final child = Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: EchoDeskColors.surface,
+        borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+        border: Border.all(color: EchoDeskColors.line),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
+          if (fromNumber.isNotEmpty)
+            _CallerRow(
+              label: 'From',
+              value: formatPhoneForDisplay(fromNumber),
+              onTap: () => onCopy(fromNumber),
+            ),
+          if (fromNumber.isNotEmpty && toNumber.isNotEmpty)
+            const Divider(height: 16, color: EchoDeskColors.line),
+          if (toNumber.isNotEmpty)
+            _CallerRow(
+              label: 'To',
+              value: formatPhoneForDisplay(toNumber),
+              onTap: () => onCopy(toNumber),
+            ),
         ],
       ),
     );
+  }
+}
 
-    if (onTap != null) {
-      return InkWell(
+class _CallerRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  const _CallerRow({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(EchoDeskRadii.sm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 48,
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: EchoDeskColors.muted,
+                    ),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                value,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: EchoDeskColors.ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+            Icon(Icons.copy_outlined, size: 16, color: EchoDeskColors.soft),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: EchoDeskColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+        side: const BorderSide(color: EchoDeskColors.line),
+      ),
+      child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: child,
-      );
-    }
-    return child;
+        borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: EchoDeskColors.brand),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: EchoDeskColors.ink,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
