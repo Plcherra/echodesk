@@ -164,7 +164,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Welcome to Echodesk'),
+        title: const Text('Welcome to EchoDesk'),
         content: const Text(
           'Create your first receptionist to answer on your business line. '
           'Your AI will answer calls and book appointments into your calendar.',

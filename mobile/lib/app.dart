@@ -94,7 +94,7 @@ class _EchodeskAppState extends State<EchodeskApp> {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       scaffoldMessengerKey: _scaffoldKey,
-      title: 'Echodesk',
+      title: 'EchoDesk',
       theme: EchoDeskTheme.light(),
       routerConfig: _router,
     );

@@ -129,12 +129,12 @@ class PushService {
       if (notification != null) {
         if (onForegroundNotification != null) {
           onForegroundNotification!(
-            notification.title ?? 'Echodesk',
+            notification.title ?? 'EchoDesk',
             notification.body ?? '',
           );
         } else {
           _showLocalNotification(
-            notification.title ?? 'Echodesk',
+            notification.title ?? 'EchoDesk',
             notification.body ?? '',
             message.data,
           );

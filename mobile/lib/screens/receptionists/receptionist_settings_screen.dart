@@ -754,6 +754,14 @@ class _ServicesTabState extends State<_ServicesTab> {
                                   .delete()
                                   .eq('id', s['id'])
                                   .eq('receptionist_id', widget.receptionistId);
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '"${s['name'] ?? 'Service'}" deleted',
+                                  ),
+                                ),
+                              );
                               _load();
                             }
                           },
@@ -908,6 +916,14 @@ class _LocationsTabState extends State<_LocationsTab> {
                           .delete()
                           .eq('id', l['id'])
                           .eq('receptionist_id', widget.receptionistId);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '"${l['name'] ?? 'Location'}" deleted',
+                          ),
+                        ),
+                      );
                       _load();
                     }
                   },
@@ -1123,6 +1139,14 @@ class _PromosTabState extends State<_PromosTab> {
                           .delete()
                           .eq('id', p['id'])
                           .eq('receptionist_id', widget.receptionistId);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '"${p['code'] ?? 'Promotion'}" deleted',
+                          ),
+                        ),
+                      );
                       _load();
                     }
                   },

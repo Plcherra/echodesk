@@ -1,6 +1,6 @@
 # EchoDesk mobile UX polish tracker
 
-Last updated: 2026-07-28  
+Last updated: 2026-07-29  
 Source: mobile UX audit + polish passes on `main`.
 
 ## Summary
@@ -11,7 +11,7 @@ Source: mobile UX audit + polish passes on `main`.
 | **P1** | Dashboard Overview cleanup | **Done** (+ hierarchy refinement) |
 | **P2** | Remaining polish (former leftover P1) | **Done** (after #14) |
 | **P3** | Receptionist Area Redesign | **Done** |
-| **P4** | Nice-to-have (former P3) | Todo |
+| **P4** | Nice-to-have (former P3) | **In progress** — quick wins done |
 
 **How many P levels?** Five: **P0**, **P1**, **P2**, **P3**, **P4**.
 
@@ -22,6 +22,8 @@ Source: mobile UX audit + polish passes on `main`.
 **Is P2 finished?** Yes. Rebuild and run [P2 manual smoke tests](#p2-manual-smoke-tests-historical--already-shipped-items).
 
 **Is P3 finished?** Yes (2026-07-28). Rebuild and run [P3 manual smoke tests](#p3-manual-smoke-tests).
+
+**Is P4 finished?** No — quick wins (25, 31, 32 + delete SnackBars) done; medium/lower items remain.
 
 ### Rebuild (Mac)
 
@@ -197,27 +199,31 @@ Finished 2026-07-28.
 
 ---
 
-## P4 — Nice-to-have (former P3) — TODO
+## P4 — Nice-to-have (former P3) — IN PROGRESS
 
-Do not start until P3 is done (or explicitly asked).
+Started 2026-07-29. Quick wins first.
 
-| # | Item | Status |
-|---|------|--------|
-| 25 | Brand casing: “Echodesk” → “EchoDesk” in welcome copy | Todo |
-| 26 | Generic badge min text size / TextScaler | Todo |
-| 27 | Semantics / text-scale spot-check on icon buttons | Todo |
-| 28 | `.SF Pro Text` on Android — platform/bundled font | Todo |
-| 29 | Shared `_OutcomeChip` (call history + receptionist detail) | Todo |
-| 30 | Appointment transcript expand / “View full” | Todo |
-| 31 | Onboarding error state matches shared ErrorStateView | Todo |
-| 32 | Checkout `Navigator.pop` → `context.pop()` | Todo |
-| 33 | Receptionist long-press-to-call discoverability | Todo |
-| 34 | Settings calendar subtitle shows Google email, not raw calendar id | Todo |
-| 35 | Push deep-link for new appointment → Needs review | Todo |
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 25 | Brand casing: “Echodesk” → “EchoDesk” in welcome copy | Done | Welcome, reset password, MaterialApp title, push/call appName, iOS/Android labels |
+| 26 | Generic badge min text size / TextScaler | Todo | |
+| 27 | Semantics / text-scale spot-check on icon buttons | Todo | |
+| 28 | `.SF Pro Text` on Android — platform/bundled font | Todo | |
+| 29 | Shared `_OutcomeChip` (call history + receptionist detail) | Todo | |
+| 30 | Appointment transcript expand / “View full” | Todo | |
+| 31 | Onboarding error state matches shared ErrorStateView | Done | Same Retry layout as other screens |
+| 32 | Checkout `Navigator.pop` → `context.pop()` | Done | go_router |
+| 33 | Receptionist long-press-to-call discoverability | Todo | |
+| 34 | Settings calendar subtitle shows Google email, not raw calendar id | Todo | |
+| 35 | Push deep-link for new appointment → Needs review | Todo | |
+| — | Delete success SnackBars (services / locations / promos) | Done | Matches receptionist delete feedback |
 
 ### P4 manual smoke tests
 
-Skip until items are implemented. Then add one check per shipped row above.
+1. **Brand casing** — Dashboard welcome + home-screen app label read **EchoDesk** (not Echodesk).
+2. **Checkout Back** — Failed checkout → Back uses go_router pop (no stack glitch).
+3. **Onboarding error** — Force setup load failure → shared ErrorStateView + Retry.
+4. **Delete feedback** — Delete a service / location / promo → success SnackBar before list reloads.
 
 ---
 

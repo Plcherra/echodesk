@@ -11,6 +11,7 @@ import '../../strings.dart';
 import '../../theme/echodesk_theme.dart';
 import '../../widgets/confirm_sign_out.dart';
 import '../../widgets/constrained_scaffold_body.dart';
+import '../../widgets/state_views.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -160,19 +161,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('Finish setup')),
         body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(_error!, textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: _load,
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
+          child: ErrorStateView(
+            title: 'Could not load setup',
+            message: _error,
+            onRetry: _load,
           ),
         ),
       );

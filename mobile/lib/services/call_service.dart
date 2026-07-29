@@ -102,7 +102,7 @@ class CallService {
       final params = CallKitParams(
         id: callId,
         nameCaller: callerName,
-        appName: 'Echodesk',
+        appName: 'EchoDesk',
         avatar: '',
         handle: callerNumber,
         type: 0, // Audio
