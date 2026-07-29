@@ -26,7 +26,7 @@ Future<Map<String, dynamic>> loadAppointments({
   if (res.statusCode >= 200 && res.statusCode < 300 && res.body.isNotEmpty) {
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
-  return {'appointments': <Map<String, dynamic>>[], 'receptionists': <String, String>{}};
+  throw Exception(_apiErrorMessage(res.body, fallback: 'Could not load appointments'));
 }
 
 /// Today's agenda for one receptionist (local calendar day via [date] + [offsetMinutes]).
@@ -61,8 +61,11 @@ Future<Map<String, dynamic>?> loadAppointment(String id) async {
   return null;
 }
 
-/// Update appointment (confirm, reject, edit service, notes, payment link, etc.)
-Future<bool> updateAppointment(
+/// Result of [updateAppointment]. [error] is set when [ok] is false.
+typedef AppointmentUpdateResult = ({bool ok, String? error});
+
+/// Update appointment (confirm, cancel, edit service, notes, payment link, etc.)
+Future<AppointmentUpdateResult> updateAppointment(
   String id, {
   String? status,
   String? serviceName,
@@ -83,10 +86,27 @@ Future<bool> updateAppointment(
   if (internalFollowupNotes != null) body['internal_followup_notes'] = internalFollowupNotes;
   if (meetingInstructions != null) body['meeting_instructions'] = meetingInstructions;
 
-  if (body.isEmpty) return true;
+  if (body.isEmpty) return (ok: true, error: null);
 
   final res = await ApiClient.patch('/api/mobile/appointments/$id', body: body);
-  return res.statusCode >= 200 && res.statusCode < 300;
+  if (res.statusCode >= 200 && res.statusCode < 300) {
+    return (ok: true, error: null);
+  }
+  return (
+    ok: false,
+    error: _apiErrorMessage(res.body, fallback: 'Could not update appointment'),
+  );
+}
+
+String _apiErrorMessage(String body, {required String fallback}) {
+  try {
+    if (body.isEmpty) return fallback;
+    final decoded = jsonDecode(body);
+    if (decoded is Map && decoded['error'] != null) {
+      return decoded['error'].toString();
+    }
+  } catch (_) {}
+  return body.isNotEmpty ? body : fallback;
 }
 
 /// Send confirmation SMS to the appointment caller.
