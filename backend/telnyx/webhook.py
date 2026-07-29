@@ -58,9 +58,9 @@ def verify_ed25519(
     public_key_pem: str,
 ) -> bool:
     """
-    Validate Telnyx webhook signature via Ed25519 (Standard Webhooks format).
+    Validate Telnyx webhook signature via Ed25519.
     Headers: telnyx-timestamp, telnyx-signature-ed25519
-    Signed payload: timestamp + '.' + body
+    Signed payload: timestamp + '|' + body  (Telnyx legacy Ed25519 scheme)
     """
     if not public_key_pem or not timestamp or not signature_b64:
         return False
@@ -86,7 +86,7 @@ def verify_ed25519(
         if abs(time.time() - ts) > 60:
             return False
 
-        signed_payload = timestamp.encode("utf-8") + b"." + payload
+        signed_payload = timestamp.encode("utf-8") + b"|" + payload
         signature = base64.b64decode(signature_b64)
 
         public_key.verify(signature, signed_payload)

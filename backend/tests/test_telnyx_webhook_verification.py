@@ -46,7 +46,8 @@ def _make_ed25519_signature_and_key(payload: bytes):
     private_key = Ed25519PrivateKey.generate()
     public_key = private_key.public_key()
     ts = str(int(time.time()))
-    signed_payload = ts.encode() + b"." + payload
+    # Telnyx legacy Ed25519 scheme signs "timestamp|body" (pipe delimiter).
+    signed_payload = ts.encode() + b"|" + payload
     signature = private_key.sign(signed_payload)
     sig_b64 = base64.b64encode(signature).decode()
 
