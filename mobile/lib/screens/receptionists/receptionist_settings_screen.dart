@@ -1061,6 +1061,9 @@ class _PromosTab extends StatefulWidget {
 class _PromosTabState extends State<_PromosTab> {
   List<Map<String, dynamic>> _promos = [];
   bool _loading = true;
+  bool _showEditor = false;
+  Map<String, dynamic>? _editingPromo;
+  Key _formKey = const ValueKey('new-promo');
 
   @override
   void initState() {
@@ -1073,95 +1076,53 @@ class _PromosTabState extends State<_PromosTab> {
         .from('promos')
         .select('id, description, code')
         .eq('receptionist_id', widget.receptionistId);
+    if (!mounted) return;
+    final promos = (res as List).cast<Map<String, dynamic>>();
     setState(() {
-      _promos = (res as List).cast<Map<String, dynamic>>();
+      _promos = promos;
       _loading = false;
+      if (promos.isEmpty) {
+        _showEditor = true;
+        _editingPromo = null;
+      }
     });
   }
 
-  Future<void> _openPromoEditor({Map<String, dynamic>? promo}) async {
-    final codeController =
-        TextEditingController(text: (promo?['code'] as String?) ?? '');
-    final descriptionController =
-        TextEditingController(text: (promo?['description'] as String?) ?? '');
+  void _openAddForm() {
+    setState(() {
+      _showEditor = true;
+      _editingPromo = null;
+      _formKey = UniqueKey();
+    });
+  }
 
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(promo == null ? 'Add promo' : 'Edit promo'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: codeController,
-                decoration: const InputDecoration(
-                  labelText: 'Code',
-                  hintText: 'e.g. WELCOME20',
-                  border: OutlineInputBorder(),
-                ),
-                textCapitalization: TextCapitalization.characters,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  hintText: 'e.g. 20% off first visit',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final code = codeController.text.trim();
-              final description = descriptionController.text.trim();
-              if (code.isEmpty && description.isEmpty) return;
+  void _openEditForm(Map<String, dynamic> promo) {
+    setState(() {
+      _showEditor = true;
+      _editingPromo = promo;
+      _formKey = ValueKey(promo['id']);
+    });
+  }
 
-              final payload = <String, dynamic>{
-                'code': code.isEmpty ? null : code,
-                'description': description.isEmpty ? null : description,
-                'receptionist_id': widget.receptionistId,
-              };
+  void _closeEditor() {
+    setState(() {
+      if (_promos.isEmpty) {
+        _showEditor = true;
+        _editingPromo = null;
+        _formKey = UniqueKey();
+      } else {
+        _showEditor = false;
+        _editingPromo = null;
+      }
+    });
+  }
 
-              try {
-                if (promo == null) {
-                  await Supabase.instance.client.from('promos').insert(payload);
-                } else {
-                  await Supabase.instance.client
-                      .from('promos')
-                      .update(payload)
-                      .eq('id', promo['id'])
-                      .eq('receptionist_id', widget.receptionistId);
-                }
-                if (!dialogContext.mounted) return;
-                Navigator.of(dialogContext).pop(true);
-              } catch (_) {
-                if (!dialogContext.mounted) return;
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  const SnackBar(content: Text('Could not save promo')),
-                );
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-
-    codeController.dispose();
-    descriptionController.dispose();
-
-    if (saved == true) _load();
+  Future<void> _onEditorSaved() async {
+    setState(() {
+      _showEditor = false;
+      _editingPromo = null;
+    });
+    await _load();
   }
 
   @override
@@ -1170,67 +1131,90 @@ class _PromosTabState extends State<_PromosTab> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_promos.isEmpty) {
-      return ListView(
-        padding: const EdgeInsets.all(EchoDeskSpacing.lg),
-        children: [
+    final isEmpty = _promos.isEmpty;
+    final showForm = _showEditor || isEmpty;
+    final editing = _editingPromo != null;
+    final canCancel = !isEmpty || editing;
+
+    return ListView(
+      padding: const EdgeInsets.all(EchoDeskSpacing.lg),
+      children: [
+        if (!showForm) ...[
           Text(
-            'No promos yet. Add an offer, package, or seasonal promotion.',
+            'Discount codes and promotions.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: EchoDeskColors.muted,
+                ),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _openAddForm,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add another promo'),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ),
+          const SizedBox(height: EchoDeskSpacing.sm),
+        ] else ...[
+          Text(
+            isEmpty
+                ? 'Add an offer, package, or seasonal promotion.'
+                : (editing
+                    ? 'Update this promo.'
+                    : 'Add another promo to your list.'),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: EchoDeskColors.muted,
                 ),
           ),
           const SizedBox(height: EchoDeskSpacing.md),
-          FilledButton(
-            onPressed: () => _openPromoEditor(),
-            child: const Text('Add promo'),
+          _InlinePromoForm(
+            key: _formKey,
+            receptionistId: widget.receptionistId,
+            promo: _editingPromo,
+            onCancel: canCancel ? _closeEditor : null,
+            onSaved: _onEditorSaved,
           ),
+          if (_promos.isNotEmpty) const SizedBox(height: EchoDeskSpacing.lg),
         ],
-      );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(EchoDeskSpacing.lg),
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Discount codes and promotions.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: EchoDeskColors.muted,
-                    ),
+        if (_promos.isNotEmpty)
+          ..._promos.map((p) {
+            final code = (p['code'] as String?)?.trim() ?? '';
+            final description = (p['description'] as String?)?.trim() ?? '';
+            final title = [
+              if (code.isNotEmpty) code,
+              if (description.isNotEmpty) description,
+            ].join(' · ');
+            return Container(
+              margin: const EdgeInsets.only(bottom: EchoDeskSpacing.sm),
+              decoration: BoxDecoration(
+                color: EchoDeskColors.surface,
+                borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+                border: Border.all(color: EchoDeskColors.line),
               ),
-            ),
-            FilledButton.tonal(
-              onPressed: () => _openPromoEditor(),
-              child: const Text('Add promo'),
-            ),
-          ],
-        ),
-        const SizedBox(height: EchoDeskSpacing.md),
-        ..._promos.map((p) => Card(
-              margin: const EdgeInsets.only(bottom: 6),
               child: ListTile(
                 dense: true,
                 visualDensity: VisualDensity.compact,
                 title: Text(
-                  '${p['code'] ?? ''} · ${p['description'] ?? ''}',
+                  title.isEmpty ? 'Promo' : title,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                 ),
-                onTap: () => _openPromoEditor(promo: p),
+                onTap: () => _openEditForm(p),
                 trailing: IconButton(
-                  icon:
-                      Icon(Icons.delete_outline, color: EchoDeskColors.danger),
+                  icon: Icon(Icons.delete_outline,
+                      color: EchoDeskColors.danger),
                   onPressed: () async {
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
                         title: const Text('Delete promotion?'),
                         content: Text(
-                          'Remove "${p['code'] ?? 'this promo'}"? This cannot be undone.',
+                          'Remove "${code.isNotEmpty ? code : 'this promo'}"? This cannot be undone.',
                         ),
                         actions: [
                           TextButton(
@@ -1240,7 +1224,8 @@ class _PromosTabState extends State<_PromosTab> {
                           FilledButton(
                             onPressed: () => Navigator.of(ctx).pop(true),
                             style: FilledButton.styleFrom(
-                              backgroundColor: Theme.of(ctx).colorScheme.error,
+                              backgroundColor:
+                                  Theme.of(ctx).colorScheme.error,
                             ),
                             child: const Text('Delete'),
                           ),
@@ -1257,7 +1242,7 @@ class _PromosTabState extends State<_PromosTab> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            '"${p['code'] ?? 'Promotion'}" deleted',
+                            '"${code.isNotEmpty ? code : 'Promotion'}" deleted',
                           ),
                         ),
                       );
@@ -1266,7 +1251,177 @@ class _PromosTabState extends State<_PromosTab> {
                   },
                 ),
               ),
-            )),
+            );
+          }),
+      ],
+    );
+  }
+}
+
+class _InlinePromoForm extends StatefulWidget {
+  final String receptionistId;
+  final Map<String, dynamic>? promo;
+  final VoidCallback? onCancel;
+  final Future<void> Function() onSaved;
+
+  const _InlinePromoForm({
+    super.key,
+    required this.receptionistId,
+    required this.promo,
+    required this.onCancel,
+    required this.onSaved,
+  });
+
+  @override
+  State<_InlinePromoForm> createState() => _InlinePromoFormState();
+}
+
+class _InlinePromoFormState extends State<_InlinePromoForm> {
+  late final TextEditingController _codeController;
+  late final TextEditingController _descriptionController;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _codeController =
+        TextEditingController(text: (widget.promo?['code'] as String?) ?? '');
+    _descriptionController = TextEditingController(
+      text: (widget.promo?['description'] as String?) ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final code = _codeController.text.trim();
+    final description = _descriptionController.text.trim();
+    if ((code.isEmpty && description.isEmpty) || _saving) return;
+
+    setState(() => _saving = true);
+
+    final payload = <String, dynamic>{
+      'code': code.isEmpty ? null : code,
+      'description': description.isEmpty ? null : description,
+      'receptionist_id': widget.receptionistId,
+    };
+
+    try {
+      if (widget.promo == null) {
+        await Supabase.instance.client.from('promos').insert(payload);
+      } else {
+        await Supabase.instance.client
+            .from('promos')
+            .update(payload)
+            .eq('id', widget.promo!['id'])
+            .eq('receptionist_id', widget.receptionistId);
+      }
+      if (!mounted) return;
+      await widget.onSaved();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save promo')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(EchoDeskSpacing.md),
+          decoration: BoxDecoration(
+            color: EchoDeskColors.surface,
+            borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+            border: Border.all(color: EchoDeskColors.line),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                widget.promo == null ? 'Promo details' : 'Edit promo',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: EchoDeskSpacing.xs),
+              Text(
+                'Code and description callers can hear about.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: EchoDeskColors.muted,
+                    ),
+              ),
+              const SizedBox(height: EchoDeskSpacing.sm + 4),
+              TextField(
+                controller: _codeController,
+                decoration: const InputDecoration(
+                  labelText: 'Code',
+                  hintText: 'e.g. WELCOME20',
+                  border: OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.characters,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: EchoDeskSpacing.sm),
+              TextField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'e.g. 20% off first visit',
+                  border: OutlineInputBorder(),
+                  alignLabelWithHint: true,
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: EchoDeskSpacing.lg),
+        if (widget.onCancel != null)
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _saving ? null : widget.onCancel,
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: EchoDeskSpacing.sm),
+              Expanded(
+                child: FilledButton(
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(widget.promo == null ? 'Save promo' : 'Save'),
+                ),
+              ),
+            ],
+          )
+        else
+          FilledButton(
+            onPressed: _saving ? null : _save,
+            child: _saving
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Save promo'),
+          ),
       ],
     );
   }

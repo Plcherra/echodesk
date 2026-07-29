@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../services/api_client.dart';
 import '../../../strings.dart';
@@ -17,8 +18,14 @@ class ReceptionistWebsiteTab extends StatefulWidget {
 
 class _ReceptionistWebsiteTabState extends State<ReceptionistWebsiteTab> {
   final _urlController = TextEditingController();
-  bool _loading = false;
-  bool _showForm = false;
+  bool _loadingPage = true;
+  bool _fetching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void dispose() {
@@ -26,92 +33,123 @@ class _ReceptionistWebsiteTabState extends State<ReceptionistWebsiteTab> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (!_showForm) {
-      return ListView(
-        padding: const EdgeInsets.all(EchoDeskSpacing.lg),
-        children: [
-          const Text(
-            'Add your website or business links so the assistant can reference them.',
+  Future<void> _load() async {
+    try {
+      final res = await Supabase.instance.client
+          .from('receptionists')
+          .select('website_url')
+          .eq('id', widget.receptionistId)
+          .maybeSingle();
+      final url = (res?['website_url'] as String?)?.trim();
+      if (url != null && url.isNotEmpty) {
+        _urlController.text = url;
+      }
+    } catch (_) {
+      // Best-effort preload only.
+    }
+    if (!mounted) return;
+    setState(() => _loadingPage = false);
+  }
+
+  Future<void> _fetchWebsite() async {
+    final url = _urlController.text.trim();
+    if (url.isEmpty || _fetching) return;
+
+    setState(() => _fetching = true);
+    try {
+      final res = await ApiClient.post(
+        '/api/mobile/receptionists/${widget.receptionistId}/website',
+        body: {'url': url},
+      );
+      if (!mounted) return;
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Website content saved')),
+        );
+      } else {
+        final data = jsonDecode(res.body) as Map<String, dynamic>?;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text((data?['error'] as String?) ?? 'Failed'),
           ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () => setState(() => _showForm = true),
-            child: const Text('Add website info'),
-          ),
-        ],
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppStrings.couldNotFetchWebsite)),
       );
     }
+    if (mounted) setState(() => _fetching = false);
+  }
 
-    return Padding(
+  @override
+  Widget build(BuildContext context) {
+    if (_loadingPage) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return ListView(
       padding: const EdgeInsets.all(EchoDeskSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Add your website URL to pull in information your assistant can use.',
+      children: [
+        Text(
+          'Add your website or business links so the assistant can reference them.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: EchoDeskColors.muted,
+              ),
+        ),
+        const SizedBox(height: EchoDeskSpacing.md),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(EchoDeskSpacing.md),
+          decoration: BoxDecoration(
+            color: EchoDeskColors.surface,
+            borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+            border: Border.all(color: EchoDeskColors.line),
           ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _urlController,
-            decoration: const InputDecoration(
-              labelText: 'Website URL',
-              hintText: 'https://yoursite.com',
-              border: OutlineInputBorder(),
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Website',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: EchoDeskSpacing.xs),
+              Text(
+                'Pull in information your assistant can use on calls.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: EchoDeskColors.muted,
+                    ),
+              ),
+              const SizedBox(height: EchoDeskSpacing.sm + 4),
+              TextField(
+                controller: _urlController,
+                decoration: const InputDecoration(
+                  labelText: 'Website URL',
+                  hintText: 'https://yoursite.com',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _fetchWebsite(),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: _loading
-                ? null
-                : () async {
-                    final url = _urlController.text.trim();
-                    if (url.isEmpty) return;
-                    setState(() => _loading = true);
-                    try {
-                      final res = await ApiClient.post(
-                        '/api/mobile/receptionists/${widget.receptionistId}/website',
-                        body: {'url': url},
-                      );
-                      if (res.statusCode >= 200 && res.statusCode < 300) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Website content saved')),
-                          );
-                        }
-                      } else {
-                        final data = jsonDecode(res.body) as Map<String, dynamic>?;
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content:
-                                  Text((data?['error'] as String?) ?? 'Failed'),
-                            ),
-                          );
-                        }
-                      }
-                    } catch (_) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text(AppStrings.couldNotFetchWebsite)),
-                        );
-                      }
-                    }
-                    if (mounted) setState(() => _loading = false);
-                  },
-            child: _loading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Fetch from website'),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: EchoDeskSpacing.lg),
+        FilledButton(
+          onPressed: _fetching ? null : _fetchWebsite,
+          child: _fetching
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Fetch from website'),
+        ),
+      ],
     );
   }
 }
-
