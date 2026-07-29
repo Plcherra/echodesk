@@ -63,4 +63,13 @@ class Env {
     if (env.isNotEmpty) return env;
     return kReleaseMode ? 'wss://echodesk.us' : '';
   }
+
+  /// Customer-facing support inbox. Override with SUPPORT_EMAIL dart-define.
+  static String get supportEmail {
+    const env = String.fromEnvironment('SUPPORT_EMAIL', defaultValue: '');
+    if (env.isNotEmpty) return env;
+    final local = _localOverrides['SUPPORT_EMAIL'];
+    if (local != null && local.isNotEmpty) return local;
+    return 'support@echodesk.us';
+  }
 }

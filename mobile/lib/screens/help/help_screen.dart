@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../config/env.dart';
+
 class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final supportEmail = Env.supportEmail;
 
     return Scaffold(
       appBar: AppBar(
@@ -100,12 +103,12 @@ class HelpScreen extends StatelessWidget {
                 TextButton.icon(
                   onPressed: () => launchUrl(
                     Uri.parse(
-                      'mailto:echodesk2@gmail.com?subject=AI%20Receptionist%20Support',
+                      'mailto:$supportEmail?subject=EchoDesk%20Support',
                     ),
                     mode: LaunchMode.externalApplication,
                   ),
                   icon: const Icon(Icons.email_outlined),
-                  label: const Text('echodesk2@gmail.com'),
+                  label: Text(supportEmail),
                 ),
               ],
             ),
