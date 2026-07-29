@@ -42,6 +42,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
 
   String? _effectiveReceptionistIdForToday;
   _TodayContext _todayContext = _TodayContext.resolving;
+  /// When multiple assistants exist, Today needs an explicit pick.
+  List<({String id, String name})> _todayAssistants = [];
   int? _lastShellTabIndex;
 
   @override
@@ -125,33 +127,55 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
     if (fromRoute != null && fromRoute.isNotEmpty) {
       _effectiveReceptionistIdForToday = fromRoute;
       _todayContext = _TodayContext.ready;
+      _todayAssistants = [];
       return;
     }
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
       _todayContext = _TodayContext.noUser;
+      _todayAssistants = [];
       return;
     }
     try {
       final res = await Supabase.instance.client
           .from('receptionists')
-          .select('id')
+          .select('id, name')
           .eq('user_id', user.id)
-          .limit(2);
+          .order('created_at', ascending: false);
       final rows = List<Map<String, dynamic>>.from(res as List? ?? []);
       if (rows.isEmpty) {
         _todayContext = _TodayContext.noAssistant;
+        _todayAssistants = [];
         return;
       }
       if (rows.length > 1) {
+        _todayAssistants = [
+          for (final row in rows)
+            (
+              id: row['id'] as String,
+              name: ((row['name'] as String?)?.trim().isNotEmpty ?? false)
+                  ? (row['name'] as String).trim()
+                  : 'Assistant',
+            ),
+        ];
         _todayContext = _TodayContext.multiAssistant;
         return;
       }
       _effectiveReceptionistIdForToday = rows.first['id'] as String?;
+      _todayAssistants = [];
       _todayContext = _TodayContext.ready;
     } catch (_) {
       _todayContext = _TodayContext.noAssistant;
+      _todayAssistants = [];
     }
+  }
+
+  Future<void> _selectTodayAssistant(String receptionistId) async {
+    setState(() {
+      _effectiveReceptionistIdForToday = receptionistId;
+      _todayContext = _TodayContext.ready;
+    });
+    await _load();
   }
 
   Future<void> _load() async {
@@ -350,12 +374,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
   Widget _buildTodayBody() {
     if (_todayContext == _TodayContext.multiAssistant &&
         (widget.receptionistId == null || widget.receptionistId!.isEmpty)) {
-      return _buildTodayGateMessage(
-        icon: Icons.groups_outlined,
-        title: 'Choose an assistant',
-        subtitle:
-            'You have more than one assistant. Open Appointments from an assistant’s page to see today’s schedule for that line, or pick an assistant below.',
-      );
+      return _buildMultiAssistantPicker();
     }
     if (_todayContext == _TodayContext.noAssistant) {
       return _buildTodayGateMessage(
@@ -363,6 +382,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
         title: 'No assistant yet',
         subtitle:
             'Add an assistant first. Then you’ll see today’s schedule here.',
+        action: FilledButton(
+          onPressed: () => context.push('/receptionists'),
+          child: const Text('Add assistant'),
+        ),
       );
     }
     if (_todayContext == _TodayContext.noUser) {
@@ -394,10 +417,55 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
     );
   }
 
+  Widget _buildMultiAssistantPicker() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+      children: [
+        Icon(
+          Icons.groups_outlined,
+          size: 48,
+          color: Colors.grey.shade400,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Choose an assistant',
+          style: Theme.of(context).textTheme.titleMedium,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'You have more than one assistant. Pick whose schedule to show for today.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 24),
+        for (final a in _todayAssistants)
+          Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              leading: const Icon(Icons.support_agent_outlined),
+              title: Text(a.name),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _selectTodayAssistant(a.id),
+            ),
+          ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: () => context.push('/receptionists'),
+          child: const Text('Manage assistants'),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTodayGateMessage({
     required IconData icon,
     required String title,
     required String subtitle,
+    Widget? action,
   }) {
     return CustomScrollView(
       slivers: [
@@ -419,6 +487,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
                       ),
                   textAlign: TextAlign.center,
                 ),
+                if (action != null) ...[
+                  const SizedBox(height: 16),
+                  action,
+                ],
               ],
             ),
           ),
