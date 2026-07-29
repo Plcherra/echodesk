@@ -10,9 +10,12 @@ import '../../strings.dart';
 import '../../services/api_client.dart';
 import '../../services/appointment_service.dart';
 import '../../services/call_history_service.dart';
+import '../../theme/echodesk_theme.dart';
 import '../../utils/appointment_formatters.dart';
 import '../../utils/call_formatters.dart';
 import '../../widgets/constrained_scaffold_body.dart';
+import '../../widgets/state_views.dart';
+import '../../widgets/status_chip.dart';
 
 class ReceptionistDetailScreen extends StatefulWidget {
   final String receptionistId;
@@ -25,7 +28,8 @@ class ReceptionistDetailScreen extends StatefulWidget {
 }
 
 class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
-  bool get _isPhoneDevice => !kIsWeb &&
+  bool get _isPhoneDevice =>
+      !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.android);
 
@@ -77,9 +81,11 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
 
       List<Map<String, dynamic>> history = [];
       try {
-        final result = await loadCallHistoryResult(widget.receptionistId, limit: 20);
+        final result =
+            await loadCallHistoryResult(widget.receptionistId, limit: 20);
         history = result.calls;
-        _callHistoryDegradedReason = result.degraded ? result.degradedReason : null;
+        _callHistoryDegradedReason =
+            result.degraded ? result.degradedReason : null;
       } on CallHistoryApiException catch (e) {
         _callHistoryError = e.message;
         // Fallback: try call_usage if call_logs API fails
@@ -103,13 +109,15 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
           receptionistId: widget.receptionistId,
           limit: 20,
         );
-        final all = List<Map<String, dynamic>>.from(aptData['appointments'] ?? []);
+        final all =
+            List<Map<String, dynamic>>.from(aptData['appointments'] ?? []);
         final now = DateTime.now().toUtc();
         for (final a in all) {
           final start = a['start_time'] != null
               ? DateTime.tryParse(a['start_time'] as String)
               : null;
-          if (start != null && start.isAfter(now) &&
+          if (start != null &&
+              start.isAfter(now) &&
               (a['status'] as String? ?? '') != 'cancelled') {
             upcoming.add(a);
           }
@@ -193,6 +201,17 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
     }
 
     final r = _receptionist!;
+    final todayCount = _todayCallCount(_callHistory);
+    final voiceLabel =
+        (r.voicePresetKey != null && r.voicePresetKey!.isNotEmpty)
+            ? _formatPresetKey(r.voicePresetKey!)
+            : ((r.voiceId != null && r.voiceId!.isNotEmpty)
+                ? 'Custom'
+                : 'Default');
+    final calendarLabel = (r.calendarId != null && r.calendarId!.isNotEmpty)
+        ? _shortCalendarDisplay(r.calendarId!)
+        : 'Not connected';
+    final isActive = r.status == null || r.status == 'active';
 
     return Scaffold(
       appBar: AppBar(
@@ -203,8 +222,7 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () =>
-                context.push('/receptionists/${r.id}/settings'),
+            onPressed: () => context.push('/receptionists/${r.id}/settings'),
           ),
         ],
       ),
@@ -213,106 +231,156 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
           onRefresh: _load,
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    r.name,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: r.status == 'active'
-                        ? Colors.green.shade100
-                        : Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    r.status ?? 'active',
-                    style: TextStyle(
-                      color: r.status == 'active'
-                          ? Colors.green.shade800
-                          : Colors.grey.shade700,
-                      fontWeight: FontWeight.w600,
+            children: [
+              // Header: name + status badge
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      r.name,
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SelectableText(
-              r.displayPhone,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
+                  const SizedBox(width: EchoDeskSpacing.sm),
+                  _StatusBadge(
+                    label: r.status ?? 'active',
+                    active: isActive,
                   ),
-            ),
-            const SizedBox(height: 24),
-            _OverviewCard(
-              receptionist: r,
-              callHistory: _callHistory,
-              onCopyNumber: () {
-                Clipboard.setData(ClipboardData(text: r.displayPhone));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Number copied')),
-                );
-              },
-              onCallBack: _isPhoneDevice
-                  ? () => launchUrl(
-                        Uri.parse('tel:${r.displayPhone}'),
-                        mode: LaunchMode.externalApplication,
-                      )
-                  : null,
-              onManageSettings: () =>
-                  context.push('/receptionists/${r.id}/settings'),
-              onViewCallHistory: () => context.push(
-                '/receptionists/${r.id}/calls?name=${Uri.encodeComponent(r.name)}',
+                ],
               ),
-              onViewAppointments: () => context.push(
-                '/appointments?receptionist_id=${r.id}&tab=today',
+              const SizedBox(height: EchoDeskSpacing.sm),
+              SelectableText(
+                r.displayPhone,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: EchoDeskColors.brandTeal,
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
-            ),
-            const SizedBox(height: 24),
-            _RecentCallsSection(
-              calls: _callHistory.take(3).toList(),
-              receptionistId: r.id,
-              errorText: _callHistoryError,
-              degradedText: _callHistoryDegradedReason,
-              onViewAll: () => context.push(
-                '/receptionists/${r.id}/calls?name=${Uri.encodeComponent(r.name)}',
+              const SizedBox(height: EchoDeskSpacing.xs),
+              Text(
+                'Shared business number — this assistant answers on your line.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: EchoDeskColors.muted,
+                    ),
               ),
-            ),
-            const SizedBox(height: 24),
-            _UpcomingAppointmentsSection(
-              appointments: _upcomingAppointments,
-              receptionistName: r.name,
-              onViewAll: () => context.push('/appointments?receptionist_id=${r.id}'),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                FilledButton(
-                  onPressed: () =>
-                      context.push('/receptionists/${r.id}/settings'),
-                  child: const Text('Manage settings'),
+
+              const SizedBox(height: EchoDeskSpacing.md),
+
+              // Compact info chips
+              Wrap(
+                spacing: EchoDeskSpacing.sm,
+                runSpacing: EchoDeskSpacing.sm,
+                children: [
+                  _InfoChip(
+                    icon: Icons.calendar_today_outlined,
+                    label: 'Calendar',
+                    value: calendarLabel,
+                  ),
+                  _InfoChip(
+                    icon: Icons.record_voice_over_outlined,
+                    label: 'Voice',
+                    value: voiceLabel,
+                  ),
+                  if (todayCount != null)
+                    _InfoChip(
+                      icon: Icons.phone_in_talk_outlined,
+                      label: 'Calls today',
+                      value: '$todayCount',
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: EchoDeskSpacing.lg),
+
+              // Primary actions — compact 2×2 grid
+              _ActionGrid(
+                onCallBack: _isPhoneDevice
+                    ? () => launchUrl(
+                          Uri.parse('tel:${r.displayPhone}'),
+                          mode: LaunchMode.externalApplication,
+                        )
+                    : null,
+                onAppointments: () => context.push(
+                  '/appointments?receptionist_id=${r.id}&tab=today',
                 ),
-                const SizedBox(width: 8),
-                OutlinedButton(
+                onCopyNumber: () {
+                  Clipboard.setData(ClipboardData(text: r.displayPhone));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Number copied')),
+                  );
+                },
+                onViewCalls: () => context.push(
+                  '/receptionists/${r.id}/calls?name=${Uri.encodeComponent(r.name)}',
+                ),
+              ),
+
+              const SizedBox(height: EchoDeskSpacing.lg),
+
+              _RecentCallsSection(
+                calls: _callHistory.take(3).toList(),
+                receptionistId: r.id,
+                errorText: _callHistoryError,
+                degradedText: _callHistoryDegradedReason,
+                onViewAll: () => context.push(
+                  '/receptionists/${r.id}/calls?name=${Uri.encodeComponent(r.name)}',
+                ),
+              ),
+
+              const SizedBox(height: EchoDeskSpacing.lg),
+
+              _UpcomingAppointmentsSection(
+                appointments: _upcomingAppointments,
+                onViewAll: () =>
+                    context.push('/appointments?receptionist_id=${r.id}'),
+              ),
+
+              const SizedBox(height: EchoDeskSpacing.lg),
+
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
                   onPressed: () => _showDeleteConfirm(context, r),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
+                  style: TextButton.styleFrom(
+                    foregroundColor: EchoDeskColors.danger,
                   ),
-                  child: const Text('Delete'),
+                  child: const Text('Delete receptionist'),
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
-      ),
     );
+  }
+
+  int? _todayCallCount(List<Map<String, dynamic>> calls) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    var count = 0;
+    for (final c in calls) {
+      final s = c['started_at'];
+      if (s == null) continue;
+      final dt = DateTime.tryParse(s as String);
+      if (dt != null) {
+        final d = DateTime(dt.year, dt.month, dt.day);
+        if (d == today) count++;
+      }
+    }
+    return count > 0 ? count : null;
+  }
+
+  String _formatPresetKey(String key) {
+    return key
+        .split('_')
+        .map((s) => s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}')
+        .join(' ');
+  }
+
+  String _shortCalendarDisplay(String id) {
+    if (id.contains('@')) return 'Connected';
+    if (id == 'primary') return 'Primary';
+    return 'Connected';
   }
 
   void _showDeleteConfirm(BuildContext context, Receptionist r) {
@@ -343,7 +411,8 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
               } catch (_) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text(AppStrings.couldNotDeleteReceptionist)),
+                    const SnackBar(
+                        content: Text(AppStrings.couldNotDeleteReceptionist)),
                   );
                 }
               }
@@ -359,134 +428,181 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
   }
 }
 
-class _OverviewCard extends StatelessWidget {
-  final Receptionist receptionist;
-  final List<Map<String, dynamic>> callHistory;
-  final VoidCallback onCopyNumber;
-  final VoidCallback? onCallBack;
-  final VoidCallback onManageSettings;
-  final VoidCallback onViewCallHistory;
-  final VoidCallback onViewAppointments;
+class _StatusBadge extends StatelessWidget {
+  final String label;
+  final bool active;
 
-  const _OverviewCard({
-    required this.receptionist,
-    required this.callHistory,
-    required this.onCopyNumber,
-    this.onCallBack,
-    required this.onManageSettings,
-    required this.onViewCallHistory,
-    required this.onViewAppointments,
-  });
+  const _StatusBadge({required this.label, required this.active});
 
   @override
   Widget build(BuildContext context) {
-    final r = receptionist;
-    final todayCount = _todayCallCount(callHistory);
-    final voiceLabel = (r.voicePresetKey != null && r.voicePresetKey!.isNotEmpty)
-        ? _formatPresetKey(r.voicePresetKey!)
-        : ((r.voiceId != null && r.voiceId!.isNotEmpty) ? 'Custom' : 'Default');
-    final calendarLabel = (r.calendarId != null && r.calendarId!.isNotEmpty)
-        ? _shortCalendarDisplay(r.calendarId!)
-        : 'Not connected';
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Overview',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 10),
-            _OverviewRow('Uses business line', r.displayPhone),
-            Padding(
-              padding: const EdgeInsets.only(left: 100, bottom: 8),
-              child: Text(
-                'Shared business number — this assistant answers calls on your business line.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ),
-            _OverviewRow('Calendar', calendarLabel),
-            _OverviewRow('Voice', voiceLabel),
-            if (todayCount != null) _OverviewRow('Calls today', '$todayCount'),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                FilledButton.tonalIcon(
-                  onPressed: onCopyNumber,
-                  icon: const Icon(Icons.copy, size: 16),
-                  label: const Text('Copy'),
-                ),
-                if (onCallBack != null)
-                  FilledButton.tonalIcon(
-                    onPressed: onCallBack,
-                    icon: const Icon(Icons.phone, size: 16),
-                    label: const Text('Call back'),
-                  ),
-                FilledButton.tonalIcon(
-                  onPressed: onManageSettings,
-                  icon: const Icon(Icons.settings, size: 16),
-                  label: const Text('Settings'),
-                ),
-                FilledButton.tonalIcon(
-                  onPressed: onViewCallHistory,
-                  icon: const Icon(Icons.history, size: 16),
-                  label: const Text('Calls'),
-                ),
-                FilledButton.tonalIcon(
-                  onPressed: onViewAppointments,
-                  icon: const Icon(Icons.event, size: 16),
-                  label: const Text('Appointments'),
-                ),
-              ],
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: active ? EchoDeskColors.successSoft : EchoDeskColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(EchoDeskRadii.sm),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: active ? EchoDeskColors.success : EchoDeskColors.muted,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
         ),
       ),
     );
   }
+}
 
-  int? _todayCallCount(List<Map<String, dynamic>> calls) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    var count = 0;
-    for (final c in calls) {
-      final s = c['started_at'];
-      if (s == null) continue;
-      final dt = DateTime.tryParse(s as String);
-      if (dt != null) {
-        final d = DateTime(dt.year, dt.month, dt.day);
-        if (d == today) count++;
-      }
-    }
-    return count > 0 ? count : null;
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: EchoDeskColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(EchoDeskRadii.sm),
+        border: Border.all(color: EchoDeskColors.line),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: EchoDeskColors.muted),
+          const SizedBox(width: 6),
+          Text(
+            '$label · ',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: EchoDeskColors.muted,
+                ),
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: EchoDeskColors.ink,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
+    );
   }
+}
 
-  String _formatPresetKey(String key) {
-    return key.split('_').map((s) => s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}').join(' ');
+class _ActionGrid extends StatelessWidget {
+  final VoidCallback? onCallBack;
+  final VoidCallback onAppointments;
+  final VoidCallback onCopyNumber;
+  final VoidCallback onViewCalls;
+
+  const _ActionGrid({
+    this.onCallBack,
+    required this.onAppointments,
+    required this.onCopyNumber,
+    required this.onViewCalls,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = <Widget>[
+      if (onCallBack != null)
+        _ActionTile(
+          icon: Icons.phone_outlined,
+          label: 'Call back',
+          onTap: onCallBack!,
+        ),
+      _ActionTile(
+        icon: Icons.event_outlined,
+        label: 'Appointments',
+        onTap: onAppointments,
+      ),
+      _ActionTile(
+        icon: Icons.copy_outlined,
+        label: 'Copy number',
+        onTap: onCopyNumber,
+      ),
+      _ActionTile(
+        icon: Icons.history,
+        label: 'View calls',
+        onTap: onViewCalls,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tileWidth = (constraints.maxWidth - EchoDeskSpacing.sm) / 2;
+        return Wrap(
+          spacing: EchoDeskSpacing.sm,
+          runSpacing: EchoDeskSpacing.sm,
+          children: actions
+              .map((w) => SizedBox(width: tileWidth, child: w))
+              .toList(),
+        );
+      },
+    );
   }
+}
 
-  String _shortCalendarDisplay(String id) {
-    if (id.contains('@')) return 'Connected';
-    if (id == 'primary') return 'Primary';
-    return 'Connected';
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: EchoDeskColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+        side: const BorderSide(color: EchoDeskColors.line),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: EchoDeskColors.brand),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: EchoDeskColors.ink,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
 class _UpcomingAppointmentsSection extends StatelessWidget {
   final List<Map<String, dynamic>> appointments;
-  final String receptionistName;
   final VoidCallback onViewAll;
 
   const _UpcomingAppointmentsSection({
     required this.appointments,
-    required this.receptionistName,
     required this.onViewAll,
   });
 
@@ -500,38 +616,29 @@ class _UpcomingAppointmentsSection extends StatelessWidget {
           children: [
             Text(
               'Upcoming appointments',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
-            TextButton(
-              onPressed: onViewAll,
-              child: const Text('View all'),
-            ),
+            if (appointments.isNotEmpty)
+              TextButton(
+                onPressed: onViewAll,
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: const Text('View all'),
+              ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: EchoDeskSpacing.sm),
         if (appointments.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Icon(Icons.event_available, size: 36, color: Colors.grey.shade400),
-                  const SizedBox(height: 8),
-                  Text(
-                    'No upcoming appointments',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Appointments booked by this receptionist will appear here.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
+          const EmptyStateView(
+            icon: Icons.event_available,
+            title: 'No upcoming appointments',
+            subtitle:
+                'Appointments booked by this receptionist will appear here.',
+            asCard: true,
           )
         else
           ...appointments.map((apt) {
@@ -540,21 +647,38 @@ class _UpcomingAppointmentsSection extends StatelessWidget {
                 : null;
             final serviceName = (apt['service_name'] as String?)?.trim();
             final displayService =
-                serviceName != null && serviceName.isNotEmpty ? serviceName : 'Generic';
+                serviceName != null && serviceName.isNotEmpty
+                    ? serviceName
+                    : 'Generic';
+            final status = (apt['status'] as String?) ?? 'needs_review';
             return Card(
-              margin: const EdgeInsets.only(bottom: 8),
+              margin: const EdgeInsets.only(bottom: 6),
               child: ListTile(
-                title: Text(
-                  formatAppointmentDateTime(start),
-                  style: Theme.of(context).textTheme.titleSmall,
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        formatAppointmentDateTime(start),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                    StatusChip(status: status),
+                  ],
                 ),
                 subtitle: Text(
                   displayService,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: EchoDeskColors.muted,
                       ),
                 ),
-                trailing: const Icon(Icons.chevron_right, size: 20),
+                trailing: Icon(Icons.chevron_right,
+                    size: 18, color: EchoDeskColors.soft),
                 onTap: () => context.push('/appointments/${apt['id']}'),
               ),
             );
@@ -589,23 +713,30 @@ class _RecentCallsSection extends StatelessWidget {
           children: [
             Text(
               'Recent calls',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
-            TextButton(
-              onPressed: onViewAll,
-              child: const Text('View all calls'),
-            ),
+            if (errorText == null && calls.isNotEmpty)
+              TextButton(
+                onPressed: onViewAll,
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: const Text('View all'),
+              ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: EchoDeskSpacing.sm),
         if (errorText != null)
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               child: Text(
                 'Call history unavailable: $errorText',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.error,
+                      color: EchoDeskColors.danger,
                     ),
               ),
             ),
@@ -613,111 +744,66 @@ class _RecentCallsSection extends StatelessWidget {
         else if (degradedText != null)
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               child: Text(
                 'Limited call data: $degradedText',
-                style: Theme.of(context).textTheme.bodySmall,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: EchoDeskColors.muted,
+                    ),
               ),
             ),
           )
         else if (calls.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  Icon(Icons.phone_missed_outlined,
-                      size: 48, color: Colors.grey.shade400),
-                  const SizedBox(height: 12),
-                  Text(
-                    'No calls yet',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "When customers call your AI receptionist, they'll appear here.",
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
+          const EmptyStateView(
+            icon: Icons.phone_missed_outlined,
+            title: 'No calls yet',
+            subtitle:
+                "When customers call your AI receptionist, they'll appear here.",
+            asCard: true,
           )
         else
-          ...calls.map((call) => _DetailCallRow(
-                call: call,
-                receptionistId: receptionistId,
+          ...calls.map((call) {
+            final start = call['started_at'] != null
+                ? DateTime.tryParse(call['started_at'] as String)
+                : null;
+            final dur = call['duration_seconds'] as int?;
+            final outcome = callOutcomeLabel(call);
+            return Card(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        formatCallTimestamp(start),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                    _OutcomeChip(label: outcome),
+                  ],
+                ),
+                subtitle: Text(
+                  formatCallDuration(dur),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: EchoDeskColors.muted,
+                      ),
+                ),
+                trailing: Icon(Icons.chevron_right,
+                    size: 18, color: EchoDeskColors.soft),
                 onTap: () => context.push(
                   '/receptionists/$receptionistId/calls/${call['id']}',
                   extra: call,
                 ),
-              )),
+              ),
+            );
+          }),
       ],
-    );
-  }
-}
-
-class _DetailCallRow extends StatelessWidget {
-  final Map<String, dynamic> call;
-  final String receptionistId;
-  final VoidCallback onTap;
-
-  const _DetailCallRow({
-    required this.call,
-    required this.receptionistId,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final start = call['started_at'] != null
-        ? DateTime.tryParse(call['started_at'] as String)
-        : null;
-    final dur = call['duration_seconds'] as int?;
-    final preview = truncateTranscriptPreview(call['transcript'] as String?);
-    final outcome = callOutcomeLabel(call);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                formatCallTimestamp(start),
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-            ),
-            _OutcomeChip(label: outcome),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              formatCallDuration(dur),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            if (preview.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                preview,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontStyle: FontStyle.italic,
-                    ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ],
-        ),
-        trailing: const Icon(Icons.chevron_right, size: 20),
-      ),
     );
   }
 }
@@ -750,39 +836,15 @@ class _OutcomeChip extends StatelessWidget {
   (Color, Color) _colorsForOutcome(String label) {
     switch (label) {
       case 'Booked':
-        return (Colors.green.shade800, Colors.green.shade100);
+        return (EchoDeskColors.success, EchoDeskColors.successSoft);
       case 'Completed':
-        return (Colors.blue.shade800, Colors.blue.shade100);
+        return (EchoDeskColors.info, EchoDeskColors.infoSoft);
       case 'Short Call':
-        return (Colors.orange.shade800, Colors.orange.shade100);
+        return (EchoDeskColors.warning, EchoDeskColors.warningSoft);
       case 'Missed':
-        return (Colors.red.shade800, Colors.red.shade100);
+        return (EchoDeskColors.danger, EchoDeskColors.dangerSoft);
       default:
-        return (Colors.grey.shade700, Colors.grey.shade200);
+        return (EchoDeskColors.muted, EchoDeskColors.surfaceMuted);
     }
-  }
-}
-
-class _OverviewRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _OverviewRow(this.label, this.value);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-          ),
-          Expanded(child: Text(value)),
-        ],
-      ),
-    );
   }
 }
