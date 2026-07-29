@@ -6,6 +6,7 @@ import '../../services/appointment_service.dart';
 import '../../utils/appointment_formatters.dart';
 import '../../widgets/appointment_day_schedule.dart';
 import '../../widgets/constrained_scaffold_body.dart';
+import '../../widgets/status_chip.dart';
 
 class AppointmentsScreen extends StatefulWidget {
   final String? initialStatus;
@@ -221,7 +222,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
       final st = DateTime.tryParse(a['start_time'] as String? ?? '');
       final status = a['status'] as String? ?? '';
       if (!isStrictlyAfterToday(st)) continue;
-      if (status == 'cancelled' || status == 'completed') continue;
+      // Show cancelled here too (with its "Cancelled" label) so a rejected
+      // future booking is still visible. Completed lives in its own tab.
+      if (status == 'completed') continue;
       out.add(a);
     }
     out.sort((a, b) {
@@ -570,7 +573,7 @@ class _AppointmentRow extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                   ),
-                  _StatusChip(status: status),
+                  StatusChip(status: status),
                   if (isGeneric) _GenericBadge(),
                   const SizedBox(width: 4),
                   Icon(Icons.chevron_right, size: 20, color: Colors.grey.shade400),
@@ -645,43 +648,6 @@ class _AppointmentRow extends StatelessWidget {
         return Colors.red.shade300;
       default:
         return Colors.grey.shade300;
-    }
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final String status;
-
-  const _StatusChip({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, color, bgColor) = _statusStyle(status);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
-      ),
-    );
-  }
-
-  (String, Color, Color) _statusStyle(String s) {
-    switch (s) {
-      case 'confirmed':
-        return ('Confirmed', Colors.green.shade800, Colors.green.shade100);
-      case 'needs_review':
-        return ('Needs Review', Colors.orange.shade800, Colors.orange.shade100);
-      case 'cancelled':
-        return ('Cancelled', Colors.red.shade800, Colors.red.shade100);
-      case 'completed':
-        return ('Completed', Colors.blue.shade800, Colors.blue.shade100);
-      default:
-        return ('—', Colors.grey.shade700, Colors.grey.shade200);
     }
   }
 }

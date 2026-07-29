@@ -11,6 +11,7 @@ import '../../utils/appointment_formatters.dart';
 import '../../utils/call_formatters.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 import '../../widgets/loading_skeleton.dart';
+import '../../widgets/status_chip.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -69,12 +70,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final start = a['start_time'] != null
               ? DateTime.tryParse(a['start_time'] as String)
               : null;
-          // Upcoming = future AND still active. Exclude cancelled/completed so a
-          // rejected appointment never lingers here (matches the Appointments tab).
-          if (start != null &&
-              start.isAfter(now) &&
-              status != 'cancelled' &&
-              status != 'completed') {
+          // Upcoming = future bookings. Cancelled ones stay visible (shown with a
+          // "Cancelled" label); Completed lives in its own tab. Matches the
+          // Appointments > Upcoming filter.
+          if (start != null && start.isAfter(now) && status != 'completed') {
             upcoming.add(a);
           }
         }
@@ -510,12 +509,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ? serviceName
                 : 'Generic appointment';
             final recName = _receptionistNames[apt['receptionist_id']] ?? '—';
+            final status = (apt['status'] as String?) ?? 'needs_review';
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                title: Text(
-                  formatAppointmentDateTime(start),
-                  style: Theme.of(context).textTheme.titleSmall,
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        formatAppointmentDateTime(start),
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    StatusChip(status: status),
+                  ],
                 ),
                 subtitle: Text(
                   '$displayService · $recName',
