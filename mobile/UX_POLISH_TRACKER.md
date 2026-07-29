@@ -125,18 +125,18 @@ Started 2026-07-28. High-impact items first.
 
 | # | Item | Status | Suggested smoke when done |
 |---|------|--------|---------------------------|
-| 9 | Today tab multi-assistant dead-end — no picker/CTA | Todo | With 2+ receptionists, Today shows a clear path to pick one |
-| 10 | Call detail without `extra` — “Call not found”, no fetch-by-id | Todo | Open call via deep link / cold path → loads or friendly retry |
+| 9 | Today tab multi-assistant dead-end — no picker/CTA | Done | Multi-assistant Today shows list + Manage assistants |
+| 10 | Call detail without `extra` — “Call not found”, no fetch-by-id | Done | Cold open fetches by id; friendly retry/error |
 | 11 | Dashboard call rows look tappable when `receptionist_id` missing | Done* | *Addressed as part of P1 Recent Calls tighten (no chevron when not navigable) |
 | 13 | Optional confirm dialog before Confirm appointment | Done | needs_review Confirm → “Confirm this appointment?” dialog |
 | 14 | Onboarding step 4 distinct “You’re ready” (not reuse test-call UI) | Todo | Finish setup shows a clear Done state |
-| 17 | Shared loading pattern (skeletons vs spinner) | Todo | Lists feel consistent while loading |
-| 18 | Ad-hoc Colors vs `EchoDeskColors` | Todo | Status/warning colors match theme (Overview already uses tokens) |
-| 19 | Settings billing/calendar: remove full-screen dim overlay | Todo | Only row spinner while loading |
-| 20 | Create receptionist padding 16 → 24 | Todo | Matches other tabs |
-| 21 | Help screen: `constrainedScaffoldBody` + padding 24 | Todo | Layout matches Settings |
+| 17 | Shared loading pattern (skeletons vs spinner) | Done | List screens use shared `ListLoadingView` skeletons |
+| 18 | Ad-hoc Colors vs `EchoDeskColors` | Done | Status chips, list accents, empty/error, call screens |
+| 19 | Settings billing/calendar: remove full-screen dim overlay | Done | Only row spinner while loading |
+| 20 | Create receptionist padding 16 → 24 | Done | Matches other tabs |
+| 21 | Help screen: `constrainedScaffoldBody` + padding 24 | Done | Layout matches Settings |
 | 22 | Help support email branded / configurable | Done | `Env.supportEmail` → `support@echodesk.us` (SUPPORT_EMAIL override) |
-| 23 | Delete receptionist success SnackBar | Todo | Brief “deleted” before navigate away |
+| 23 | Delete receptionist success SnackBar | Done | “deleted” SnackBar before navigate away |
 | 24 | Active call: confirm End; clarify back vs hang up | Done | End confirms; back offers Stay / Leave screen / End call |
 
 ### P2 manual smoke tests (historical — already shipped items)

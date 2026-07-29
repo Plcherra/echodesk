@@ -335,7 +335,11 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
                 await ApiClient.post(
                   '/api/mobile/receptionists/${r.id}/delete',
                 );
-                if (context.mounted) context.go('/receptionists');
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('"${r.name}" deleted')),
+                );
+                context.go('/receptionists');
               } catch (_) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(

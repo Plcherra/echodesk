@@ -229,7 +229,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           _buildStepper(),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(24),
               children: [
                 if (_error != null) ...[
                   Card(
