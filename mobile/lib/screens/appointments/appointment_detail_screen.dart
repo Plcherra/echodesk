@@ -67,6 +67,42 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     }
   }
 
+  /// Guard Confirm behind an explicit dialog when the appointment still needs
+  /// review, so a stray tap doesn't lock in a booking without a second look.
+  Future<void> _confirmConfirm() async {
+    final start = _appointment?['start_time'] != null
+        ? DateTime.tryParse(_appointment!['start_time'] as String)
+        : null;
+    final whenText =
+        start != null ? ' on ${formatAppointmentDateTime(start)}' : '';
+    final serviceName =
+        (_appointment?['service_name'] as String?)?.trim();
+    final serviceText = (serviceName != null && serviceName.isNotEmpty)
+        ? ' ($serviceName)'
+        : '';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm this appointment?'),
+        content: Text(
+          'This marks the appointment$serviceText$whenText as confirmed. '
+          'You can still cancel it later if needed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Not yet'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) _updateStatus('confirmed');
+  }
+
   /// Guard destructive cancellation behind an explicit confirmation so a stray
   /// tap can't cancel a real booking.
   Future<void> _confirmCancel() async {
@@ -594,7 +630,9 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                             if (canConfirm)
                               Expanded(
                                 child: FilledButton.icon(
-                                  onPressed: () => _updateStatus('confirmed'),
+                                  onPressed: status == 'needs_review'
+                                      ? _confirmConfirm
+                                      : () => _updateStatus('confirmed'),
                                   icon: const Icon(Icons.check, size: 18),
                                   label: const Text('Confirm'),
                                 ),
