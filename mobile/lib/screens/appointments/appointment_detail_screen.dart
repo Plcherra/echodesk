@@ -49,21 +49,27 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
   Future<void> _updateStatus(String status) async {
     setState(() => _saving = true);
     try {
-      final ok = await updateAppointment(widget.appointmentId, status: status);
-      if (ok && mounted) {
+      final result =
+          await updateAppointment(widget.appointmentId, status: status);
+      if (!mounted) return;
+      if (result.ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Status updated to ${_statusLabel(status)}')),
         );
         _load();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.error ?? 'Could not update status')),
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  /// Guard destructive rejection behind an explicit confirmation so a stray tap
-  /// can't cancel a real booking (the previous flat button did this instantly).
-  Future<void> _confirmReject() async {
+  /// Guard destructive cancellation behind an explicit confirmation so a stray
+  /// tap can't cancel a real booking.
+  Future<void> _confirmCancel() async {
     final start = _appointment?['start_time'] != null
         ? DateTime.tryParse(_appointment!['start_time'] as String)
         : null;
@@ -71,7 +77,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reject this appointment?'),
+        title: const Text('Cancel this appointment?'),
         content: Text(
           'This cancels the appointment$whenText. The caller won\'t be automatically '
           'notified, and this can\'t be undone from here.',
@@ -86,12 +92,35 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Reject appointment'),
+            child: const Text('Cancel appointment'),
           ),
         ],
       ),
     );
     if (ok == true) _updateStatus('cancelled');
+  }
+
+  Future<void> _applyUpdate({
+    required Future<({bool ok, String? error})> Function() update,
+    required String successMessage,
+  }) async {
+    setState(() => _saving = true);
+    try {
+      final result = await update();
+      if (!mounted) return;
+      if (result.ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(successMessage)),
+        );
+        _load();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.error ?? 'Update failed')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _showEditService() async {
@@ -106,16 +135,11 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
       ),
     );
     if (c != null && c != current) {
-      setState(() => _saving = true);
-      try {
-        final ok = await updateAppointment(widget.appointmentId, serviceName: c);
-        if (ok && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Service updated')));
-          _load();
-        }
-      } finally {
-        if (mounted) setState(() => _saving = false);
-      }
+      await _applyUpdate(
+        update: () =>
+            updateAppointment(widget.appointmentId, serviceName: c),
+        successMessage: 'Service updated',
+      );
     }
   }
 
@@ -130,16 +154,11 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
       ),
     );
     if (result != null && result != current) {
-      setState(() => _saving = true);
-      try {
-        final ok = await updateAppointment(widget.appointmentId, notes: result);
-        if (ok && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notes updated')));
-          _load();
-        }
-      } finally {
-        if (mounted) setState(() => _saving = false);
-      }
+      await _applyUpdate(
+        update: () =>
+            updateAppointment(widget.appointmentId, notes: result),
+        successMessage: 'Notes updated',
+      );
     }
   }
 
@@ -155,16 +174,13 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
       ),
     );
     if (result != null) {
-      setState(() => _saving = true);
-      try {
-        final ok = await updateAppointment(widget.appointmentId, paymentLink: result.isEmpty ? null : result);
-        if (ok && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment link updated')));
-          _load();
-        }
-      } finally {
-        if (mounted) setState(() => _saving = false);
-      }
+      await _applyUpdate(
+        update: () => updateAppointment(
+          widget.appointmentId,
+          paymentLink: result.isEmpty ? null : result,
+        ),
+        successMessage: 'Payment link updated',
+      );
     }
   }
 
@@ -180,16 +196,13 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
       ),
     );
     if (result != null) {
-      setState(() => _saving = true);
-      try {
-        final ok = await updateAppointment(widget.appointmentId, customerAddress: result.isEmpty ? null : result);
-        if (ok && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address updated')));
-          _load();
-        }
-      } finally {
-        if (mounted) setState(() => _saving = false);
-      }
+      await _applyUpdate(
+        update: () => updateAppointment(
+          widget.appointmentId,
+          customerAddress: result.isEmpty ? null : result,
+        ),
+        successMessage: 'Address updated',
+      );
     }
   }
 
@@ -205,16 +218,13 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
       ),
     );
     if (result != null) {
-      setState(() => _saving = true);
-      try {
-        final ok = await updateAppointment(widget.appointmentId, locationText: result.isEmpty ? null : result);
-        if (ok && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Meeting link updated')));
-          _load();
-        }
-      } finally {
-        if (mounted) setState(() => _saving = false);
-      }
+      await _applyUpdate(
+        update: () => updateAppointment(
+          widget.appointmentId,
+          locationText: result.isEmpty ? null : result,
+        ),
+        successMessage: 'Meeting link updated',
+      );
     }
   }
 
@@ -230,16 +240,13 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
       ),
     );
     if (result != null) {
-      setState(() => _saving = true);
-      try {
-        final ok = await updateAppointment(widget.appointmentId, meetingInstructions: result.isEmpty ? null : result);
-        if (ok && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Instructions updated')));
-          _load();
-        }
-      } finally {
-        if (mounted) setState(() => _saving = false);
-      }
+      await _applyUpdate(
+        update: () => updateAppointment(
+          widget.appointmentId,
+          meetingInstructions: result.isEmpty ? null : result,
+        ),
+        successMessage: 'Instructions updated',
+      );
     }
   }
 
@@ -321,20 +328,14 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
       ),
     );
     if (result != null) {
-      setState(() => _saving = true);
-      try {
-        final ok = await updateAppointment(
+      await _applyUpdate(
+        update: () => updateAppointment(
           widget.appointmentId,
           customerAddress: result.isNotEmpty ? result : null,
           locationText: result.isNotEmpty ? result : null,
-        );
-        if (ok && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Updated')));
-          _load();
-        }
-      } finally {
-        if (mounted) setState(() => _saving = false);
-      }
+        ),
+        successMessage: 'Updated',
+      );
     }
   }
 
@@ -449,6 +450,13 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     final confirmSent = apt['confirmation_message_sent_at'] != null;
     final callerNumber = (apt['caller_number'] as String?)?.trim();
 
+    final canConfirm = status != 'confirmed' && status != 'cancelled' && status != 'completed';
+    final canCancel = status != 'cancelled' && status != 'completed';
+    final canComplete = status != 'completed' &&
+        status != 'cancelled' &&
+        start != null &&
+        start.isBefore(DateTime.now());
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
@@ -469,7 +477,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
         child: _saving
             ? const Center(child: CircularProgressIndicator())
             : ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                 children: [
                   if (isGeneric)
                     Card(
@@ -530,159 +538,222 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 32),
-
-                  // --- Primary decision: prominent, full-width, hard to mis-tap ---
-                  if (status != 'confirmed')
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _saving ? null : () => _updateStatus('confirmed'),
-                        icon: const Icon(Icons.check, size: 18),
-                        label: const Text('Confirm appointment'),
-                      ),
-                    ),
-                  if (status == 'confirmed')
-                    _StatusNote(
-                      icon: Icons.check_circle,
-                      color: Colors.green.shade700,
-                      text: 'This appointment is confirmed.',
-                    ),
-                  if (status == 'cancelled')
-                    _StatusNote(
-                      icon: Icons.cancel,
-                      color: Theme.of(context).colorScheme.error,
-                      text: 'This appointment was rejected.',
-                    ),
-                  if (status != 'completed' && status != 'cancelled' && start != null && start.isBefore(DateTime.now())) ...[
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _saving ? null : () => _updateStatus('completed'),
-                        icon: const Icon(Icons.done_all, size: 18),
-                        label: const Text('Mark as completed'),
-                      ),
-                    ),
-                  ],
-                  if (status != 'cancelled') ...[
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _saving ? null : _confirmReject,
-                        icon: const Icon(Icons.cancel_outlined, size: 18),
-                        label: const Text('Reject appointment'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Theme.of(context).colorScheme.error,
-                          side: BorderSide(
-                            color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: 28),
-
-                  // --- Edit details: a tidy list, not a pile of buttons ---
-                  Text('Edit details', style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 8),
-                  Card(
-                    margin: EdgeInsets.zero,
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        _ActionTile(
-                          icon: Icons.design_services_outlined,
-                          label: 'Service',
-                          value: displayService,
-                          onTap: _showEditService,
-                        ),
-                        const Divider(height: 1),
-                        _ActionTile(
-                          icon: Icons.notes_outlined,
-                          label: 'Notes',
-                          value: ((apt['notes'] as String?)?.trim().isNotEmpty ?? false) ? 'Added' : 'None',
-                          onTap: _showEditNotes,
-                        ),
-                        const Divider(height: 1),
-                        _ActionTile(
-                          icon: Icons.payment_outlined,
-                          label: 'Payment link',
-                          value: hasPayment ? 'Attached' : 'None',
-                          onTap: _showAttachPaymentLink,
-                        ),
-                        const Divider(height: 1),
-                        _ActionTile(
-                          icon: Icons.list_alt_outlined,
-                          label: 'Service instructions',
-                          value: ((apt['meeting_instructions'] as String?)?.trim().isNotEmpty ?? false) ? 'Added' : 'None',
-                          onTap: _showEditServiceInstructions,
-                        ),
-                        const Divider(height: 1),
-                        if (_isAddressBased(apt))
-                          _ActionTile(
-                            icon: Icons.place_outlined,
-                            label: 'Service address',
-                            value: (location != null && location.isNotEmpty) ? location : 'None',
-                            onTap: _showEditAddress,
-                          )
-                        else if (_isVideoMeeting(apt))
-                          _ActionTile(
-                            icon: Icons.videocam_outlined,
-                            label: 'Meeting link',
-                            value: (locationText != null && locationText.isNotEmpty) ? locationText : 'None',
-                            onTap: _showEditVideoLink,
-                          )
-                        else
-                          _ActionTile(
-                            icon: Icons.location_on_outlined,
-                            label: 'Address / meeting link',
-                            value: (locDisplay != null && locDisplay.isNotEmpty) ? locDisplay : 'None',
-                            onTap: _showEditAddressOrVideo,
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // --- Customer message (SMS): grouped and de-emphasized ---
-                  Text('Customer message', style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Send an SMS confirmation to the caller.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton.tonalIcon(
-                        onPressed: confirmSent || callerNumber == null || callerNumber.isEmpty
-                            ? null
-                            : () => _showSendConfirmation(isResend: false),
-                        icon: const Icon(Icons.send, size: 18),
-                        label: const Text('Send confirmation'),
-                      ),
-                      if (confirmSent)
-                        OutlinedButton.icon(
-                          onPressed: callerNumber == null || callerNumber.isEmpty
-                              ? null
-                              : () => _showSendConfirmation(isResend: true),
-                          icon: const Icon(Icons.refresh, size: 18),
-                          label: const Text('Resend confirmation'),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
                 ],
               ),
       ),
+      bottomNavigationBar: _saving
+          ? null
+          : SafeArea(
+              child: Material(
+                elevation: 8,
+                color: Theme.of(context).colorScheme.surface,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (status == 'confirmed')
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _StatusNote(
+                            icon: Icons.check_circle,
+                            color: Colors.green.shade700,
+                            text: 'This appointment is confirmed.',
+                          ),
+                        ),
+                      if (status == 'cancelled')
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _StatusNote(
+                            icon: Icons.cancel,
+                            color: Theme.of(context).colorScheme.error,
+                            text: 'This appointment was cancelled.',
+                          ),
+                        ),
+                      if (canConfirm || canCancel)
+                        Row(
+                          children: [
+                            if (canCancel)
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _confirmCancel,
+                                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                                  label: const Text('Cancel'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Theme.of(context).colorScheme.error,
+                                    side: BorderSide(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .error
+                                          .withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (canConfirm && canCancel) const SizedBox(width: 12),
+                            if (canConfirm)
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: () => _updateStatus('confirmed'),
+                                  icon: const Icon(Icons.check, size: 18),
+                                  label: const Text('Confirm'),
+                                ),
+                              ),
+                          ],
+                        ),
+                      TextButton.icon(
+                        onPressed: () => _showMoreActions(
+                          apt: apt,
+                          displayService: displayService,
+                          hasPayment: hasPayment,
+                          confirmSent: confirmSent,
+                          callerNumber: callerNumber,
+                          location: location,
+                          locationText: locationText,
+                          locDisplay: locDisplay,
+                          canComplete: canComplete,
+                        ),
+                        icon: const Icon(Icons.more_horiz, size: 18),
+                        label: const Text('More actions'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  Future<void> _showMoreActions({
+    required Map<String, dynamic> apt,
+    required String displayService,
+    required bool hasPayment,
+    required bool confirmSent,
+    required String? callerNumber,
+    required String? location,
+    required String? locationText,
+    required String? locDisplay,
+    required bool canComplete,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Text(
+                    'More actions',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                if (canComplete)
+                  ListTile(
+                    leading: const Icon(Icons.done_all),
+                    title: const Text('Mark as completed'),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _updateStatus('completed');
+                    },
+                  ),
+                const Divider(height: 1),
+                _ActionTile(
+                  icon: Icons.design_services_outlined,
+                  label: 'Edit service',
+                  value: displayService,
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _showEditService();
+                  },
+                ),
+                _ActionTile(
+                  icon: Icons.notes_outlined,
+                  label: 'Edit notes',
+                  value: ((apt['notes'] as String?)?.trim().isNotEmpty ?? false)
+                      ? 'Added'
+                      : 'None',
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _showEditNotes();
+                  },
+                ),
+                _ActionTile(
+                  icon: Icons.payment_outlined,
+                  label: 'Payment link',
+                  value: hasPayment ? 'Attached' : 'None',
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _showAttachPaymentLink();
+                  },
+                ),
+                _ActionTile(
+                  icon: Icons.list_alt_outlined,
+                  label: 'Service instructions',
+                  value: ((apt['meeting_instructions'] as String?)?.trim().isNotEmpty ?? false)
+                      ? 'Added'
+                      : 'None',
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _showEditServiceInstructions();
+                  },
+                ),
+                if (_isAddressBased(apt))
+                  _ActionTile(
+                    icon: Icons.place_outlined,
+                    label: 'Service address',
+                    value: (location != null && location.isNotEmpty) ? location : 'None',
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _showEditAddress();
+                    },
+                  )
+                else if (_isVideoMeeting(apt))
+                  _ActionTile(
+                    icon: Icons.videocam_outlined,
+                    label: 'Meeting link',
+                    value: (locationText != null && locationText.isNotEmpty)
+                        ? locationText
+                        : 'None',
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _showEditVideoLink();
+                    },
+                  )
+                else
+                  _ActionTile(
+                    icon: Icons.location_on_outlined,
+                    label: 'Address / meeting link',
+                    value: (locDisplay != null && locDisplay.isNotEmpty) ? locDisplay : 'None',
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _showEditAddressOrVideo();
+                    },
+                  ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.send_outlined),
+                  title: Text(confirmSent ? 'Resend confirmation' : 'Send confirmation'),
+                  subtitle: callerNumber == null || callerNumber.isEmpty
+                      ? const Text('No caller number')
+                      : null,
+                  enabled: callerNumber != null && callerNumber.isNotEmpty,
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _showSendConfirmation(isResend: confirmSent);
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
