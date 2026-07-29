@@ -233,16 +233,6 @@ async def telnyx_voice(request: Request):
         or headers.get("x-telnyx-signature")
     )
 
-    # TEMP DIAGNOSTIC (safe: header NAMES only, no values) — remove after confirming
-    # why Telnyx Ed25519 signature headers are not reaching the backend.
-    logger.info(
-        "[TELNYX_HDR_DEBUG] voice header_names=%s has_ed25519=%s has_timestamp=%s ua=%s",
-        sorted(headers.keys()),
-        bool(ed25519_sig),
-        bool(timestamp),
-        user_agent,
-    )
-
     # Rate limit check before verification
     if await check_rate_limit(client_ip):
         logger.warning(
