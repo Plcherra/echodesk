@@ -9,7 +9,7 @@ Source: mobile UX audit + polish passes on `main`.
 |----------|---------|--------|
 | **P0** | Demo-blocking / embarrassing | **Done** — do not touch |
 | **P1** | Dashboard Overview cleanup | **Done** (+ hierarchy refinement) |
-| **P2** | Remaining polish (former leftover P1) | In progress |
+| **P2** | Remaining polish (former leftover P1) | Nearly done (#14 left) |
 | **P3** | Nice-to-have (former P2) | Todo |
 
 **How many P levels?** Four: **P0**, **P1**, **P2**, **P3**.
