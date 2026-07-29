@@ -293,18 +293,22 @@ class _ServicesTabState extends State<_ServicesTab> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (modalContext, setModalState) {
           final media = MediaQuery.of(modalContext);
-          final maxHeight = media.size.height * 0.88;
+          final maxHeight = media.size.height * 0.85;
           final sectionTitleStyle = Theme.of(modalContext)
               .textTheme
-              .titleSmall
-              ?.copyWith(fontWeight: FontWeight.w600);
-          const fieldGap = SizedBox(height: EchoDeskSpacing.sm);
-          const sectionGap = SizedBox(height: EchoDeskSpacing.sm);
-          const panelPadding = EdgeInsets.fromLTRB(
-            EchoDeskSpacing.sm + 2,
-            EchoDeskSpacing.sm,
-            EchoDeskSpacing.sm + 2,
-            EchoDeskSpacing.sm,
+              .labelLarge
+              ?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: EchoDeskColors.ink,
+              );
+          const fieldGap = SizedBox(height: 6);
+          const sectionGap = SizedBox(height: EchoDeskSpacing.xs + 2);
+          const followUpGap = SizedBox(height: EchoDeskSpacing.xs + 2);
+          const panelPadding = EdgeInsets.fromLTRB(10, 8, 10, 8);
+          const denseLabelStyle = TextStyle(
+            fontSize: 12.5,
+            color: EchoDeskColors.muted,
+            height: 1.15,
           );
 
           Widget sectionPanel({
@@ -316,7 +320,7 @@ class _ServicesTabState extends State<_ServicesTab> {
               padding: panelPadding,
               decoration: BoxDecoration(
                 color: color,
-                borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+                borderRadius: BorderRadius.circular(EchoDeskRadii.sm),
                 border: Border.all(color: EchoDeskColors.line),
               ),
               child: Column(
@@ -326,16 +330,27 @@ class _ServicesTabState extends State<_ServicesTab> {
             );
           }
 
-          InputDecoration denseDecoration(String label, {bool filled = false}) {
+          InputDecoration denseDecoration(
+            String label, {
+            bool filled = false,
+            bool compact = false,
+          }) {
             return InputDecoration(
               labelText: label,
+              labelStyle: denseLabelStyle,
+              floatingLabelStyle: denseLabelStyle.copyWith(
+                fontSize: 12,
+                color: EchoDeskColors.muted,
+              ),
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              alignLabelWithHint: true,
               border: const OutlineInputBorder(),
               isDense: true,
               filled: filled,
               fillColor: filled ? EchoDeskColors.surface : null,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 11,
+                vertical: compact ? 9 : 10,
               ),
             );
           }
@@ -418,15 +433,15 @@ class _ServicesTabState extends State<_ServicesTab> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
                       EchoDeskSpacing.md,
+                      EchoDeskSpacing.sm + 2,
                       EchoDeskSpacing.md,
-                      EchoDeskSpacing.md,
-                      EchoDeskSpacing.sm,
+                      EchoDeskSpacing.xs + 2,
                     ),
                     child: Text(
                       service == null ? 'Add service' : 'Edit service',
                       style: Theme.of(modalContext)
                           .textTheme
-                          .titleLarge
+                          .titleMedium
                           ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                   ),
@@ -436,7 +451,7 @@ class _ServicesTabState extends State<_ServicesTab> {
                         EchoDeskSpacing.md,
                         0,
                         EchoDeskSpacing.md,
-                        EchoDeskSpacing.sm,
+                        EchoDeskSpacing.xs,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -450,12 +465,14 @@ class _ServicesTabState extends State<_ServicesTab> {
                                 controller: nameController,
                                 decoration: denseDecoration('Name'),
                                 textInputAction: TextInputAction.next,
+                                style: const TextStyle(fontSize: 14),
                               ),
                               fieldGap,
                               TextField(
                                 controller: descriptionController,
                                 decoration: denseDecoration('Description'),
                                 maxLines: 2,
+                                style: const TextStyle(fontSize: 14),
                               ),
                               fieldGap,
                               Row(
@@ -468,6 +485,7 @@ class _ServicesTabState extends State<_ServicesTab> {
                                       decoration: denseDecoration(
                                           'Duration (min)'),
                                       keyboardType: TextInputType.number,
+                                      style: const TextStyle(fontSize: 14),
                                     ),
                                   ),
                                   const SizedBox(width: EchoDeskSpacing.sm),
@@ -481,6 +499,7 @@ class _ServicesTabState extends State<_ServicesTab> {
                                               .numberWithOptions(
                                         decimal: true,
                                       ),
+                                      style: const TextStyle(fontSize: 14),
                                     ),
                                   ),
                                 ],
@@ -492,11 +511,10 @@ class _ServicesTabState extends State<_ServicesTab> {
                             color: EchoDeskColors.surfaceSoft,
                             children: [
                               Text('Location', style: sectionTitleStyle),
-                              const SizedBox(height: EchoDeskSpacing.xs),
                               CheckboxListTile(
                                 title: const Text(
                                   'Requires location',
-                                  style: TextStyle(fontSize: 14),
+                                  style: TextStyle(fontSize: 13.5),
                                 ),
                                 value: requiresLocation,
                                 onChanged: (v) => setModalState(
@@ -505,8 +523,13 @@ class _ServicesTabState extends State<_ServicesTab> {
                                 controlAffinity:
                                     ListTileControlAffinity.leading,
                                 contentPadding: EdgeInsets.zero,
-                                visualDensity: VisualDensity.compact,
+                                visualDensity: const VisualDensity(
+                                  horizontal: -2,
+                                  vertical: -3,
+                                ),
                                 dense: true,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
                               ),
                               if (requiresLocation) ...[
                                 fieldGap,
@@ -518,6 +541,10 @@ class _ServicesTabState extends State<_ServicesTab> {
                                     filled: true,
                                   ),
                                   isExpanded: true,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: EchoDeskColors.ink,
+                                  ),
                                   items: const [
                                     DropdownMenuItem(
                                       value: 'customer_address',
@@ -550,7 +577,6 @@ class _ServicesTabState extends State<_ServicesTab> {
                                 .withValues(alpha: 0.45),
                             children: [
                               Text('Follow-up', style: sectionTitleStyle),
-                              const SizedBox(height: 2),
                               Text(
                                 'Owner-controlled actions after a booking.',
                                 style: Theme.of(modalContext)
@@ -558,16 +584,23 @@ class _ServicesTabState extends State<_ServicesTab> {
                                     .bodySmall
                                     ?.copyWith(
                                       color: EchoDeskColors.muted,
+                                      fontSize: 11.5,
+                                      height: 1.25,
                                     ),
                               ),
-                              fieldGap,
+                              followUpGap,
                               DropdownButtonFormField<String>(
                                 initialValue: followupMode,
                                 decoration: denseDecoration(
                                   'Follow-up mode',
                                   filled: true,
+                                  compact: true,
                                 ),
                                 isExpanded: true,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: EchoDeskColors.ink,
+                                ),
                                 items: const [
                                   DropdownMenuItem(
                                     value: 'none',
@@ -591,50 +624,60 @@ class _ServicesTabState extends State<_ServicesTab> {
                                       followupMode = v ?? 'under_review',
                                 ),
                               ),
-                              fieldGap,
+                              followUpGap,
                               TextField(
                                 controller: followupTemplateController,
                                 decoration: denseDecoration(
                                   'Follow-up message template (optional)',
                                   filled: true,
+                                  compact: true,
                                 ),
                                 maxLines: 2,
+                                style: const TextStyle(fontSize: 14),
                               ),
-                              fieldGap,
+                              followUpGap,
                               TextField(
                                 controller: paymentLinkController,
                                 decoration: denseDecoration(
                                   'Payment link (optional)',
                                   filled: true,
+                                  compact: true,
                                 ),
+                                style: const TextStyle(fontSize: 14),
                               ),
-                              fieldGap,
+                              followUpGap,
                               TextField(
                                 controller:
                                     ownerSelectedPlatformController,
                                 decoration: denseDecoration(
                                   'Owner-selected platform (optional)',
                                   filled: true,
+                                  compact: true,
                                 ),
+                                style: const TextStyle(fontSize: 14),
                               ),
-                              fieldGap,
+                              followUpGap,
                               TextField(
                                 controller: meetingInstructionsController,
                                 decoration: denseDecoration(
                                   'Meeting instructions (optional)',
                                   filled: true,
+                                  compact: true,
                                 ),
                                 maxLines: 2,
+                                style: const TextStyle(fontSize: 14),
                               ),
-                              fieldGap,
+                              followUpGap,
                               TextField(
                                 controller:
                                     internalFollowupNotesController,
                                 decoration: denseDecoration(
                                   'Internal follow-up notes (optional)',
                                   filled: true,
+                                  compact: true,
                                 ),
                                 maxLines: 2,
+                                style: const TextStyle(fontSize: 14),
                               ),
                             ],
                           ),
@@ -644,12 +687,7 @@ class _ServicesTabState extends State<_ServicesTab> {
                   ),
                   const Divider(height: 1, color: EchoDeskColors.line),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      EchoDeskSpacing.sm,
-                      EchoDeskSpacing.sm,
-                      EchoDeskSpacing.sm,
-                      EchoDeskSpacing.sm,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
