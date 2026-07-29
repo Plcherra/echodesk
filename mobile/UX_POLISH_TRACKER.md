@@ -8,7 +8,7 @@ Source: mobile UX audit + polish passes on `main`.
 | Priority | Meaning | Status |
 |----------|---------|--------|
 | **P0** | Demo-blocking / embarrassing | **Done** — do not touch |
-| **P1** | Dashboard Overview cleanup | **Done** |
+| **P1** | Dashboard Overview cleanup | **Done** (+ hierarchy refinement) |
 | **P2** | Remaining polish (former leftover P1) | Todo |
 | **P3** | Nice-to-have (former P2) | Todo |
 
@@ -16,7 +16,7 @@ Source: mobile UX audit + polish passes on `main`.
 
 **Is P0 finished?** Yes. Rebuild and run [P0 smoke tests](#p0-manual-smoke-tests) anytime.
 
-**Is P1 finished?** Yes. Rebuild and run [P1 smoke tests](#p1-manual-smoke-tests).
+**Is P1 finished?** Yes (includes 2026-07-28 hierarchy refinement). Rebuild and run [P1 smoke tests](#p1-manual-smoke-tests).
 
 ### Rebuild (Mac)
 
@@ -85,8 +85,19 @@ Goal: calmer Overview without changing overall information architecture. Appoint
 | 4 | Default phone only when set (hide “Not set”) | Done | Quiet full-width row when present |
 | 5 | Demote Total Calls + Total Minutes | Done | Quiet lifetime footer line (not peer cards) |
 | 6 | Remove noisy Total Receptionists peer card | Done | Active count is enough in Overview |
-| 7 | Stronger numbers, quieter labels, consistent padding | Done | `_OverviewMetricCard` + EchoDesk theme tokens |
+| 7 | Stronger numbers, quieter labels, consistent padding | Done | EchoDesk theme tokens |
 | 8 | Tighten Recent Calls so it doesn’t compete | Done | `titleSmall`, denser tiles, show 3, hide dead chevrons |
+
+### P1 refinement (2026-07-28) — denser hierarchy
+
+Follow-up polish on the same Overview section (still P1). Problem: two large equal-weight cards after Minutes left awkward empty space and weak hierarchy.
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| R1 | Hero Minutes this period | Done | Larger number (`headlineMedium`), remaining in green, thin usage progress bar |
+| R2 | Compact status row | Done | Replaces Active + Calendar cards: `Active N · Calendar Connected · phone` (phone only if set) |
+| R3 | Lifetime caption quieter | Done | Smaller soft caption under status row |
+| R4 | Tighter vertical spacing | Done | Less gap after hero; denser Overview → Recent Calls |
 
 ### P1 manual smoke tests
 
@@ -95,10 +106,10 @@ Goal: calmer Overview without changing overall information architecture. Appoint
    - Tap still opens Appointments (needs_review deep link when badge present).
 
 2. **Overview hierarchy**
-   - Minutes this period is the largest / first Overview metric.
-   - Active receptionists and Calendar sit side-by-side below it.
-   - Default phone appears only if a number is set; “Not set” is not shown as a card.
-   - Lifetime “N calls · X.X min lifetime” is a quiet line under Overview (not equal-weight cards).
+   - Minutes this period is the clear hero (largest number + progress bar).
+   - Active receptionists, Calendar, and optional phone sit in one compact status strip (no large secondary cards).
+   - Default phone appears only if a number is set; “Not set” is not shown.
+   - Lifetime “N calls · X.X min lifetime” is a quiet caption under the status row.
    - No separate Total Calls / Total Minutes / Total Receptionists cards.
 
 3. **Recent Calls quieter**

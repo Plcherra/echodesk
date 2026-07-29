@@ -261,7 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _buildUpgradeCard(context),
               ] else ...[
                 _buildStatsGrid(profile),
-                const SizedBox(height: 20),
+                const SizedBox(height: EchoDeskSpacing.md),
                 _buildRecentCallsSection(context),
                 const SizedBox(height: 24),
                 _buildUpcomingAppointmentsSection(context),
@@ -369,8 +369,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final lowMinutes = _remainingMinutes != null &&
         _remainingMinutes! > 0 &&
         _remainingMinutes! <= 30;
-    final showPhone = profile.hasPhone &&
-        (profile.phone?.trim().isNotEmpty ?? false);
+    final subtext = overageText ??
+        (overageWarning
+            ? 'Over cap; overage may be billed at \$0.25/min.'
+            : remainingText);
+    final subtextColor = overageText != null || overageWarning
+        ? EchoDeskColors.warning
+        : (lowMinutes ? EchoDeskColors.warning : EchoDeskColors.success);
+    final progress = _includedMinutes != null && _includedMinutes! > 0
+        ? (_totalUsageMinutes / _includedMinutes!).clamp(0.0, 1.0)
+        : null;
+    final showPhone =
+        profile.hasPhone && (profile.phone?.trim().isNotEmpty ?? false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -401,60 +411,114 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
           ],
         ),
-        const SizedBox(height: EchoDeskSpacing.sm + 4),
-        // Primary: usage for this billing period
-        _OverviewMetricCard(
-          label: 'Minutes this period',
-          value: minutesValue,
-          emphasize: true,
-          subtext: overageText ??
-              (overageWarning
-                  ? 'Over cap; overage may be billed at \$0.25/min.'
-                  : remainingText),
-          subtextColor: overageText != null || overageWarning
-              ? EchoDeskColors.warning
-              : (lowMinutes
-                  ? EchoDeskColors.warning
-                  : EchoDeskColors.success),
-        ),
-        const SizedBox(height: EchoDeskSpacing.sm + 2),
-        // Secondary: setup health
-        Row(
-          children: [
-            Expanded(
-              child: _OverviewMetricCard(
-                label: 'Active receptionists',
-                value: '$_activeReceptionists',
-              ),
+        const SizedBox(height: EchoDeskSpacing.sm),
+        // Hero: minutes this billing period
+        Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              EchoDeskSpacing.md,
+              EchoDeskSpacing.md,
+              EchoDeskSpacing.md,
+              EchoDeskSpacing.sm + 4,
             ),
-            const SizedBox(width: EchoDeskSpacing.sm + 2),
-            Expanded(
-              child: _OverviewMetricCard(
-                label: 'Calendar',
-                value: profile.hasCalendar ? 'Connected' : 'Not connected',
-                valueColor: profile.hasCalendar
-                    ? EchoDeskColors.success
-                    : EchoDeskColors.warning,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Minutes this period',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: EchoDeskColors.muted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  minutesValue,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: EchoDeskColors.ink,
+                        height: 1.1,
+                      ),
+                ),
+                if (subtext != null && subtext.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtext,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: subtextColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ],
+                if (progress != null) ...[
+                  const SizedBox(height: EchoDeskSpacing.sm + 2),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 4,
+                      backgroundColor: EchoDeskColors.surfaceMuted,
+                      color: overageText != null || overageWarning
+                          ? EchoDeskColors.warning
+                          : EchoDeskColors.brandTeal,
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
-        ),
-        if (showPhone) ...[
-          const SizedBox(height: EchoDeskSpacing.sm + 2),
-          _OverviewMetricCard(
-            label: 'Default phone',
-            value: profile.phone!.trim(),
-            quiet: true,
           ),
-        ],
-        // Demoted: lifetime volume as a quiet footer, not peer cards
-        const SizedBox(height: EchoDeskSpacing.sm + 4),
+        ),
+        const SizedBox(height: EchoDeskSpacing.sm),
+        // Compact secondary status strip
+        _buildOverviewStatusRow(profile, showPhone: showPhone),
+        // Quiet lifetime caption
+        const SizedBox(height: EchoDeskSpacing.xs + 2),
         Text(
           '$_totalCalls calls · ${_totalCallMinutes.toStringAsFixed(1)} min lifetime',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: EchoDeskColors.soft,
+                fontSize: 11,
               ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildOverviewStatusRow(
+    UserProfile profile, {
+    required bool showPhone,
+  }) {
+    final style = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: EchoDeskColors.muted,
+          fontWeight: FontWeight.w500,
+        );
+    Widget sep() => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Text('·', style: style),
+        );
+
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text('Active $_activeReceptionists', style: style),
+        sep(),
+        Text(
+          profile.hasCalendar ? 'Calendar Connected' : 'Calendar disconnected',
+          style: style?.copyWith(
+            color: profile.hasCalendar
+                ? EchoDeskColors.success
+                : EchoDeskColors.warning,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        if (showPhone) ...[
+          sep(),
+          Text(
+            formatPhoneForDisplay(profile.phone!.trim()),
+            style: style,
+          ),
+        ],
       ],
     );
   }
@@ -682,81 +746,3 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _OverviewMetricCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final String? subtext;
-  final Color? subtextColor;
-  final Color? valueColor;
-  final bool emphasize;
-  final bool quiet;
-
-  const _OverviewMetricCard({
-    required this.label,
-    required this.value,
-    this.subtext,
-    this.subtextColor,
-    this.valueColor,
-    this.emphasize = false,
-    this.quiet = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final valueStyle = emphasize
-        ? Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: valueColor ?? EchoDeskColors.ink,
-              height: 1.15,
-            )
-        : Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: valueColor ?? EchoDeskColors.ink,
-              height: 1.2,
-            );
-
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: EchoDeskSpacing.md,
-          vertical: quiet ? 12 : (emphasize ? 16 : 14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: EchoDeskColors.muted,
-                    fontWeight: FontWeight.w500,
-                  ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: quiet
-                  ? Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: EchoDeskColors.ink,
-                      )
-                  : valueStyle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (subtext != null && subtext!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                subtext!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: subtextColor ?? EchoDeskColors.muted,
-                      fontWeight: FontWeight.w500,
-                    ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
