@@ -8,7 +8,8 @@ class PendingPlanService {
   static bool isValidPlanId(String? planId) {
     final normalized = planId?.trim();
     if (normalized == null || normalized.isEmpty) return false;
-    return Plan.subscriptionPlans.any((plan) => plan.id == normalized);
+    // Includes hidden internal plans (e.g. dev_test) for deep-link checkout.
+    return Plan.checkoutablePlans.any((plan) => plan.id == normalized);
   }
 
   static Future<void> save(String? planId) async {

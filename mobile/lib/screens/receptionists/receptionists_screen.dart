@@ -247,7 +247,7 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('Upgrade to Pro'),
+            const Text('Subscribe to continue'),
             const SizedBox(height: 8),
             const Text(
               'You need an active subscription to add receptionists.',

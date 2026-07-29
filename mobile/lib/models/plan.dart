@@ -1,4 +1,4 @@
-/// Subscription plan definitions (matches app/lib/plans.ts)
+/// Subscription plan definitions (matches backend stripe_plans / Stripe prices).
 class Plan {
   final String id;
   final String name;
@@ -16,8 +16,8 @@ class Plan {
       ? 'Try free'
       : '\$${(priceCents / 100).toStringAsFixed(0)}/mo';
 
-  /// Public paid tiers shown in app surfaces.
-  /// Keep ids in sync with backend stripe_plans / Stripe prices.
+  /// Public paid tiers shown in Settings, checkout, and marketing.
+  /// Customers can buy Starter and Business only.
   static const List<Plan> publicPlans = [
     Plan(
       id: 'starter',
@@ -33,5 +33,21 @@ class Plan {
     ),
   ];
 
+  /// Owner testing plan — never list in Settings, checkout UI, or marketing.
+  /// Reachable only via deep link / code (e.g. `/checkout?plan=dev_test`).
+  static const Plan internalDevPlan = Plan(
+    id: 'dev_test',
+    name: 'DEV test',
+    priceCents: 100,
+    includedMinutes: 50,
+  );
+
+  /// Plans shown in customer-facing plan pickers.
   static List<Plan> get subscriptionPlans => publicPlans;
+
+  /// Plans that may be purchased via API or deep link (includes hidden internal).
+  static List<Plan> get checkoutablePlans => [
+        ...publicPlans,
+        internalDevPlan,
+      ];
 }

@@ -8,10 +8,22 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('saves and reads valid subscription plans', () async {
+  test('saves and reads public subscription plans', () async {
+    await PendingPlanService.save('starter');
+
+    expect(await PendingPlanService.peekValid(), 'starter');
+  });
+
+  test('allows hidden internal dev_test via deep link', () async {
     await PendingPlanService.save('dev_test');
 
     expect(await PendingPlanService.peekValid(), 'dev_test');
+  });
+
+  test('rejects retired pro plan', () async {
+    await PendingPlanService.save('pro');
+
+    expect(await PendingPlanService.peekValid(), isNull);
   });
 
   test('ignores invalid plan ids', () async {

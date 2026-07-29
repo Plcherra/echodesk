@@ -338,7 +338,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Upgrade to Pro',
+              'Subscribe to continue',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),

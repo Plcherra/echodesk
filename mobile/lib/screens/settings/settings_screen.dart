@@ -129,7 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 ListTile(
                   title: const Text('Subscribe / Upgrade'),
-                  subtitle: const Text('Starter, Pro, Business, DEV test'),
+                  subtitle: const Text('Starter, Business'),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 0),
                   trailing: const Icon(Icons.chevron_right, size: 20),
                   onTap: () => context.push('/checkout'),

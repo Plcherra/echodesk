@@ -653,10 +653,12 @@ async def checkout(request: Request):
     except Exception:
         return JSONResponse({"error": "Invalid JSON"}, status_code=400)
     plan_id = body.get("plan_id", "starter")
-    public_checkout_plan_ids = {"starter", "pro", "business", "dev_test"}
-    if plan_id not in public_checkout_plan_ids:
+    # Public: starter + business. Internal: dev_test (API/deep-link only; never listed in UI).
+    # Retired tiers (pro, growth, etc.) are rejected.
+    allowed_checkout_plan_ids = {"starter", "business", "dev_test"}
+    if plan_id not in allowed_checkout_plan_ids:
         return JSONResponse(
-            {"error": "Invalid plan. Choose starter, pro, business, or dev_test."},
+            {"error": "Invalid plan. Choose starter or business."},
             status_code=400,
         )
     return_scheme = body.get("return_scheme") or settings.mobile_redirect_scheme

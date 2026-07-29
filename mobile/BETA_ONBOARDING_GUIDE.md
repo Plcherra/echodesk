@@ -22,7 +22,7 @@ Thanks for testing our AI receptionist app. Follow these steps to get up and run
 ## 3. Subscribe to a plan
 
 1. If you see an **Upgrade** card, tap **Subscribe**
-2. Choose a plan (Starter, Pro, Business, or Pay As You Go)
+2. Choose a plan (Starter or Business)
 3. Complete Stripe Checkout (use test card `4242 4242 4242 4242` if in test mode)
 4. After payment, you’ll return to the app and see your plan as **Active**
 
