@@ -19,7 +19,15 @@ echo "=== EchoDesk restart ==="
 echo "Root: $ROOT"
 
 echo "--- git pull origin main ---"
-git pull origin main
+# Deploy host should track origin/main only. Prefer fast-forward; avoid merge/rebase prompts.
+git fetch origin main
+if git merge-base --is-ancestor HEAD origin/main; then
+  git merge --ff-only origin/main
+else
+  echo "WARNING: local main has diverged from origin/main."
+  echo "Deploy machines should not keep local commits. Resetting to origin/main."
+  git reset --hard origin/main
+fi
 echo "Now at: $(git rev-parse --short HEAD) $(git log -1 --format='%s')"
 
 # Reinstall backend deps only when requirements.txt actually changed in this pull.
