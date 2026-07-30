@@ -22,7 +22,8 @@
 
 ## Batch 1 — Critical Trust & Marketing (C1 + C4)
 
-**Priority:** Highest
+**Priority:** Highest  
+**Status:** ✅ **Done / smoke-tested** (July 30, 2026)
 
 ### Tasks
 
@@ -37,18 +38,30 @@
    - Show only a clean “Coming soon” message + support email if needed.
    - Remove any “Open Telnyx / Meta” buttons.
 
+### What shipped (Batch 1 + launch support)
+
+- **Marketing landing** (`landing/`): 14-day trial card + spot counter (live via `GET /api/public/trial-offer`), paid tiers Starter $69/400 · Growth $129/850 · Business $179/1,350, overage **$0.20**/min; Enterprise removed.
+- **Legal pages**: Privacy / Terms / Opt-in restyled to match landing; contact **echodesk2@gmail.com**.
+- **Mobile Communication setup**: SMS/WhatsApp = Coming soon + support email; voice line shows **ready** when a number is assigned (no stuck “provisioning” copy).
+- **Billing**: `stripe_plans.py` aligned to launch tiers; checkout allows Growth; VPS env uses new Stripe price IDs; overage billed by backend (amount fallback if metered price incompatible).
+- **Auth email**: Confirm + reset templates branded EchoDesk; custom SMTP via **Resend** (`noreply@echodesk.us`); recovery email sending verified working.
+
 ### Smoke Test after Batch 1
 
-- [ ] Landing page pricing looks correct
-- [ ] No pure Free plan promised
-- [ ] Trial messaging + counter works
-- [ ] WhatsApp/SMS section only shows “Coming soon”
+- [x] Landing page pricing looks correct
+- [x] No pure Free plan promised
+- [x] Trial messaging + counter works
+- [x] WhatsApp/SMS section only shows “Coming soon”
+- [x] Communication setup voice line ready state (when number assigned)
+- [x] Support email shows echodesk2@gmail.com (app) / legal pages
+- [x] Password reset / confirm email send via Resend (not “supabase” sender once SMTP set)
 
 ---
 
 ## Batch 2 — Telnyx Customer Language (C2 + C3)
 
-**Priority:** Critical
+**Priority:** Critical  
+**Status:** ⬜ Next
 
 ### Tasks
 
