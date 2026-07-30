@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:app_links/app_links.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'api_client.dart';
 
@@ -64,8 +65,12 @@ class DeepLinkHandler {
         onMessage('Calendar: $err');
       }
     } else if (uri.host == 'auth-callback') {
-      // Supabase recovers the session from auth links; password recovery routing
-      // is handled by the auth state listener in the app shell.
+      // Recover session from confirmation / OAuth / recovery links.
+      try {
+        await Supabase.instance.client.auth.getSessionFromUrl(uri);
+      } catch (_) {
+        // Session may already be present or link may be a bare open-app handoff.
+      }
       if (uri.queryParameters['type'] != 'recovery') {
         onMessage('Signed in successfully');
       }

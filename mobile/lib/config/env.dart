@@ -43,6 +43,15 @@ class Env {
   static const String deepLinkScheme =
       String.fromEnvironment('DEEP_LINK_SCHEME', defaultValue: 'echodesk');
 
+  /// Where Supabase sends the browser after email confirmation.
+  /// Must be allowlisted in Supabase Auth → URL Configuration.
+  /// Landing page /auth/callback then opens the app via deep link.
+  static String get authEmailRedirectUrl {
+    const env = String.fromEnvironment('AUTH_EMAIL_REDIRECT', defaultValue: '');
+    if (env.isNotEmpty) return env;
+    return 'https://echodesk.us/auth/callback';
+  }
+
   static bool get googleAuthEnabled {
     const env = String.fromEnvironment(
       'GOOGLE_AUTH_ENABLED',

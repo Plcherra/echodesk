@@ -59,6 +59,7 @@ class _SignupScreenState extends State<SignupScreen> {
       final authRes = await Supabase.instance.client.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        emailRedirectTo: Env.authEmailRedirectUrl,
       );
       if (mounted) {
         if (authRes.session != null) {

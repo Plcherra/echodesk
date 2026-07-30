@@ -12,7 +12,7 @@ const plans = [
     minutes: "60 call minutes included",
     note: "Limited launch offer for the first 100 customers. Answering pauses when trial minutes run out.",
     cta: "Start free trial",
-    href: "mailto:echodesk2@gmail.com?subject=EchoDesk%2014-day%20trial",
+    href: "/get-started?plan=trial",
     spotsLabel: trialSpotsLabel,
     liveSpots: true,
     features: [
@@ -31,7 +31,7 @@ const plans = [
     minutes: "400 minutes included",
     note: "For independent operators and small service businesses that want reliable call coverage.",
     cta: "Choose Starter",
-    href: "mailto:echodesk2@gmail.com?subject=EchoDesk%20Starter",
+    href: "/get-started?plan=starter",
     featured: true,
     overage: "$0.20 / extra minute",
     features: ["AI call answering", "Calendar booking", "Call history and recordings", "Appointment review"],
@@ -43,9 +43,9 @@ const plans = [
     minutes: "850 minutes included",
     note: "For growing teams that need more weekly call coverage without jumping to Business.",
     cta: "Choose Growth",
-    href: "mailto:echodesk2@gmail.com?subject=EchoDesk%20Growth",
+    href: "/get-started?plan=growth",
     overage: "$0.20 / extra minute",
-    features: ["Everything in Starter", "Higher included usage", "Multiple receptionists", "Priority email support"],
+    features: ["Everything in Starter", "Higher included usage", "Staff and locations", "Priority email support"],
   },
   {
     name: "Business",
@@ -54,7 +54,7 @@ const plans = [
     minutes: "1,350 minutes included",
     note: "For busier teams that need more receptionist coverage across the week.",
     cta: "Choose Business",
-    href: "mailto:echodesk2@gmail.com?subject=EchoDesk%20Business",
+    href: "/get-started?plan=business",
     overage: "$0.20 / extra minute",
     features: ["Everything in Growth", "Highest included usage", "Priority setup support", "Multi-location ready"],
   },
@@ -1652,16 +1652,10 @@ const testimonials = [
           if (cta) {
             if (remaining > 0) {
               cta.textContent = "Start free trial";
-              cta.setAttribute(
-                "href",
-                "mailto:echodesk2@gmail.com?subject=EchoDesk%2014-day%20trial"
-              );
+              cta.setAttribute("href", "/get-started?plan=trial");
             } else {
               cta.textContent = "Create account";
-              cta.setAttribute(
-                "href",
-                "mailto:echodesk2@gmail.com?subject=EchoDesk%20signup"
-              );
+              cta.setAttribute("href", "/get-started?plan=starter");
             }
           }
         }
