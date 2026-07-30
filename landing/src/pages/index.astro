@@ -1,14 +1,37 @@
 ---
+// Marketing-only trial counter. Bump TRIAL_SPOTS_CLAIMED as seats fill.
+// TODO: Replace with backend/API remaining seats when signup tracking exists.
+const TRIAL_TOTAL_SPOTS = 100;
+const TRIAL_SPOTS_CLAIMED = 0;
+const trialSpotsRemaining = Math.max(0, TRIAL_TOTAL_SPOTS - TRIAL_SPOTS_CLAIMED);
+const trialSpotsLabel =
+  trialSpotsRemaining <= 0
+    ? "Trial spots are full"
+    : trialSpotsRemaining === 1
+      ? "1 of 100 trial spots left"
+      : `${trialSpotsRemaining} of ${TRIAL_TOTAL_SPOTS} trial spots left`;
+
 const plans = [
   {
-    name: "Free",
-    price: "$0",
-    period: "/ month",
-    minutes: "Trial workspace",
-    note: "Explore the app, voice presets, and setup flow before adding a live business line.",
-    cta: "Start free",
-    href: "mailto:hello@echodesk.us?subject=Start%20EchoDesk%20Free",
-    features: ["Mobile app access", "Create a test receptionist", "Preview voice presets", "Connect Google Calendar"],
+    name: "14-day trial",
+    price: "Free",
+    period: "",
+    minutes: "60 call minutes included",
+    note: "Limited launch offer for the first 100 customers. Answering pauses when trial minutes run out.",
+    cta: trialSpotsRemaining > 0 ? "Start free trial" : "Create account",
+    href:
+      trialSpotsRemaining > 0
+        ? "mailto:hello@echodesk.us?subject=EchoDesk%2014-day%20trial"
+        : "mailto:hello@echodesk.us?subject=EchoDesk%20signup",
+    spotsLabel: trialSpotsLabel,
+    features: [
+      "14 days",
+      "One phone number",
+      "60 included call minutes",
+      "Google Calendar booking",
+      "Recordings and summaries",
+      "No credit card required",
+    ],
   },
   {
     name: "Starter",
@@ -19,30 +42,30 @@ const plans = [
     cta: "Choose Starter",
     href: "mailto:hello@echodesk.us?subject=EchoDesk%20Starter",
     featured: true,
-    overage: "$0.29 / extra minute",
+    overage: "$0.20 / extra minute",
     features: ["AI call answering", "Calendar booking", "Call history and recordings", "Appointment review"],
   },
   {
-    name: "Business",
-    price: "$149",
+    name: "Growth",
+    price: "$129",
     period: "/ month",
-    minutes: "1,200 minutes included",
+    minutes: "850 minutes included",
+    note: "For growing teams that need more weekly call coverage without jumping to Business.",
+    cta: "Choose Growth",
+    href: "mailto:hello@echodesk.us?subject=EchoDesk%20Growth",
+    overage: "$0.20 / extra minute",
+    features: ["Everything in Starter", "Higher included usage", "Multiple receptionists", "Priority email support"],
+  },
+  {
+    name: "Business",
+    price: "$179",
+    period: "/ month",
+    minutes: "1,350 minutes included",
     note: "For busier teams that need more receptionist coverage across the week.",
     cta: "Choose Business",
     href: "mailto:hello@echodesk.us?subject=EchoDesk%20Business",
-    overage: "$0.29 / extra minute",
-    features: ["Everything in Starter", "Multiple receptionists", "Higher included usage", "Priority setup support"],
-  },
-  {
-    name: "Enterprise",
-    price: "Custom",
-    period: "",
-    minutes: "Custom minutes",
-    note: "For multi-location operators, higher call volume, and custom operational workflows.",
-    cta: "Talk to us",
-    href: "mailto:hello@echodesk.us?subject=EchoDesk%20Enterprise",
-    overage: "Volume pricing",
-    features: ["Custom call routing", "Dedicated onboarding", "Compliance review", "Custom reporting"],
+    overage: "$0.20 / extra minute",
+    features: ["Everything in Growth", "Highest included usage", "Priority setup support", "Multi-location ready"],
   },
 ];
 
@@ -789,6 +812,18 @@ const testimonials = [
         color: var(--muted);
       }
 
+      .trial-spots {
+        display: inline-block;
+        margin: 0 0 14px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--brand-soft);
+        color: var(--brand);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+      }
+
       .minutes {
         color: var(--brand);
         font-weight: 700;
@@ -1371,7 +1406,7 @@ const testimonials = [
               <div class="trust-item"><strong>24/7 coverage</strong>Customers get a polished answer after hours.</div>
               <div class="trust-item"><strong>Calendar-first</strong>Availability comes from the schedule you trust.</div>
               <div class="trust-item"><strong>Mobile control</strong>Review calls, bookings, and recordings from your phone.</div>
-              <div class="trust-item"><strong>Clear pricing</strong>Included minutes and a predictable $0.29 overage.</div>
+              <div class="trust-item"><strong>Clear pricing</strong>Included minutes and a predictable $0.20 overage.</div>
             </div>
           </div>
         </div>
@@ -1383,12 +1418,12 @@ const testimonials = [
             <p class="kicker">Pricing</p>
             <h2 id="pricing-title">Clear plans built around call minutes.</h2>
             <p class="section-copy">
-              Start small, upgrade when call volume grows, and keep busy months predictable with a simple
-              $0.29 per minute overage on paid plans.
+              Start with a limited 14-day trial, then pick Starter, Growth, or Business. Extra minutes on
+              paid plans are a simple $0.20 each.
             </p>
             <div class="pricing-note">
-              <strong>Overage:</strong> Starter and Business include extra minutes at $0.29 per minute.
-              Enterprise plans can use custom volume pricing.
+              <strong>Overage:</strong> Starter, Growth, and Business include extra minutes at $0.20 per minute.
+              Trial answering pauses automatically when the 60 included minutes are used.
             </div>
           </div>
 
@@ -1400,6 +1435,7 @@ const testimonials = [
                     <h3 class="plan-name">{plan.name}</h3>
                     {plan.featured && <span class="recommended">Recommended</span>}
                   </div>
+                  {plan.spotsLabel && <p class="trial-spots">{plan.spotsLabel}</p>}
                   <div class="price">
                     <strong>{plan.price}</strong>
                     {plan.period && <span>{plan.period}</span>}

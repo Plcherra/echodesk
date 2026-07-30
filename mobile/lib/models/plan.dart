@@ -17,7 +17,7 @@ class Plan {
       : '\$${(priceCents / 100).toStringAsFixed(0)}/mo';
 
   /// Public paid tiers shown in Settings, checkout, and marketing.
-  /// Customers can buy Starter and Business only.
+  /// Customers can buy Starter, Growth, and Business.
   static const List<Plan> publicPlans = [
     Plan(
       id: 'starter',
@@ -26,10 +26,16 @@ class Plan {
       includedMinutes: 400,
     ),
     Plan(
+      id: 'growth',
+      name: 'Growth',
+      priceCents: 12900,
+      includedMinutes: 850,
+    ),
+    Plan(
       id: 'business',
       name: 'Business',
-      priceCents: 14900,
-      includedMinutes: 1200,
+      priceCents: 17900,
+      includedMinutes: 1350,
     ),
   ];
 

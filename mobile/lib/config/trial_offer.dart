@@ -10,6 +10,7 @@ class TrialOffer {
 
   static const int trialDays = 14;
   static const int totalSpots = 100;
+  static const int includedMinutes = 60;
 
   /// Number of trial seats already claimed. Override at build time:
   /// `flutter run --dart-define=TRIAL_SPOTS_CLAIMED=12`
@@ -33,7 +34,16 @@ class TrialOffer {
   static String get spotsLabel {
     final n = spotsRemaining;
     if (n <= 0) return 'Trial spots are full — choose a plan to get started';
-    if (n == 1) return '1 trial spot left';
-    return '$n trial spots left';
+    if (n == 1) return '1 of $totalSpots trial spots left';
+    return '$n of $totalSpots trial spots left';
   }
+
+  static const List<String> marketingFeatures = [
+    '14 days',
+    'One phone number',
+    '60 included call minutes',
+    'Google Calendar booking',
+    'Recordings and summaries',
+    'No credit card required',
+  ];
 }

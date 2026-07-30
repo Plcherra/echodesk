@@ -357,6 +357,16 @@ class _PricingSection extends StatelessWidget {
 
   static const _plans = [
     _MarketingPlan(
+      name: '14-day trial',
+      price: 'Free',
+      minutes: '60 call minutes included',
+      description:
+          'Limited launch offer for the first 100 customers. Answering pauses when trial minutes run out.',
+      cta: 'Start free trial',
+      features: TrialOffer.marketingFeatures,
+      showTrialSpots: true,
+    ),
+    _MarketingPlan(
       name: 'Starter',
       price: '\$69',
       minutes: '400 minutes included',
@@ -364,24 +374,25 @@ class _PricingSection extends StatelessWidget {
       cta: 'Choose Starter',
       planId: 'starter',
       featured: true,
-      overage: '\$0.29 / extra minute',
+      overage: '\$0.20 / extra minute',
+    ),
+    _MarketingPlan(
+      name: 'Growth',
+      price: '\$129',
+      minutes: '850 minutes included',
+      description: 'For growing teams that need more weekly call coverage.',
+      cta: 'Choose Growth',
+      planId: 'growth',
+      overage: '\$0.20 / extra minute',
     ),
     _MarketingPlan(
       name: 'Business',
-      price: '\$149',
-      minutes: '1,200 minutes included',
+      price: '\$179',
+      minutes: '1,350 minutes included',
       description: 'For busier teams with higher weekly call volume.',
       cta: 'Choose Business',
       planId: 'business',
-      overage: '\$0.29 / extra minute',
-    ),
-    _MarketingPlan(
-      name: 'Enterprise',
-      price: 'Custom',
-      minutes: 'Custom minutes',
-      description: 'For multi-location teams and custom workflows.',
-      cta: 'Contact us',
-      overage: 'Volume pricing',
+      overage: '\$0.20 / extra minute',
     ),
   ];
 
@@ -399,12 +410,10 @@ class _PricingSection extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Paid plans with included minutes. New customers can start with a limited free trial.',
+            'Start with a limited 14-day trial, then pick Starter, Growth, or Business. Extra minutes are \$0.20 each.',
             style: Theme.of(context).textTheme.bodyLarge,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 22),
-          const _TrialOfferBanner(),
           const SizedBox(height: 28),
           Wrap(
             spacing: 16,
@@ -413,55 +422,6 @@ class _PricingSection extends StatelessWidget {
             children: _plans.map((plan) => _PricingCard(plan: plan)).toList(),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _TrialOfferBanner extends StatelessWidget {
-  const _TrialOfferBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 640),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        decoration: BoxDecoration(
-          color: EchoDeskColors.brandSoft,
-          borderRadius: BorderRadius.circular(EchoDeskRadii.md),
-          border: Border.all(color: EchoDeskColors.line),
-        ),
-        child: Column(
-          children: [
-            Text(
-              TrialOffer.headline,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: EchoDeskColors.brand,
-                    fontWeight: FontWeight.w800,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              TrialOffer.spotsLabel,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 14),
-            FilledButton(
-              onPressed: () => _startSignup(context),
-              child: Text(
-                TrialOffer.hasSpotsRemaining
-                    ? 'Start free trial'
-                    : 'Create account',
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -516,6 +476,24 @@ class _PricingCard extends StatelessWidget {
               const SizedBox(height: 14),
             ],
             Text(plan.name, style: Theme.of(context).textTheme.titleLarge),
+            if (plan.showTrialSpots) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: EchoDeskColors.brandSoft,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  TrialOffer.spotsLabel,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: EchoDeskColors.brand,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -543,6 +521,25 @@ class _PricingCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(plan.description,
                 style: Theme.of(context).textTheme.bodySmall),
+            if (plan.features != null && plan.features!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ...plan.features!.map(
+                (feature) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('·  ',
+                          style: TextStyle(fontWeight: FontWeight.w800)),
+                      Expanded(
+                        child: Text(feature,
+                            style: Theme.of(context).textTheme.bodySmall),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
             if (plan.overage != null) ...[
               const SizedBox(height: 12),
               Text(plan.overage!,
@@ -558,12 +555,20 @@ class _PricingCard extends StatelessWidget {
                   ? FilledButton(
                       onPressed: () =>
                           _startSignup(context, planId: plan.planId),
-                      child: Text(plan.cta),
+                      child: Text(
+                        plan.showTrialSpots && !TrialOffer.hasSpotsRemaining
+                            ? 'Create account'
+                            : plan.cta,
+                      ),
                     )
                   : OutlinedButton(
                       onPressed: () =>
                           _startSignup(context, planId: plan.planId),
-                      child: Text(plan.cta),
+                      child: Text(
+                        plan.showTrialSpots && !TrialOffer.hasSpotsRemaining
+                            ? 'Create account'
+                            : plan.cta,
+                      ),
                     ),
             ),
           ],
@@ -831,6 +836,8 @@ class _MarketingPlan {
     this.planId,
     this.featured = false,
     this.overage,
+    this.features,
+    this.showTrialSpots = false,
   });
 
   final String name;
@@ -841,4 +848,6 @@ class _MarketingPlan {
   final String? planId;
   final bool featured;
   final String? overage;
+  final List<String>? features;
+  final bool showTrialSpots;
 }
