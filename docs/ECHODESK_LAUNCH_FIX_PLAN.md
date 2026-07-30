@@ -80,6 +80,18 @@
 - [ ] Delete receptionist → correct 24–48h message appears
 - [ ] Internal notify: email to SUPPORT_EMAIL when RESEND_API_KEY set, else `[ops] MANUAL_PHONE_RELEASE_NEEDED` in backend logs
 
+### Number transfer onboard (follow-on) — smoke checklist
+
+Requires migration `043_number_transfer_requests` applied and backend restarted with `RESEND_API_KEY` / `SUPPORT_EMAIL`.
+
+- [ ] Phone step: **Get a new business number** still provisions and completes create
+- [ ] **Transfer a number I already have**: submit mobile_carrier + T-Mobile → ops email received; UI locks **Under review**
+- [ ] Same for voip_internet + Twilio
+- [ ] Cannot tap Next while Transfer is selected; must choose new number after submit
+- [ ] After create with new number, open transfer row has `business_id` set
+- [ ] Ops: `PATCH /api/internal/number-transfers/{id}` with `Authorization: Bearer $INTERNAL_API_KEY` and `{"status":"completed"}` (or `rejected`) clears active request / emails customer
+- [ ] Helper mailto opens support email
+
 ---
 
 ## Batch 3 — Settings & Routing Cleanup (H1 + H2 + H7)

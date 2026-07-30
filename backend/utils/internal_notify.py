@@ -20,6 +20,45 @@ def _from_address() -> str:
     return (settings.email_from or "EchoDesk <noreply@echodesk.us>").strip()
 
 
+def _send_resend_email(*, to: str, subject: str, text: str) -> bool:
+    api_key = (settings.resend_api_key or "").strip()
+    if not api_key:
+        logger.warning(
+            "[ops] RESEND_API_KEY not set; email not sent to=%s subject=%s",
+            to,
+            subject[:80],
+        )
+        return False
+    payload: dict[str, Any] = {
+        "from": _from_address(),
+        "to": [to],
+        "subject": subject,
+        "text": text,
+    }
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            r = client.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+        if r.status_code >= 200 and r.status_code < 300:
+            logger.info("[ops] Email sent to=%s subject=%s", to, subject[:80])
+            return True
+        logger.warning(
+            "[ops] Email failed status=%s body=%s",
+            r.status_code,
+            (r.text or "")[:300],
+        )
+        return False
+    except Exception as ex:
+        logger.warning("[ops] Email error: %s", ex)
+        return False
+
+
 def notify_phone_number_release_needed(
     *,
     receptionist_id: str,
@@ -63,44 +102,98 @@ def notify_phone_number_release_needed(
         business_id or "",
     )
 
-    api_key = (settings.resend_api_key or "").strip()
-    if not api_key:
-        logger.warning(
-            "[ops] RESEND_API_KEY not set; release notify email not sent "
-            "(check logs above). to=%s",
-            to_addr,
-        )
+    return _send_resend_email(to=to_addr, subject=subject, text=body)
+
+
+def notify_number_transfer_requested(
+    *,
+    request_id: str,
+    phone_number: str,
+    number_kind: str,
+    carrier_or_provider: str,
+    customer_note: str | None,
+    owner_user_id: str,
+    owner_email: str | None,
+    business_id: str | None,
+) -> bool:
+    """Email ops that a customer submitted a number transfer evaluation request."""
+    to_addr = _support_email()
+    phone = (phone_number or "").strip() or "(unknown)"
+    kind = (number_kind or "").strip() or "(unknown)"
+    carrier = (carrier_or_provider or "").strip() or "(unknown)"
+    note = (customer_note or "").strip() or "(none)"
+    owner_em = (owner_email or "").strip() or "(unknown)"
+
+    kind_label = {
+        "mobile_carrier": "Mobile / carrier phone",
+        "voip_internet": "Internet / VoIP",
+    }.get(kind, kind)
+
+    subject = f"[EchoDesk] Number transfer review: {phone}"
+    body = (
+        "A customer requested evaluation to transfer a number into EchoDesk.\n"
+        "Review whether porting is possible, then update status via "
+        "PATCH /api/internal/number-transfers/{id}.\n\n"
+        f"Request ID: {request_id}\n"
+        f"Phone number: {phone}\n"
+        f"Number type: {kind_label} ({kind})\n"
+        f"Carrier / provider: {carrier}\n"
+        f"Customer note: {note}\n"
+        f"Owner user ID: {owner_user_id}\n"
+        f"Owner email: {owner_em}\n"
+        f"Business ID: {business_id or '(none yet)'}\n"
+    )
+
+    logger.warning(
+        "[ops] NUMBER_TRANSFER_REQUESTED request_id=%s phone=%s kind=%s "
+        "carrier=%s owner_user_id=%s owner_email=%s",
+        request_id,
+        phone,
+        kind,
+        carrier,
+        owner_user_id,
+        owner_em,
+    )
+
+    return _send_resend_email(to=to_addr, subject=subject, text=body)
+
+
+def notify_customer_number_transfer_status(
+    *,
+    owner_email: str,
+    phone_number: str,
+    status: str,
+    ops_note: str | None = None,
+) -> bool:
+    """Email the customer when a transfer request is completed or rejected."""
+    email = (owner_email or "").strip()
+    if not email or "@" not in email:
+        logger.warning("[ops] No customer email for transfer status notify")
         return False
 
-    payload: dict[str, Any] = {
-        "from": _from_address(),
-        "to": [to_addr],
-        "subject": subject,
-        "text": body,
-    }
-    try:
-        with httpx.Client(timeout=15.0) as client:
-            r = client.post(
-                "https://api.resend.com/emails",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-            )
-        if r.status_code >= 200 and r.status_code < 300:
-            logger.info(
-                "[ops] Release notify email sent to=%s phone=%s",
-                to_addr,
-                phone,
-            )
-            return True
-        logger.warning(
-            "[ops] Release notify email failed status=%s body=%s",
-            r.status_code,
-            (r.text or "")[:300],
+    phone = (phone_number or "").strip() or "your number"
+    note = (ops_note or "").strip()
+
+    if status == "completed":
+        subject = "EchoDesk: your number transfer is complete"
+        text = (
+            f"Good news — we've finished moving {phone} to EchoDesk.\n\n"
+            "Your EchoDesk business line should now use this number. "
+            "If anything looks off in the app, reply to this email or contact support.\n"
         )
+    elif status == "rejected":
+        subject = "EchoDesk: update on your number transfer request"
+        text = (
+            f"We reviewed your request to move {phone} to EchoDesk and "
+            "we're not able to complete that transfer right now.\n\n"
+        )
+        if note:
+            text += f"Details: {note}\n\n"
+        text += (
+            "You can keep using your temporary EchoDesk number, or email us "
+            f"at {_support_email()} if you have questions.\n"
+        )
+    else:
         return False
-    except Exception as ex:
-        logger.warning("[ops] Release notify email error: %s", ex)
-        return False
+
+    return _send_resend_email(to=email, subject=subject, text=text)

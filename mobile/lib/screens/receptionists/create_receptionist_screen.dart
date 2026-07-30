@@ -9,7 +9,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/wizard_form.dart';
+import '../../config/env.dart';
 import '../../services/api_client.dart';
+import '../../strings.dart';
 
 const _steps = [
   'Basics',
@@ -45,6 +47,16 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   bool _voicePresetsLoading = false;
   final AudioPlayer _previewPlayer = AudioPlayer();
   String? _previewPlayingKey;
+
+  /// Active number-transfer evaluation request (pending_review | porting).
+  Map<String, dynamic>? _activeTransfer;
+  bool _transferLoading = false;
+  bool _transferSubmitting = false;
+  String _transferPhone = '';
+  String? _transferKind; // mobile_carrier | voip_internet
+  String _transferCarrier = '';
+  String _transferNote = '';
+  bool _transferStatusFetched = false;
 
   @override
   void initState() {
@@ -134,22 +146,17 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
       return true;
     }
     if (_step == 2) {
-      if (_formData.phoneStrategy == 'new') {
-        if (_formData.areaCode == null || _formData.areaCode!.isEmpty) {
-          setState(() => _error = 'Please select an area code');
-          return false;
-        }
-      } else {
-        final phone = _formData.ownPhone?.trim() ?? '';
-        if (phone.isEmpty) {
-          setState(() => _error = 'Phone number is required');
-          return false;
-        }
-        if (!RegExp(r'^\+\d{10,15}$').hasMatch(phone)) {
-          setState(
-              () => _error = 'Enter phone with country code (e.g. +15551234567)');
-          return false;
-        }
+      if (_formData.phoneStrategy != 'new') {
+        setState(() {
+          _error = _activeTransfer != null
+              ? AppStrings.transferMustUseNewNumber
+              : AppStrings.transferSelectNewToContinue;
+        });
+        return false;
+      }
+      if (_formData.areaCode == null || _formData.areaCode!.isEmpty) {
+        setState(() => _error = 'Please select an area code');
+        return false;
       }
       return true;
     }
@@ -429,7 +436,127 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
     );
   }
 
+  Future<void> _loadActiveTransfer() async {
+    if (_transferLoading) return;
+    setState(() => _transferLoading = true);
+    try {
+      final res = await ApiClient.get('/api/mobile/number-transfers/active');
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>?;
+        final req = data?['request'] as Map<String, dynamic>?;
+        if (!mounted) return;
+        setState(() {
+          _activeTransfer = req;
+          _transferStatusFetched = true;
+          _transferLoading = false;
+          if (req != null) {
+            // Keep user on the only completable path.
+            _formData.phoneStrategy = 'new';
+          }
+        });
+      } else {
+        if (mounted) {
+          setState(() {
+            _transferStatusFetched = true;
+            _transferLoading = false;
+          });
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _transferStatusFetched = true;
+          _transferLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _submitTransferRequest() async {
+    setState(() => _error = null);
+    final phone = _transferPhone.trim();
+    if (phone.isEmpty) {
+      setState(() => _error = 'Phone number is required');
+      return;
+    }
+    if (!RegExp(r'^\+\d{10,15}$').hasMatch(phone)) {
+      setState(
+          () => _error = 'Enter phone with country code (e.g. +15551234567)');
+      return;
+    }
+    if (_transferKind == null) {
+      setState(() => _error =
+          'Select whether this is a mobile/carrier phone or an internet/VoIP number.');
+      return;
+    }
+    final carrier = _transferCarrier.trim();
+    if (carrier.isEmpty) {
+      setState(() =>
+          _error = 'Tell us the carrier or provider (e.g. T-Mobile, Twilio).');
+      return;
+    }
+
+    setState(() => _transferSubmitting = true);
+    try {
+      final res = await ApiClient.post(
+        '/api/mobile/number-transfers',
+        body: {
+          'phone': phone,
+          'number_kind': _transferKind,
+          'carrier_or_provider': carrier,
+          if (_transferNote.trim().isNotEmpty)
+            'customer_note': _transferNote.trim(),
+        },
+      );
+      if (!mounted) return;
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final req = data['request'] as Map<String, dynamic>?;
+        setState(() {
+          _activeTransfer = req;
+          _transferSubmitting = false;
+          _formData.phoneStrategy = 'new';
+          _error = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.transferSubmitted)),
+        );
+      } else {
+        final data = jsonDecode(res.body) as Map<String, dynamic>?;
+        setState(() {
+          _transferSubmitting = false;
+          _error = data?['error'] as String? ??
+              AppStrings.couldNotSubmitTransfer;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _transferSubmitting = false;
+          _error = AppStrings.couldNotSubmitTransfer;
+        });
+      }
+    }
+  }
+
+  String _transferKindLabel(String? kind) {
+    switch (kind) {
+      case 'mobile_carrier':
+        return 'Mobile / carrier phone';
+      case 'voip_internet':
+        return 'Internet / VoIP';
+      default:
+        return kind ?? '—';
+    }
+  }
+
   Widget _buildStep2() {
+    if (!_transferStatusFetched && !_transferLoading) {
+      _loadActiveTransfer();
+    }
+    final underReview = _activeTransfer != null;
+    final supportEmail = Env.supportEmail;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -438,7 +565,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         _selectableOption(
           title: 'Get a new business number',
           subtitle:
-              "We'll set up a US business number for your business (~\$1–2/month). Your receptionists share this line.",
+              "We'll set up a US business number for you (~\$1–2/month). Ready quickly.",
           selected: _formData.phoneStrategy == 'new',
           onTap: () => setState(() => _formData.phoneStrategy = 'new'),
         ),
@@ -459,19 +586,66 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
             ),
           ),
         _selectableOption(
-          title: 'Use a number I already own',
-          subtitle:
-              'Link a phone number you already have as your shared business line.',
-          selected: _formData.phoneStrategy == 'own',
-          onTap: () => setState(() => _formData.phoneStrategy = 'own'),
+          title: underReview
+              ? 'Transfer a number I already have (under review)'
+              : 'Transfer a number I already have',
+          subtitle: underReview
+              ? AppStrings.transferUnderReview
+              : 'Tell us about the number you use today. We’ll review whether we can move it to EchoDesk. Meanwhile, get a temporary number so you can start.',
+          selected: _formData.phoneStrategy == 'transfer',
+          onTap: underReview
+              ? () {}
+              : () => setState(() => _formData.phoneStrategy = 'transfer'),
         ),
-        if (_formData.phoneStrategy == 'own')
+        if (_transferLoading)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (underReview)
           Padding(
-            padding: const EdgeInsets.only(left: 16, top: 8),
+            padding: const EdgeInsets.only(left: 8, top: 8, bottom: 8),
+            child: Card(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Under review',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _activeTransfer!['phone_number_e164'] as String? ?? '—',
+                    ),
+                    Text(
+                      '${_transferKindLabel(_activeTransfer!['number_kind'] as String?)} · '
+                      '${_activeTransfer!['carrier_or_provider'] as String? ?? '—'}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      AppStrings.transferUnderReview,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else if (_formData.phoneStrategy == 'transfer')
+          Padding(
+            padding: const EdgeInsets.only(left: 8, top: 8),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 TextFormField(
-                  initialValue: _formData.ownPhone,
+                  initialValue: _transferPhone,
                   decoration: const InputDecoration(
                     labelText: 'Phone number',
                     hintText: '+15551234567',
@@ -479,28 +653,79 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                     border: OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.phone,
-                  onChanged: (v) => _formData.ownPhone = v,
+                  onChanged: (v) => _transferPhone = v,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Number type',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                RadioListTile<String>(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Mobile / carrier phone'),
+                  subtitle: const Text('T‑Mobile, AT&T, Verizon, etc.'),
+                  value: 'mobile_carrier',
+                  groupValue: _transferKind,
+                  onChanged: (v) => setState(() => _transferKind = v),
+                ),
+                RadioListTile<String>(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Internet / VoIP'),
+                  subtitle: const Text('Twilio, Telnyx, other business phone'),
+                  value: 'voip_internet',
+                  groupValue: _transferKind,
+                  onChanged: (v) => setState(() => _transferKind = v),
                 ),
                 const SizedBox(height: 8),
-                ExpansionTile(
-                  title: const Text('Advanced'),
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: EdgeInsets.zero,
-                  children: [
-                    TextFormField(
-                      initialValue: _formData.providerSid,
-                      decoration: const InputDecoration(
-                        labelText: 'Telnyx Phone Number ID (optional)',
-                        hintText: 'PN...',
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (v) => _formData.providerSid = v,
-                    ),
-                  ],
+                TextFormField(
+                  initialValue: _transferCarrier,
+                  decoration: const InputDecoration(
+                    labelText: 'Carrier or provider',
+                    hintText: 'e.g. T-Mobile, AT&T, Twilio, Telnyx',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (v) => _transferCarrier = v,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  initialValue: _transferNote,
+                  decoration: const InputDecoration(
+                    labelText: 'Anything else we should know (optional)',
+                    border: OutlineInputBorder(),
+                    alignLabelWithHint: true,
+                  ),
+                  maxLines: 3,
+                  onChanged: (v) => _transferNote = v,
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed:
+                      _transferSubmitting ? null : _submitTransferRequest,
+                  child: _transferSubmitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Submit for review'),
                 ),
               ],
             ),
           ),
+        const SizedBox(height: 16),
+        Text(
+          'Questions about moving your number? Email us.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        TextButton.icon(
+          onPressed: () => launchUrl(
+            Uri.parse(
+              'mailto:$supportEmail?subject=${Uri.encodeComponent('EchoDesk number transfer')}',
+            ),
+          ),
+          icon: const Icon(Icons.email_outlined, size: 18),
+          label: Text(supportEmail),
+        ),
       ],
     );
   }
@@ -923,9 +1148,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                 _ReviewRow('Calendar', _formData.calendarId),
                 _ReviewRow(
                   'Phone',
-                  _formData.phoneStrategy == 'new'
-                      ? 'New number (${_formData.areaCode ?? '—'})'
-                      : (_formData.ownPhone ?? '—'),
+                  'New number (${_formData.areaCode ?? '—'})',
                 ),
                 _ReviewRow(
                   'Prompt',

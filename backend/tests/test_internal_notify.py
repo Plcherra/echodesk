@@ -2,7 +2,10 @@
 
 from unittest.mock import MagicMock, patch
 
-from utils.internal_notify import notify_phone_number_release_needed
+from utils.internal_notify import (
+    notify_number_transfer_requested,
+    notify_phone_number_release_needed,
+)
 
 
 def test_notify_logs_and_skips_email_without_api_key(monkeypatch):
@@ -61,3 +64,40 @@ def test_notify_sends_resend_email_when_configured(monkeypatch):
     assert kwargs["json"]["to"] == ["echodesk2@gmail.com"]
     assert "+15551234567" in kwargs["json"]["subject"]
     assert "PN123" in kwargs["json"]["text"]
+
+
+def test_notify_transfer_requested_includes_kind_and_carrier(monkeypatch):
+    monkeypatch.setattr("utils.internal_notify.settings.resend_api_key", "re_test")
+    monkeypatch.setattr(
+        "utils.internal_notify.settings.support_email", "echodesk2@gmail.com"
+    )
+    monkeypatch.setattr(
+        "utils.internal_notify.settings.email_from",
+        "EchoDesk <noreply@echodesk.us>",
+    )
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.text = '{"id":"email_2"}'
+    mock_client = MagicMock()
+    mock_client.__enter__.return_value = mock_client
+    mock_client.__exit__.return_value = False
+    mock_client.post.return_value = mock_resp
+
+    with patch("utils.internal_notify.httpx.Client", return_value=mock_client):
+        ok = notify_number_transfer_requested(
+            request_id="req-1",
+            phone_number="+15559876543",
+            number_kind="mobile_carrier",
+            carrier_or_provider="T-Mobile",
+            customer_note="Keep my cell",
+            owner_user_id="user-1",
+            owner_email="owner@example.com",
+            business_id=None,
+        )
+
+    assert ok is True
+    text = mock_client.post.call_args.kwargs["json"]["text"]
+    assert "T-Mobile" in text
+    assert "mobile_carrier" in text
+    assert "req-1" in text

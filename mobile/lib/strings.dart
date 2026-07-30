@@ -37,4 +37,16 @@ class AppStrings {
   static const callInitiated = "Call initiated";
   static const couldNotStartCall = "Couldn't start call. Please try again.";
   static const couldNotFetchWebsite = "Couldn't fetch website. Please try again.";
+
+  // Number transfer
+  static const transferUnderReview =
+      'Transfer under review. Get a temporary business number below to continue setup.';
+  static const transferSubmitted =
+      'Submitted for review. Get a temporary business number to continue.';
+  static const couldNotSubmitTransfer =
+      "Couldn't submit transfer request. Please try again.";
+  static const transferMustUseNewNumber =
+      'While your transfer is under review, choose “Get a new business number” to continue.';
+  static const transferSelectNewToContinue =
+      'Submit a transfer for review, or choose “Get a new business number” to continue.';
 }

@@ -42,7 +42,7 @@ class WizardFormData {
   String country;
   String calendarId;
   String mode; // 'personal' | 'business'
-  String phoneStrategy; // 'new' | 'own'
+  String phoneStrategy; // 'new' | 'transfer' (create API only accepts new)
   String? areaCode;
   String? ownPhone;
   String? providerSid;
@@ -106,14 +106,9 @@ class WizardFormData {
     if (voicePresetKey != null && voicePresetKey!.trim().isNotEmpty) body['voice_preset_key'] = voicePresetKey!.trim();
     if (phoneStrategy == 'new') {
       body['area_code'] = areaCode ?? '212';
-    } else {
-      if (ownPhone != null && ownPhone!.trim().isNotEmpty) {
-        body['own_phone'] = ownPhone!.trim();
-      }
-      if (providerSid != null && providerSid!.trim().isNotEmpty) {
-        body['provider_sid'] = providerSid!.trim();
-      }
     }
+    // Transfer requests use POST /api/mobile/number-transfers (not create).
+    // Instant "own" linking is no longer supported from the wizard.
     if (promotions != null && promotions!.trim().isNotEmpty) {
       body['promotions'] = promotions!.trim();
     }

@@ -40,7 +40,6 @@ from stripe_plans import get_price_id_for_plan_id, plan_from_subscription
 from supabase_client import create_service_role_client
 from telnyx import provision as telnyx_provision
 from telnyx.recording_download import fetch_fresh_recording_mp3_url
-from utils.phone import normalize_to_e164, phones_match
 from communication.ensure import (
     ensure_business_communication,
     ensure_communication_for_user_after_receptionist_change,
@@ -62,6 +61,7 @@ from api.mobile.call_logs_projection import (
 from api.mobile.settings import router as settings_router
 from api.mobile.communication import router as communication_router
 from api.mobile.businesses import router as businesses_router
+from api.mobile.number_transfers import router as number_transfers_router
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/mobile", tags=["mobile"])
@@ -149,6 +149,7 @@ router.include_router(settings_router)
 router.include_router(communication_router)
 router.include_router(businesses_router)
 router.include_router(agenda_router)
+router.include_router(number_transfers_router)
 
 
 def _require_auth(request: Request) -> tuple[dict | None, Any]:
@@ -813,6 +814,16 @@ async def create_receptionist(request: Request):
 
     # Wizard or legacy — only the first assistant for this business may provision a new Telnyx number.
     phone_strategy = body.get("phone_strategy")
+    if phone_strategy == "own":
+        return JSONResponse(
+            {
+                "error": (
+                    "Linking an existing number instantly is no longer available. "
+                    "Get a new business number to continue, or submit a transfer request from the phone step."
+                )
+            },
+            status_code=400,
+        )
     provisioned_new_number = False
     telnyx_id: str | None = None
     inbound_number: str | None = None
@@ -838,57 +849,9 @@ async def create_receptionist(request: Request):
                 },
                 status_code=400,
             )
-        if phone_strategy == "own":
-            own_phone = (body.get("own_phone") or "").strip()
-            if not own_phone:
-                return JSONResponse({"error": "Phone number is required."}, status_code=400)
-            e164 = normalize_to_e164(own_phone)
-            if not e164:
-                return JSONResponse({"error": "Enter phone in E.164 format (e.g. +15551234567)."}, status_code=400)
-            if not phones_match(own_phone, primary_inb) and not phones_match(own_phone, primary_tel):
-                return JSONResponse(
-                    {
-                        "error": (
-                            "Additional assistants must use the same phone line as the first assistant "
-                            "for this business."
-                        )
-                    },
-                    status_code=400,
-                )
-            provider_sid = (body.get("provider_sid") or "").strip()
-            if provider_sid and provider_sid != primary_tid:
-                return JSONResponse(
-                    {"error": "Provider phone ID must match your account line; leave blank to reuse the existing line."},
-                    status_code=400,
-                )
-            telnyx_id = primary_tid
-            inbound_number = e164
-            telnyx_phone = primary_tel or e164
-            if provider_sid:
-                try:
-                    telnyx_provision.configure_voice_url(provider_sid, f"{webhook_base}/api/telnyx/voice")
-                except Exception as ex:
-                    return JSONResponse({"error": f"Could not configure Telnyx: {ex}"}, status_code=400)
-        else:
-            telnyx_id = primary_tid
-            inbound_number = primary_inb or primary_tel
-            telnyx_phone = primary_tel or primary_inb
-    elif phone_strategy == "own":
-        own_phone = (body.get("own_phone") or "").strip()
-        if not own_phone:
-            return JSONResponse({"error": "Phone number is required."}, status_code=400)
-        e164 = normalize_to_e164(own_phone)
-        if not e164:
-            return JSONResponse({"error": "Enter phone in E.164 format (e.g. +15551234567)."}, status_code=400)
-        provider_sid = (body.get("provider_sid") or "").strip()
-        telnyx_id = provider_sid if provider_sid else None
-        inbound_number = e164
-        telnyx_phone = inbound_number
-        if provider_sid:
-            try:
-                telnyx_provision.configure_voice_url(provider_sid, f"{webhook_base}/api/telnyx/voice")
-            except Exception as ex:
-                return JSONResponse({"error": f"Could not configure Telnyx: {ex}"}, status_code=400)
+        telnyx_id = primary_tid
+        inbound_number = primary_inb or primary_tel
+        telnyx_phone = primary_tel or primary_inb
     else:
         area_code = body.get("area_code") or "212"
         if area_code == "other":
@@ -1063,6 +1026,19 @@ async def create_receptionist(request: Request):
             ensure_business_communication(supabase, target_business_id)
         except Exception as comm_ex:
             logger.warning("[receptionists/create] communication ensure failed: %s", comm_ex)
+
+        try:
+            now_link = datetime.utcnow().isoformat() + "Z"
+            supabase.table("number_transfer_requests").update(
+                {"business_id": target_business_id, "updated_at": now_link}
+            ).eq("user_id", user["id"]).in_(
+                "status", ["pending_review", "porting"]
+            ).is_("business_id", "null").execute()
+        except Exception as link_ex:
+            logger.warning(
+                "[receptionists/create] link open transfer to business failed: %s",
+                link_ex,
+            )
 
         logger.info(
             "[receptionists/create] success rec_id=%s staff_ran=%s services_ran=%s promos_ran=%s",
