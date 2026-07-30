@@ -32,6 +32,7 @@ from fastapi.responses import JSONResponse
 from api.google_routes import google_callback_get
 from api.admin_billing import router as admin_billing_router
 from api.mobile_routes import router as mobile_router
+from api.public_routes import router as public_router
 from api.stripe_routes import stripe_webhook_post
 from config import settings
 from quota import check_outbound_quota
@@ -147,6 +148,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Echodesk Voice Backend", lifespan=lifespan)
 app.include_router(mobile_router)
 app.include_router(admin_billing_router)
+app.include_router(public_router)
 
 
 @app.get("/health")

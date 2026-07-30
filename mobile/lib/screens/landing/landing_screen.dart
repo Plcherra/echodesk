@@ -20,8 +20,24 @@ Future<void> _startSignup(BuildContext context, {String? planId}) async {
   context.go('/signup$query');
 }
 
-class LandingScreen extends StatelessWidget {
+class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
+
+  @override
+  State<LandingScreen> createState() => _LandingScreenState();
+}
+
+class _LandingScreenState extends State<LandingScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _refreshTrialSpots();
+  }
+
+  Future<void> _refreshTrialSpots() async {
+    await TrialOffer.refreshFromApi();
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -1,15 +1,8 @@
 ---
-// Marketing-only trial counter. Bump TRIAL_SPOTS_CLAIMED as seats fill.
-// TODO: Replace with backend/API remaining seats when signup tracking exists.
+// Static fallback until /api/public/trial-offer loads (same-origin on echodesk.us).
 const TRIAL_TOTAL_SPOTS = 100;
-const TRIAL_SPOTS_CLAIMED = 0;
-const trialSpotsRemaining = Math.max(0, TRIAL_TOTAL_SPOTS - TRIAL_SPOTS_CLAIMED);
-const trialSpotsLabel =
-  trialSpotsRemaining <= 0
-    ? "Trial spots are full"
-    : trialSpotsRemaining === 1
-      ? "1 of 100 trial spots left"
-      : `${trialSpotsRemaining} of ${TRIAL_TOTAL_SPOTS} trial spots left`;
+const trialSpotsRemaining = TRIAL_TOTAL_SPOTS;
+const trialSpotsLabel = `${trialSpotsRemaining} of ${TRIAL_TOTAL_SPOTS} trial spots left`;
 
 const plans = [
   {
@@ -18,12 +11,10 @@ const plans = [
     period: "",
     minutes: "60 call minutes included",
     note: "Limited launch offer for the first 100 customers. Answering pauses when trial minutes run out.",
-    cta: trialSpotsRemaining > 0 ? "Start free trial" : "Create account",
-    href:
-      trialSpotsRemaining > 0
-        ? "mailto:hello@echodesk.us?subject=EchoDesk%2014-day%20trial"
-        : "mailto:hello@echodesk.us?subject=EchoDesk%20signup",
+    cta: "Start free trial",
+    href: "mailto:hello@echodesk.us?subject=EchoDesk%2014-day%20trial",
     spotsLabel: trialSpotsLabel,
+    liveSpots: true,
     features: [
       "14 days",
       "One phone number",
@@ -1435,7 +1426,14 @@ const testimonials = [
                     <h3 class="plan-name">{plan.name}</h3>
                     {plan.featured && <span class="recommended">Recommended</span>}
                   </div>
-                  {plan.spotsLabel && <p class="trial-spots">{plan.spotsLabel}</p>}
+                  {plan.spotsLabel && (
+                    <p
+                      class="trial-spots"
+                      data-trial-spots={plan.liveSpots ? "true" : undefined}
+                    >
+                      {plan.spotsLabel}
+                    </p>
+                  )}
                   <div class="price">
                     <strong>{plan.price}</strong>
                     {plan.period && <span>{plan.period}</span>}
@@ -1447,7 +1445,13 @@ const testimonials = [
                   </ul>
                   <div class="plan-footer">
                     {plan.overage && <p class="overage">Overage: {plan.overage}</p>}
-                    <a class:list={["button", { primary: plan.featured }]} href={plan.href}>{plan.cta}</a>
+                    <a
+                      class:list={["button", { primary: plan.featured }]}
+                      href={plan.href}
+                      data-trial-cta={plan.liveSpots ? "true" : undefined}
+                    >
+                      {plan.cta}
+                    </a>
                   </div>
                 </article>
               ))
@@ -1631,5 +1635,55 @@ const testimonials = [
         </nav>
       </div>
     </footer>
+    <script is:inline>
+      (function () {
+        function labelFor(remaining, total) {
+          if (remaining <= 0) return "Trial spots are full";
+          if (remaining === 1) return "1 of " + total + " trial spots left";
+          return remaining + " of " + total + " trial spots left";
+        }
+
+        function apply(data) {
+          var total = Number(data.total_spots) || 100;
+          var remaining = Math.max(0, Number(data.remaining) || 0);
+          var spots = document.querySelector("[data-trial-spots]");
+          if (spots) spots.textContent = labelFor(remaining, total);
+          var cta = document.querySelector("[data-trial-cta]");
+          if (cta) {
+            if (remaining > 0) {
+              cta.textContent = "Start free trial";
+              cta.setAttribute(
+                "href",
+                "mailto:hello@echodesk.us?subject=EchoDesk%2014-day%20trial"
+              );
+            } else {
+              cta.textContent = "Create account";
+              cta.setAttribute(
+                "href",
+                "mailto:hello@echodesk.us?subject=EchoDesk%20signup"
+              );
+            }
+          }
+        }
+
+        function refresh() {
+          fetch("/api/public/trial-offer", {
+            headers: { Accept: "application/json" },
+            credentials: "omit",
+          })
+            .then(function (res) {
+              if (!res.ok) throw new Error("trial-offer " + res.status);
+              return res.json();
+            })
+            .then(apply)
+            .catch(function () {
+              /* Keep static fallback if API is down. */
+            });
+        }
+
+        refresh();
+        setInterval(refresh, 30000);
+      })();
+    </script>
   </body>
 </html>
