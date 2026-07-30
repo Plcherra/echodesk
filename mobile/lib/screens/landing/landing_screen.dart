@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../config/trial_offer.dart';
 import '../../services/pending_plan_service.dart';
 import '../../theme/echodesk_theme.dart';
 import '../../widgets/brand_lockup.dart';
@@ -65,7 +66,11 @@ class _LandingHeader extends StatelessWidget {
           padding: const EdgeInsets.only(right: 16),
           child: FilledButton(
             onPressed: () => _startSignup(context),
-            child: const Text('Start free'),
+            child: Text(
+              TrialOffer.hasSpotsRemaining
+                  ? 'Start free trial'
+                  : 'Create account',
+            ),
           ),
         ),
       ],
@@ -127,8 +132,15 @@ class _HeroSection extends StatelessWidget {
             alignment: WrapAlignment.center,
             children: [
               FilledButton(
-                onPressed: () => _startSignup(context, planId: 'starter'),
-                child: const Text('Start with Starter'),
+                onPressed: () => _startSignup(
+                  context,
+                  planId: TrialOffer.hasSpotsRemaining ? null : 'starter',
+                ),
+                child: Text(
+                  TrialOffer.hasSpotsRemaining
+                      ? 'Start free trial'
+                      : 'Start with Starter',
+                ),
               ),
               OutlinedButton(
                 onPressed: () => _scrollToPricing(context),
@@ -345,13 +357,6 @@ class _PricingSection extends StatelessWidget {
 
   static const _plans = [
     _MarketingPlan(
-      name: 'Free',
-      price: '\$0',
-      minutes: 'Trial workspace',
-      description: 'Explore the app, setup flow, and voice presets.',
-      cta: 'Start free',
-    ),
-    _MarketingPlan(
       name: 'Starter',
       price: '\$69',
       minutes: '400 minutes included',
@@ -394,10 +399,12 @@ class _PricingSection extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Simple tiers, included minutes, and transparent overage.',
+            'Paid plans with included minutes. New customers can start with a limited free trial.',
             style: Theme.of(context).textTheme.bodyLarge,
             textAlign: TextAlign.center,
           ),
+          const SizedBox(height: 22),
+          const _TrialOfferBanner(),
           const SizedBox(height: 28),
           Wrap(
             spacing: 16,
@@ -406,6 +413,55 @@ class _PricingSection extends StatelessWidget {
             children: _plans.map((plan) => _PricingCard(plan: plan)).toList(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TrialOfferBanner extends StatelessWidget {
+  const _TrialOfferBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 640),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: BoxDecoration(
+          color: EchoDeskColors.brandSoft,
+          borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+          border: Border.all(color: EchoDeskColors.line),
+        ),
+        child: Column(
+          children: [
+            Text(
+              TrialOffer.headline,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: EchoDeskColors.brand,
+                    fontWeight: FontWeight.w800,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              TrialOffer.spotsLabel,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 14),
+            FilledButton(
+              onPressed: () => _startSignup(context),
+              child: Text(
+                TrialOffer.hasSpotsRemaining
+                    ? 'Start free trial'
+                    : 'Create account',
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

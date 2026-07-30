@@ -68,7 +68,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             ListTile(
               title: const Text('Communication setup'),
-              subtitle: const Text('Voice line, SMS approval, WhatsApp'),
+              subtitle: const Text('Voice line · SMS & WhatsApp coming soon'),
               contentPadding: const EdgeInsets.symmetric(horizontal: 0),
               trailing: const Icon(Icons.chevron_right, size: 20),
               onTap: () => context.push('/settings/communication-setup'),
