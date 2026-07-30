@@ -31,19 +31,19 @@ class _ReceptionistLocationsTabState extends State<ReceptionistLocationsTab> {
   }
 
   Future<void> _load() async {
-    final results = await Future.wait([
-      Supabase.instance.client
-          .from('locations')
-          .select('id, name, address, notes, hours, calendar_id')
-          .eq('receptionist_id', widget.receptionistId)
-          .order('name'),
-      _fetchCalendars(),
-    ]);
+    final locationsFuture = Supabase.instance.client
+        .from('locations')
+        .select('id, name, address, notes, hours, calendar_id')
+        .eq('receptionist_id', widget.receptionistId)
+        .order('name');
+    final calendarsFuture = _fetchCalendars();
+    final locsRaw = await locationsFuture;
+    final calendars = await calendarsFuture;
     if (!mounted) return;
-    final locs = (results[0] as List).cast<Map<String, dynamic>>();
+    final locs = (locsRaw as List).cast<Map<String, dynamic>>();
     setState(() {
       _locations = locs;
-      _calendars = results[1] as List<_GoogleCalendarOption>;
+      _calendars = calendars;
       _loading = false;
       if (locs.isEmpty) {
         _showEditor = true;
