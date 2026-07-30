@@ -1230,7 +1230,7 @@ async def delete_receptionist(request: Request, receptionist_id: str):
     rec = (
         supabase.table("receptionists")
         .select(
-            "telnyx_phone_number_id, inbound_phone_number, status, deleted_at, active, user_id, business_id"
+            "name, telnyx_phone_number_id, inbound_phone_number, status, deleted_at, active, user_id, business_id"
         )
         .eq("id", receptionist_id)
         .single()
@@ -1240,26 +1240,28 @@ async def delete_receptionist(request: Request, receptionist_id: str):
     owner_id = str(data.get("user_id") or user["id"])
     business_id_for_refresh = data.get("business_id")
 
-    # Release Telnyx number only if no other active assistant still uses it (shared line).
+    # Manual release (C3): do not auto-release Telnyx. If this was the last
+    # active receptionist on the number, notify ops to release within 24–48h.
     telnyx_id = data.get("telnyx_phone_number_id")
-    if telnyx_id:
-        others = (
+    inbound_phone = data.get("inbound_phone_number")
+    needs_manual_release = False
+    if telnyx_id or inbound_phone:
+        others_q = (
             supabase.table("receptionists")
             .select("id")
             .eq("user_id", owner_id)
             .neq("id", receptionist_id)
-            .eq("telnyx_phone_number_id", telnyx_id)
             .eq("status", "active")
             .eq("active", True)
             .is_("deleted_at", "null")
             .limit(1)
-            .execute()
         )
-        if not (others.data or []):
-            try:
-                telnyx_provision.release_number(telnyx_id)
-            except Exception as ex:
-                logger.warning("[delete] Failed to release Telnyx number: %s", ex)
+        if telnyx_id:
+            others_q = others_q.eq("telnyx_phone_number_id", telnyx_id)
+        elif inbound_phone:
+            others_q = others_q.eq("inbound_phone_number", inbound_phone)
+        others = others_q.execute()
+        needs_manual_release = not (others.data or [])
 
     # Soft delete receptionist: keep history, hide from UI/routing
     now_iso = datetime.utcnow().isoformat() + "Z"
@@ -1279,9 +1281,39 @@ async def delete_receptionist(request: Request, receptionist_id: str):
     except Exception as ex:
         logger.warning("[delete] communication refresh failed: %s", ex)
 
+    if needs_manual_release:
+        owner_email = None
+        try:
+            ures = (
+                supabase.table("users")
+                .select("email")
+                .eq("id", owner_id)
+                .limit(1)
+                .execute()
+            )
+            if ures.data:
+                owner_email = (ures.data[0] or {}).get("email")
+        except Exception as ex:
+            logger.warning("[delete] failed to load owner email for notify: %s", ex)
+        try:
+            from utils.internal_notify import notify_phone_number_release_needed
+
+            notify_phone_number_release_needed(
+                receptionist_id=receptionist_id,
+                receptionist_name=data.get("name"),
+                phone_number=inbound_phone,
+                telnyx_phone_number_id=telnyx_id,
+                owner_user_id=owner_id,
+                owner_email=owner_email,
+                business_id=str(business_id_for_refresh) if business_id_for_refresh else None,
+            )
+        except Exception as ex:
+            logger.warning("[delete] release notify failed: %s", ex)
+
     return {
         "success": True,
-        "message": "Assistant deleted. Call history, usage records, and billing data are preserved.",
+        "message": "Deletion requested. The number will be fully released in 24–48 hours.",
+        "number_release_pending": needs_manual_release,
     }
 
 

@@ -147,7 +147,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         }
         if (!RegExp(r'^\+\d{10,15}$').hasMatch(phone)) {
           setState(
-              () => _error = 'Enter phone in E.164 format (e.g. +15551234567)');
+              () => _error = 'Enter phone with country code (e.g. +15551234567)');
           return false;
         }
       }
@@ -438,7 +438,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         _selectableOption(
           title: 'Get a new business number',
           subtitle:
-              "We'll provision a US line for your business through Telnyx (~\$1–2/month). Assistants use this shared line.",
+              "We'll set up a US business number for your business (~\$1–2/month). Your receptionists share this line.",
           selected: _formData.phoneStrategy == 'new',
           onTap: () => setState(() => _formData.phoneStrategy = 'new'),
         ),
@@ -461,7 +461,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         _selectableOption(
           title: 'Use a number I already own',
           subtitle:
-              'Link a number you already control (Telnyx, carrier, etc.) as your shared business line.',
+              'Link a phone number you already have as your shared business line.',
           selected: _formData.phoneStrategy == 'own',
           onTap: () => setState(() => _formData.phoneStrategy = 'own'),
         ),
@@ -473,22 +473,30 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                 TextFormField(
                   initialValue: _formData.ownPhone,
                   decoration: const InputDecoration(
-                    labelText: 'Phone number (E.164)',
+                    labelText: 'Phone number',
                     hintText: '+15551234567',
+                    helperText: 'Include country code (e.g. +1 for the US)',
                     border: OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.phone,
                   onChanged: (v) => _formData.ownPhone = v,
                 ),
                 const SizedBox(height: 8),
-                TextFormField(
-                  initialValue: _formData.providerSid,
-                  decoration: const InputDecoration(
-                    labelText: 'Telnyx Phone Number ID (optional)',
-                    hintText: 'PN...',
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (v) => _formData.providerSid = v,
+                ExpansionTile(
+                  title: const Text('Advanced'),
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: EdgeInsets.zero,
+                  children: [
+                    TextFormField(
+                      initialValue: _formData.providerSid,
+                      decoration: const InputDecoration(
+                        labelText: 'Telnyx Phone Number ID (optional)',
+                        hintText: 'PN...',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (v) => _formData.providerSid = v,
+                    ),
+                  ],
                 ),
               ],
             ),

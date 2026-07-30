@@ -61,7 +61,7 @@
 ## Batch 2 — Telnyx Customer Language (C2 + C3)
 
 **Priority:** Critical  
-**Status:** ⬜ Next
+**Status:** ⬜ Implemented — awaiting smoke test
 
 ### Tasks
 
@@ -78,6 +78,7 @@
 
 - [ ] Create receptionist → phone step has no Telnyx jargon
 - [ ] Delete receptionist → correct 24–48h message appears
+- [ ] Internal notify: email to SUPPORT_EMAIL when RESEND_API_KEY set, else `[ops] MANUAL_PHONE_RELEASE_NEEDED` in backend logs
 
 ---
 

@@ -119,6 +119,11 @@ class Settings(BaseSettings):
     mobile_redirect_scheme: str = "echodesk"
     app_url: str = ""  # NEXT_PUBLIC_APP_URL or APP_URL for redirects
 
+    # Internal ops email (Resend). Used for manual phone-release alerts, etc.
+    support_email: str = "echodesk2@gmail.com"  # Env: SUPPORT_EMAIL
+    resend_api_key: str = ""  # Env: RESEND_API_KEY
+    email_from: str = "EchoDesk <noreply@echodesk.us>"  # Env: EMAIL_FROM
+
     # App
     port: int = 8000
 

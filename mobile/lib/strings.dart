@@ -29,6 +29,8 @@ class AppStrings {
       "Couldn't open browser for calendar. Please try again.";
 
   // Receptionist
+  static const receptionistDeletionRequested =
+      'Deletion requested. The number will be fully released in 24–48 hours.';
   static const couldNotDeleteReceptionist =
       "Couldn't delete receptionist. Please try again.";
   static const couldNotSaveSettings = "Couldn't save. Please try again.";

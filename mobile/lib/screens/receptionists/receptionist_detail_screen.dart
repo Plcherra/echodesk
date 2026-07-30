@@ -390,7 +390,9 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete receptionist?'),
         content: Text(
-          'This will remove "${r.name}" as an assistant. Your business phone line stays with the business unless you release it in Telnyx. This cannot be undone.',
+          'This will remove "${r.name}". We\'ll stop routing calls to this receptionist. '
+          'If this was the last receptionist on the business number, we\'ll release the number within 24–48 hours. '
+          'This cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -406,7 +408,10 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
                 );
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('"${r.name}" deleted')),
+                  const SnackBar(
+                    content: Text(AppStrings.receptionistDeletionRequested),
+                    duration: Duration(seconds: 6),
+                  ),
                 );
                 context.go('/receptionists');
               } catch (_) {
