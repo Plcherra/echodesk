@@ -120,7 +120,7 @@ async def stripe_webhook_post(request: Request):
                 update["billing_plan_metadata"] = plan.get("billing_plan_metadata")
                 meta = plan.get("billing_plan_metadata") or {}
                 included = meta.get("included_minutes", 0)
-                overage_cents = int(meta.get("overage_rate_cents", 8))
+                overage_cents = int(meta.get("overage_rate_cents", 20))
                 ep = supabase.table("user_plans").select("inbound_percent, outbound_percent").eq("user_id", user["id"]).limit(1).execute()
                 inbound_pct = 80
                 outbound_pct = 20

@@ -10,11 +10,57 @@ import stripe
 
 from billing.invoicing import compute_overage_minutes
 from billing.subscriptions import get_active_subscription
+from stripe_plans import DEFAULT_OVERAGE_RATE_CENTS, get_overage_price_id
 from supabase_client import create_service_role_client
 
 logger = logging.getLogger(__name__)
 MIN_INVOICE_CENTS = 500
 MIN_OPTION_A_OVERAGE_CENTS = 50
+
+
+def _create_overage_invoice_item(
+    stripe_mod: Any,
+    *,
+    customer_id: str,
+    invoice_id: str,
+    overage_minutes: float,
+    rate_cents: int,
+    description: str,
+) -> None:
+    """Attach overage to an invoice.
+
+    Prefer STRIPE_PRICE_OVERAGE + quantity when set (standard per-unit price at
+    $0.20/min). Fall back to a raw amount line item so billing still works if
+    the overage price is metered/incompatible with InvoiceItem price=.
+    """
+    qty = max(1, int(round(overage_minutes))) if overage_minutes > 0 else 0
+    if qty <= 0:
+        return
+    price_id = get_overage_price_id()
+    if price_id:
+        try:
+            stripe_mod.InvoiceItem.create(
+                customer=customer_id,
+                price=price_id,
+                quantity=qty,
+                description=description,
+                invoice=invoice_id,
+            )
+            return
+        except Exception as e:
+            logger.warning(
+                "[usageBilling] STRIPE_PRICE_OVERAGE failed (%s); using amount fallback",
+                e,
+            )
+    amount_cents = int(round(overage_minutes * float(rate_cents)))
+    amount_cents = max(MIN_OPTION_A_OVERAGE_CENTS, amount_cents)
+    stripe_mod.InvoiceItem.create(
+        customer=customer_id,
+        amount=amount_cents,
+        currency="usd",
+        description=description,
+        invoice=invoice_id,
+    )
 
 
 def _get_previous_month_period() -> tuple[str, str]:
@@ -110,7 +156,7 @@ def invoice_overage_for_fixed_plans(supabase, stripe_mod) -> dict[str, int]:
             skipped += 1
             continue
 
-        rate = p.get("overage_rate_cents") or 8
+        rate = p.get("overage_rate_cents") or DEFAULT_OVERAGE_RATE_CENTS
         subtotal = int(overage * rate) + (1 if (overage * rate) % 1 else 0)
         amount_cents = max(MIN_INVOICE_CENTS, subtotal)
         try:
@@ -120,13 +166,37 @@ def invoice_overage_for_fixed_plans(supabase, stripe_mod) -> dict[str, int]:
                 description=f"Overage minutes {period_start} to {period_end}",
                 metadata={"userId": p["user_id"], "period_start": period_start},
             )
-            stripe_mod.InvoiceItem.create(
-                customer=customer_id,
-                amount=amount_cents,
-                currency="usd",
-                description=f"Overage ({overage:.1f} min @ ${rate/100:.2f}/min)",
-                invoice=inv.id,
-            )
+            price_id = get_overage_price_id()
+            if price_id:
+                try:
+                    qty = max(1, int(round(overage)))
+                    stripe_mod.InvoiceItem.create(
+                        customer=customer_id,
+                        price=price_id,
+                        quantity=qty,
+                        description=f"Overage ({overage:.1f} min @ ${rate/100:.2f}/min)",
+                        invoice=inv.id,
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "[usageBilling] STRIPE_PRICE_OVERAGE failed (%s); amount fallback",
+                        e,
+                    )
+                    stripe_mod.InvoiceItem.create(
+                        customer=customer_id,
+                        amount=amount_cents,
+                        currency="usd",
+                        description=f"Overage ({overage:.1f} min @ ${rate/100:.2f}/min)",
+                        invoice=inv.id,
+                    )
+            else:
+                stripe_mod.InvoiceItem.create(
+                    customer=customer_id,
+                    amount=amount_cents,
+                    currency="usd",
+                    description=f"Overage ({overage:.1f} min @ ${rate/100:.2f}/min)",
+                    invoice=inv.id,
+                )
             stripe_mod.Invoice.finalize_invoice(inv.id)
             supabase.table("billing_invoices").insert({
                 "user_id": p["user_id"],
@@ -207,7 +277,7 @@ def option_a_invoice_closed_periods(supabase: Any, stripe_mod: Any) -> dict[str,
         )
         total_min = sum(float(x.get("quantity") or 0) for x in (sr.data or []))
         included = int(meta.get("included_minutes") or 0)
-        rate = int(meta.get("overage_rate_cents") or 8)
+        rate = int(meta.get("overage_rate_cents") or DEFAULT_OVERAGE_RATE_CENTS)
         overage_m = compute_overage_minutes(total_min, included)
         if overage_m <= 0:
             skipped += 1
@@ -231,12 +301,15 @@ def option_a_invoice_closed_periods(supabase: Any, stripe_mod: Any) -> dict[str,
                     "option_a": "true",
                 },
             )
-            stripe_mod.InvoiceItem.create(
-                customer=customer_id,
-                amount=amount_cents,
-                currency="usd",
-                description=f"Voice minutes overage ({overage_m:.2f} min @ ${rate/100:.2f}/min)",
-                invoice=inv.id,
+            _create_overage_invoice_item(
+                stripe_mod,
+                customer_id=customer_id,
+                invoice_id=inv.id,
+                overage_minutes=overage_m,
+                rate_cents=rate,
+                description=(
+                    f"Voice minutes overage ({overage_m:.2f} min @ ${rate/100:.2f}/min)"
+                ),
             )
             stripe_mod.Invoice.finalize_invoice(inv.id)
             sub_row = get_active_subscription(supabase, user_id)

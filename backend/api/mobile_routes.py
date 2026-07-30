@@ -97,7 +97,7 @@ def _stripe_metadata_to_dict(metadata) -> dict:
 def _sync_user_plan_from_billing_plan(supabase, user_id: str, plan: dict) -> None:
     meta = plan.get("billing_plan_metadata") or {}
     included = int(meta.get("included_minutes") or 0)
-    overage_cents = int(meta.get("overage_rate_cents") or 8)
+    overage_cents = int(meta.get("overage_rate_cents") or 20)
     try:
         existing = (
             supabase.table("user_plans")
@@ -654,12 +654,11 @@ async def checkout(request: Request):
     except Exception:
         return JSONResponse({"error": "Invalid JSON"}, status_code=400)
     plan_id = body.get("plan_id", "starter")
-    # Public: starter + business. Internal: dev_test (API/deep-link only; never listed in UI).
-    # Retired tiers (pro, growth, etc.) are rejected.
-    allowed_checkout_plan_ids = {"starter", "business", "dev_test"}
+    # Public: starter, growth, business. Internal: dev_test (API/deep-link only).
+    allowed_checkout_plan_ids = {"starter", "growth", "business", "dev_test"}
     if plan_id not in allowed_checkout_plan_ids:
         return JSONResponse(
-            {"error": "Invalid plan. Choose starter or business."},
+            {"error": "Invalid plan. Choose starter, growth, or business."},
             status_code=400,
         )
     return_scheme = body.get("return_scheme") or settings.mobile_redirect_scheme
