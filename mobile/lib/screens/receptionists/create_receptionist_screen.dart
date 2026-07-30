@@ -61,9 +61,14 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   String? _transferKindError;
   String? _transferCarrierError;
 
+  /// Existing business line to reuse when adding another receptionist.
+  bool _reusesSharedLine = false;
+  String? _sharedLinePhone;
+
   bool get _canGoNext {
     if (_loading) return false;
     if (_step == 2) {
+      if (_reusesSharedLine) return true;
       // Only a new EchoDesk number can advance the wizard.
       return _formData.phoneStrategy == 'new' &&
           (_formData.areaCode != null && _formData.areaCode!.isNotEmpty);
@@ -160,7 +165,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   Future<void> _loadDefaults() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
-    final res = await Supabase.instance.client
+    final supabase = Supabase.instance.client;
+    final res = await supabase
         .from('users')
         .select('calendar_id')
         .eq('id', user.id)
@@ -168,6 +174,57 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
     if (res != null && res['calendar_id'] != null) {
       setState(() => _formData.calendarId = res['calendar_id'] as String);
     }
+
+    try {
+      final recs = await supabase
+          .from('receptionists')
+          .select(
+            'phone_number, inbound_phone_number, telnyx_phone_number, '
+            'telnyx_phone_number_id, deleted_at, status, active',
+          )
+          .eq('user_id', user.id)
+          .order('created_at', ascending: true);
+      String? sharedPhone;
+      var hasLine = false;
+      for (final raw in (recs as List)) {
+        final row = raw as Map<String, dynamic>;
+        if (row['deleted_at'] != null) continue;
+        if (row['status'] != null && row['status'] != 'active') continue;
+        if (row['active'] == false) continue;
+        final tid = (row['telnyx_phone_number_id'] as String?)?.trim() ?? '';
+        final phone = ((row['inbound_phone_number'] as String?) ??
+                    (row['telnyx_phone_number'] as String?) ??
+                    (row['phone_number'] as String?) ??
+                    '')
+                .trim();
+        if (tid.isNotEmpty || phone.isNotEmpty) {
+          hasLine = true;
+          sharedPhone = phone.isNotEmpty ? phone : sharedPhone;
+          if (tid.isNotEmpty && phone.isNotEmpty) break;
+        }
+      }
+      if (mounted && hasLine) {
+        setState(() {
+          _reusesSharedLine = true;
+          _sharedLinePhone = sharedPhone;
+          _formData.phoneStrategy = 'new';
+        });
+      }
+    } catch (_) {
+      // Keep full phone step if lookup fails.
+    }
+  }
+
+  int _nextStepFrom(int step) {
+    final n = step + 1;
+    if (n == 2 && _reusesSharedLine) return 3;
+    return n;
+  }
+
+  int _prevStepFrom(int step) {
+    final n = step - 1;
+    if (n == 2 && _reusesSharedLine) return 1;
+    return n;
   }
 
   bool _validateStep() {
@@ -187,6 +244,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
       return true;
     }
     if (_step == 2) {
+      if (_reusesSharedLine) return true;
       if (_formData.phoneStrategy != 'new') {
         _showVisibleError(
           _activeTransfer != null
@@ -324,7 +382,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (_step == 2 && !_canGoNext)
+                  if (_step == 2 && !_canGoNext && !_reusesSharedLine)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
@@ -343,7 +401,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                           onPressed: _loading
                               ? null
                               : () => setState(() {
-                                    _step--;
+                                    _step = _prevStepFrom(_step);
                                     _error = null;
                                   }),
                           child: const Text('Back'),
@@ -355,7 +413,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                           if (_step == 4 || _step == 5)
                             TextButton(
                               onPressed: () => setState(() {
-                                _step++;
+                                _step = _nextStepFrom(_step);
                                 _error = null;
                               }),
                               child: const Text('Skip'),
@@ -367,7 +425,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                                     if (_step < 6) {
                                       if (_validateStep()) {
                                         setState(() {
-                                          _step++;
+                                          _step = _nextStepFrom(_step);
                                           _error = null;
                                         });
                                       }
@@ -482,13 +540,15 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         const SizedBox(height: 8),
         _selectableOption(
           title: 'Personal / Solo',
-          subtitle: 'Book time directly on my own calendar',
+          subtitle:
+              'Book time on my calendar. Shares your business phone line with other receptionists.',
           selected: _formData.mode == 'personal',
           onTap: () => setState(() => _formData.mode = 'personal'),
         ),
         _selectableOption(
           title: 'Business / Team',
-          subtitle: 'Use staff, services, and locations',
+          subtitle:
+              'Staff, services, and locations. Same shared phone line — not a second number.',
           selected: _formData.mode == 'business',
           onTap: () => setState(() => _formData.mode = 'business'),
         ),
@@ -659,6 +719,43 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   }
 
   Widget _buildStep2() {
+    if (_reusesSharedLine) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Business phone line'),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Uses your existing business number',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _sharedLinePhone ?? 'Shared business line',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'All receptionists for this account share one phone line. '
+                    'Solo vs business only changes booking setup — not the number.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     if (!_transferStatusFetched && !_transferLoading) {
       _loadActiveTransfer();
     }
@@ -1281,7 +1378,9 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                 _ReviewRow('Calendar', _formData.calendarId),
                 _ReviewRow(
                   'Phone',
-                  'New number (${_formData.areaCode ?? '—'})',
+                  _reusesSharedLine
+                      ? 'Shared line (${_sharedLinePhone ?? 'existing'})'
+                      : 'New number (${_formData.areaCode ?? '—'})',
                 ),
                 _ReviewRow(
                   'Prompt',

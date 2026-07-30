@@ -839,11 +839,44 @@ async def create_receptionist(request: Request):
             or ""
         ).strip()
         primary_tel = (primary.get("telnyx_phone_number") or "").strip() or primary_inb
+        # Prefer canonical business line when receptionist mirrors are incomplete.
+        if not primary_tid:
+            try:
+                phone_res = (
+                    supabase.table("business_phone_numbers")
+                    .select("telnyx_number_id, phone_number_e164")
+                    .eq("business_id", target_business_id)
+                    .limit(1)
+                    .execute()
+                )
+                if phone_res.data:
+                    crow = phone_res.data[0] or {}
+                    primary_tid = (crow.get("telnyx_number_id") or "").strip() or None
+                    canon_e164 = (crow.get("phone_number_e164") or "").strip()
+                    if canon_e164:
+                        primary_inb = primary_inb or canon_e164
+                        primary_tel = primary_tel or canon_e164
+                    if primary_tid:
+                        try:
+                            from communication.ensure import mirror_business_phone_to_receptionists
+
+                            mirror_business_phone_to_receptionists(supabase, target_business_id)
+                        except Exception as mirror_ex:
+                            logger.warning(
+                                "[receptionists/create] mirror shared line failed: %s",
+                                mirror_ex,
+                            )
+            except Exception as canon_ex:
+                logger.warning(
+                    "[receptionists/create] load canonical phone failed: %s",
+                    canon_ex,
+                )
         if not primary_tid:
             return JSONResponse(
                 {
                     "error": (
-                        "The first assistant for this business must finish phone setup before you add another. "
+                        "Your business phone line is not ready yet. Open your existing "
+                        "receptionist and finish phone setup, or contact support. "
                         "Assistants under the same business share one phone line."
                     )
                 },
