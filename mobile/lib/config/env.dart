@@ -70,6 +70,6 @@ class Env {
     if (env.isNotEmpty) return env;
     final local = _localOverrides['SUPPORT_EMAIL'];
     if (local != null && local.isNotEmpty) return local;
-    return 'support@echodesk.us';
+    return 'echodesk2@gmail.com';
   }
 }

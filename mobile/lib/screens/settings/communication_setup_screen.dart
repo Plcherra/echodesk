@@ -139,19 +139,37 @@ class _CommunicationSetupScreenState extends State<CommunicationSetupScreen> {
     final scheme = Theme.of(context).colorScheme;
     final bizName = s['business_name']?.toString();
     final isDefault = s['is_default_business'] == true;
-    final e164 = s['phone_number_e164']?.toString();
-    final voice = s['voice_status']?.toString() ?? '—';
-    final voiceTitle = _s(s, 'voice_setup_title');
-    final voiceDescription = _s(s, 'voice_setup_description');
-    final voiceHelp = _s(s, 'voice_help_text');
-    final voiceAction = _s(s, 'voice_primary_action');
+    final e164 = (s['phone_number_e164']?.toString() ?? '').trim();
+    final rawVoice = s['voice_status']?.toString() ?? '—';
+    // If a number is already assigned, treat the line as ready even when the
+    // backend still reports provisioning (common status lag).
+    final hasNumber = e164.isNotEmpty;
+    final voice = (hasNumber && rawVoice != 'failed') ? 'active' : rawVoice;
+    final voiceTitle = voice == 'active'
+        ? 'Business line ready'
+        : _s(s, 'voice_setup_title');
+    final voiceDescription = voice == 'active'
+        ? 'Callers can reach your AI receptionist on this number.'
+        : voice == 'provisioning'
+            ? "We're setting up your US business line. This can take up to a minute."
+            : _s(s, 'voice_setup_description');
+    final voiceHelp = voice == 'active'
+        ? ''
+        : voice == 'provisioning'
+            ? "If the number hasn't appeared yet, tap Refresh."
+            : _s(s, 'voice_help_text');
+    final voiceAction = voice == 'active'
+        ? ''
+        : voice == 'provisioning'
+            ? 'Refresh status'
+            : _s(s, 'voice_primary_action');
     final assistant = s['primary_receptionist_name']?.toString();
-    final lineText = (e164 != null && e164.isNotEmpty)
+    final lineText = hasNumber
         ? e164
         : (voice == 'failed'
             ? 'Phone setup failed'
             : voice == 'provisioning'
-                ? 'Provisioning...'
+                ? 'Assigning number...'
                 : 'No number yet');
 
     return Card(
@@ -223,10 +241,11 @@ class _CommunicationSetupScreenState extends State<CommunicationSetupScreen> {
               const SizedBox(height: 6),
               Text(
                 voiceHelp,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: scheme.error),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: voice == 'provisioning' || voice == 'failed'
+                          ? scheme.onSurfaceVariant
+                          : scheme.error,
+                    ),
               ),
             ],
             if (voiceAction.isNotEmpty) ...[
@@ -278,8 +297,16 @@ class _CommunicationSetupScreenState extends State<CommunicationSetupScreen> {
   /// Voice-only next steps. SMS / WhatsApp prompts are suppressed while those
   /// channels are coming soon.
   Widget _nextStepBanner(BuildContext context, Map<String, dynamic> s) {
+    final e164 = (s['phone_number_e164']?.toString() ?? '').trim();
+    final rawVoice = s['voice_status']?.toString() ?? '';
+    final voiceReady = e164.isNotEmpty && rawVoice != 'failed';
+
     final next = s['next_recommended_action']?.toString() ?? '';
     if (next.isEmpty || next == 'none') return const SizedBox.shrink();
+    // Number already assigned — don't keep nudging "setup in progress".
+    if (voiceReady && (next == 'check_voice' || next == 'create_receptionist')) {
+      return const SizedBox.shrink();
+    }
 
     final String? msg;
     switch (next) {
@@ -288,7 +315,8 @@ class _CommunicationSetupScreenState extends State<CommunicationSetupScreen> {
             'Next: create your first receptionist to set up the business line.';
         break;
       case 'check_voice':
-        msg = 'Voice line setup is in progress — refresh to check status.';
+        msg =
+            'Your business number is being assigned. Tap Refresh in a moment to update.';
         break;
       case 'activate_sms':
       case 'submit_sms':
@@ -300,7 +328,6 @@ class _CommunicationSetupScreenState extends State<CommunicationSetupScreen> {
       case 'retry_whatsapp':
         return const SizedBox.shrink();
       default:
-        // Unknown actions that mention sms/whatsapp stay hidden.
         final lower = next.toLowerCase();
         if (lower.contains('sms') || lower.contains('whatsapp')) {
           return const SizedBox.shrink();
@@ -314,7 +341,6 @@ class _CommunicationSetupScreenState extends State<CommunicationSetupScreen> {
           ),
     );
   }
-
   Widget _comingSoonChannels(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final supportEmail = Env.supportEmail;

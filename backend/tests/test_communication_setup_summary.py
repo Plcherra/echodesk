@@ -56,3 +56,21 @@ def test_setup_summary_allows_sms_after_voice_active() -> None:
 
     assert summary["voice_status"] == "active"
     assert summary["next_recommended_action"] == "activate_sms"
+
+
+def test_setup_summary_treats_provisioning_with_number_as_active() -> None:
+    summary = build_setup_summary(
+        _business(),
+        {
+            "status": "provisioning",
+            "phone_number_e164": "+15551234567",
+            "telnyx_number_id": "123",
+        },
+        {"status": "not_started"},
+        {"status": "not_connected"},
+        is_default_business=True,
+    )
+
+    assert summary["voice_status"] == "active"
+    assert summary["voice_setup_title"] == "Business line ready"
+    assert summary["voice_primary_action"] == ""

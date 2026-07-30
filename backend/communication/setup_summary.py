@@ -21,6 +21,9 @@ NextRecommendedAction = Literal[
 
 def _effective_voice_status(phone: dict[str, Any], e164: str | None) -> str:
     st = (phone.get("status") or "not_started").strip()
+    # A live E.164 means the line is usable even if status lags on "provisioning".
+    if e164 and st != "failed":
+        return "active"
     if st == "active" and e164:
         return "active"
     if st == "failed":
@@ -33,28 +36,30 @@ def _effective_voice_status(phone: dict[str, Any], e164: str | None) -> str:
 def _voice_guidance(status: str) -> dict[str, str | None]:
     if status == "active":
         return {
-            "voice_setup_title": "Business line active",
-            "voice_setup_description": "Voice calls are ready on this business number.",
+            "voice_setup_title": "Business line ready",
+            "voice_setup_description": "Callers can reach your AI receptionist on this number.",
             "voice_primary_action": "",
             "voice_help_text": None,
         }
     if status == "provisioning":
         return {
-            "voice_setup_title": "Business line provisioning",
-            "voice_setup_description": "EchoDesk is setting up the Telnyx voice line for this business.",
+            "voice_setup_title": "Assigning your business number",
+            "voice_setup_description": (
+                "We're setting up your US business line. This can take up to a minute."
+            ),
             "voice_primary_action": "Refresh status",
-            "voice_help_text": "This usually takes a few seconds after receptionist creation.",
+            "voice_help_text": "If the number hasn't appeared yet, tap Refresh.",
         }
     if status == "failed":
         return {
             "voice_setup_title": "Phone setup needs attention",
-            "voice_setup_description": "The business line was not provisioned successfully.",
+            "voice_setup_description": "We couldn't finish setting up your business line.",
             "voice_primary_action": "Retry phone setup",
-            "voice_help_text": "Create or retry your first receptionist to provision the shared business line.",
+            "voice_help_text": "Create or retry your first receptionist to set up the shared business line.",
         }
     return {
         "voice_setup_title": "No business number yet",
-        "voice_setup_description": "Create your first receptionist to provision or attach the shared business line.",
+        "voice_setup_description": "Create your first receptionist to set up your shared business line.",
         "voice_primary_action": "Create receptionist",
         "voice_help_text": None,
     }
