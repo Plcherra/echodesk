@@ -57,6 +57,47 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   String _transferCarrier = '';
   String _transferNote = '';
   bool _transferStatusFetched = false;
+  String? _transferPhoneError;
+  String? _transferKindError;
+  String? _transferCarrierError;
+
+  bool get _canGoNext {
+    if (_loading) return false;
+    if (_step == 2) {
+      // Only a new EchoDesk number can advance the wizard.
+      return _formData.phoneStrategy == 'new' &&
+          (_formData.areaCode != null && _formData.areaCode!.isNotEmpty);
+    }
+    if (_step == 6) return _formData.consent;
+    return true;
+  }
+
+  bool get _transferFormReady {
+    return _transferPhoneE164() != null &&
+        _transferKind != null &&
+        _transferCarrier.trim().isNotEmpty;
+  }
+
+  /// National digits only in the field; fixed +1 prefix for US/Canada.
+  String? _transferPhoneE164() {
+    final digits = _transferPhone.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 10) return '+1$digits';
+    if (digits.length == 11 && digits.startsWith('1')) return '+$digits';
+    return null;
+  }
+
+  void _showVisibleError(String message) {
+    setState(() => _error = message);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -132,11 +173,11 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   bool _validateStep() {
     if (_step == 1) {
       if (_formData.name.trim().isEmpty) {
-        setState(() => _error = 'Name is required');
+        _showVisibleError('Name is required');
         return false;
       }
       if (_formData.calendarId.trim().isEmpty) {
-        setState(() => _error = 'Calendar ID is required');
+        _showVisibleError('Calendar ID is required');
         return false;
       }
       return true;
@@ -147,22 +188,22 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
     }
     if (_step == 2) {
       if (_formData.phoneStrategy != 'new') {
-        setState(() {
-          _error = _activeTransfer != null
+        _showVisibleError(
+          _activeTransfer != null
               ? AppStrings.transferMustUseNewNumber
-              : AppStrings.transferSelectNewToContinue;
-        });
+              : AppStrings.transferSelectNewToContinue,
+        );
         return false;
       }
       if (_formData.areaCode == null || _formData.areaCode!.isEmpty) {
-        setState(() => _error = 'Please select an area code');
+        _showVisibleError('Please select an area code');
         return false;
       }
       return true;
     }
     if (_step == 3) {
       if (_formData.systemPrompt.trim().isEmpty) {
-        setState(() => _error = 'System prompt is required');
+        _showVisibleError('System prompt is required');
         return false;
       }
       return true;
@@ -172,7 +213,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
     }
     if (_step == 6) {
       if (!_formData.consent) {
-        setState(() => _error = 'Consent is required');
+        _showVisibleError('Consent is required');
         return false;
       }
       return true;
@@ -204,16 +245,14 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         });
       } else {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
-        setState(() {
-          _error = data['error'] as String? ?? 'Failed to create receptionist';
-          _loading = false;
-        });
+        setState(() => _loading = false);
+        _showVisibleError(
+          data['error'] as String? ?? 'Failed to create receptionist',
+        );
       }
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      setState(() => _loading = false);
+      _showVisibleError(AppStrings.somethingWentWrong);
     }
   }
 
@@ -234,73 +273,127 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
       body: Column(
         children: [
           _buildStepper(),
+          if (_error != null)
+            Material(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => setState(() => _error = null),
+                      icon: const Icon(Icons.close, size: 18),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(24),
               children: [
-                if (_error != null) ...[
-                  Card(
-                    color: Theme.of(context).colorScheme.errorContainer,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Text(_error!),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
                 if (_step == 1) _buildStep1(),
                 if (_step == 2) _buildStep2(),
                 if (_step == 3) _buildStep3(),
                 if (_step == 4) _buildStep4(),
                 if (_step == 5) _buildStep5(),
                 if (_step == 6) _buildStep6(),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (_step > 1)
-                      OutlinedButton(
-                        onPressed: _loading
-                            ? null
-                            : () => setState(() {
-                                  _step--;
-                                  _error = null;
-                                }),
-                        child: const Text('Back'),
-                      )
-                    else
-                      const SizedBox(),
-                    if (_step == 4 || _step == 5)
-                      TextButton(
-                        onPressed: () => setState(() => _step++),
-                        child: const Text('Skip'),
-                      ),
-                    FilledButton(
-                      onPressed: _loading || (_step == 6 && !_formData.consent)
-                          ? null
-                          : () async {
-                              if (_step < 6) {
-                                if (_validateStep()) {
-                                  setState(() {
-                                    _step++;
-                                    _error = null;
-                                  });
-                                }
-                              } else {
-                                await _submit();
-                              }
-                            },
-                      child: _loading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(_step == 6 ? 'Create Receptionist' : 'Next'),
-                    ),
-                  ],
-                ),
               ],
+            ),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_step == 2 && !_canGoNext)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        _activeTransfer != null
+                            ? AppStrings.transferMustUseNewNumber
+                            : AppStrings.transferSelectNewToContinue,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (_step > 1)
+                        OutlinedButton(
+                          onPressed: _loading
+                              ? null
+                              : () => setState(() {
+                                    _step--;
+                                    _error = null;
+                                  }),
+                          child: const Text('Back'),
+                        )
+                      else
+                        const SizedBox(),
+                      Row(
+                        children: [
+                          if (_step == 4 || _step == 5)
+                            TextButton(
+                              onPressed: () => setState(() {
+                                _step++;
+                                _error = null;
+                              }),
+                              child: const Text('Skip'),
+                            ),
+                          FilledButton(
+                            onPressed: !_canGoNext
+                                ? null
+                                : () async {
+                                    if (_step < 6) {
+                                      if (_validateStep()) {
+                                        setState(() {
+                                          _step++;
+                                          _error = null;
+                                        });
+                                      }
+                                    } else {
+                                      await _submit();
+                                    }
+                                  },
+                            child: _loading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : Text(
+                                    _step == 6
+                                        ? 'Create Receptionist'
+                                        : 'Next',
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -473,26 +566,37 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   }
 
   Future<void> _submitTransferRequest() async {
-    setState(() => _error = null);
-    final phone = _transferPhone.trim();
-    if (phone.isEmpty) {
-      setState(() => _error = 'Phone number is required');
-      return;
-    }
-    if (!RegExp(r'^\+\d{10,15}$').hasMatch(phone)) {
-      setState(
-          () => _error = 'Enter phone with country code (e.g. +15551234567)');
-      return;
+    setState(() {
+      _error = null;
+      _transferPhoneError = null;
+      _transferKindError = null;
+      _transferCarrierError = null;
+    });
+
+    final normalized = _transferPhoneE164();
+    String? phoneErr;
+    String? kindErr;
+    String? carrierErr;
+    if (normalized == null) {
+      phoneErr = 'Enter a 10-digit US/Canada number';
     }
     if (_transferKind == null) {
-      setState(() => _error =
-          'Select whether this is a mobile/carrier phone or an internet/VoIP number.');
-      return;
+      kindErr = 'Select mobile/carrier or internet/VoIP.';
     }
     final carrier = _transferCarrier.trim();
     if (carrier.isEmpty) {
-      setState(() =>
-          _error = 'Tell us the carrier or provider (e.g. T-Mobile, Twilio).');
+      carrierErr = 'Tell us the carrier or provider (e.g. T-Mobile, Twilio).';
+    }
+
+    if (phoneErr != null || kindErr != null || carrierErr != null) {
+      setState(() {
+        _transferPhoneError = phoneErr;
+        _transferKindError = kindErr;
+        _transferCarrierError = carrierErr;
+      });
+      _showVisibleError(
+        phoneErr ?? kindErr ?? carrierErr ?? AppStrings.couldNotSubmitTransfer,
+      );
       return;
     }
 
@@ -501,7 +605,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
       final res = await ApiClient.post(
         '/api/mobile/number-transfers',
         body: {
-          'phone': phone,
+          'phone': normalized,
           'number_kind': _transferKind,
           'carrier_or_provider': carrier,
           if (_transferNote.trim().isNotEmpty)
@@ -517,24 +621,28 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           _transferSubmitting = false;
           _formData.phoneStrategy = 'new';
           _error = null;
+          _transferPhoneError = null;
+          _transferKindError = null;
+          _transferCarrierError = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.transferSubmitted)),
+          const SnackBar(
+            content: Text(AppStrings.transferSubmitted),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 5),
+          ),
         );
       } else {
         final data = jsonDecode(res.body) as Map<String, dynamic>?;
-        setState(() {
-          _transferSubmitting = false;
-          _error = data?['error'] as String? ??
-              AppStrings.couldNotSubmitTransfer;
-        });
+        setState(() => _transferSubmitting = false);
+        _showVisibleError(
+          data?['error'] as String? ?? AppStrings.couldNotSubmitTransfer,
+        );
       }
     } catch (_) {
       if (mounted) {
-        setState(() {
-          _transferSubmitting = false;
-          _error = AppStrings.couldNotSubmitTransfer;
-        });
+        setState(() => _transferSubmitting = false);
+        _showVisibleError(AppStrings.couldNotSubmitTransfer);
       }
     }
   }
@@ -646,14 +754,24 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
               children: [
                 TextFormField(
                   initialValue: _transferPhone,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Phone number',
-                    hintText: '+15551234567',
-                    helperText: 'Include country code (e.g. +1 for the US)',
-                    border: OutlineInputBorder(),
+                    hintText: '5551234567',
+                    prefixText: '+1 ',
+                    helperText:
+                        'US/Canada. Other countries? Email us below.',
+                    errorText: _transferPhoneError,
+                    border: const OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.phone,
-                  onChanged: (v) => _transferPhone = v,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  onChanged: (v) => setState(() {
+                    _transferPhone = v;
+                    _transferPhoneError = null;
+                  }),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -666,7 +784,10 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                   subtitle: const Text('T‑Mobile, AT&T, Verizon, etc.'),
                   value: 'mobile_carrier',
                   groupValue: _transferKind,
-                  onChanged: (v) => setState(() => _transferKind = v),
+                  onChanged: (v) => setState(() {
+                    _transferKind = v;
+                    _transferKindError = null;
+                  }),
                 ),
                 RadioListTile<String>(
                   contentPadding: EdgeInsets.zero,
@@ -674,17 +795,35 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                   subtitle: const Text('Twilio, Telnyx, other business phone'),
                   value: 'voip_internet',
                   groupValue: _transferKind,
-                  onChanged: (v) => setState(() => _transferKind = v),
+                  onChanged: (v) => setState(() {
+                    _transferKind = v;
+                    _transferKindError = null;
+                  }),
                 ),
+                if (_transferKindError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12, bottom: 8),
+                    child: Text(
+                      _transferKindError!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 8),
                 TextFormField(
                   initialValue: _transferCarrier,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Carrier or provider',
                     hintText: 'e.g. T-Mobile, AT&T, Twilio, Telnyx',
-                    border: OutlineInputBorder(),
+                    errorText: _transferCarrierError,
+                    border: const OutlineInputBorder(),
                   ),
-                  onChanged: (v) => _transferCarrier = v,
+                  onChanged: (v) => setState(() {
+                    _transferCarrier = v;
+                    _transferCarrierError = null;
+                  }),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -699,8 +838,9 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                 ),
                 const SizedBox(height: 12),
                 FilledButton(
-                  onPressed:
-                      _transferSubmitting ? null : _submitTransferRequest,
+                  onPressed: (_transferSubmitting || !_transferFormReady)
+                      ? null
+                      : _submitTransferRequest,
                   child: _transferSubmitting
                       ? const SizedBox(
                           height: 20,
@@ -709,6 +849,14 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                         )
                       : const Text('Submit for review'),
                 ),
+                if (!_transferFormReady && !_transferSubmitting)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Fill phone, number type, and carrier to enable submit.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1112,21 +1260,6 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
               ),
             );
           }),
-        const SizedBox(height: 16),
-        TextFormField(
-          initialValue: _formData.maxCallDurationMinutes?.toString(),
-          decoration: const InputDecoration(
-            labelText: 'Max call duration (minutes)',
-            hintText: 'e.g. 15',
-            border: OutlineInputBorder(),
-          ),
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          onChanged: (v) {
-            final n = int.tryParse(v);
-            _formData.maxCallDurationMinutes = n;
-          },
-        ),
       ],
     );
   }

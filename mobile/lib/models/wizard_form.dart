@@ -133,9 +133,6 @@ class WizardFormData {
         body['fallback_transfer_number'] = normalized;
       }
     }
-    if (maxCallDurationMinutes != null) {
-      body['max_call_duration_minutes'] = maxCallDurationMinutes;
-    }
     return body;
   }
 }
