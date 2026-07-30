@@ -84,7 +84,7 @@ def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str,
 
     rec_res = supabase.table("receptionists").select(
         "id, name, user_id, phone_number, calendar_id, payment_settings, website_content, "
-        "extra_instructions, system_prompt, greeting, voice_id, voice_preset_key, assistant_identity"
+        "extra_instructions, system_prompt, greeting, voice_id, voice_preset_key, assistant_identity, mode"
     ).eq("id", receptionist_id).execute()
 
     if not rec_res.data or len(rec_res.data) == 0:
@@ -95,6 +95,7 @@ def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str,
     identity = (rec.get("assistant_identity") or "").strip() or name
     voice_preset_key = (rec.get("voice_preset_key") or "").strip() or None
     persona_key = infer_persona_key_from_voice_preset(voice_preset_key)
+    is_business = (rec.get("mode") or "personal").strip().lower() == "business"
 
     # Precedence: system_prompt if set, else generated
     custom_prompt = (rec.get("system_prompt") or "").strip()
@@ -103,15 +104,20 @@ def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str,
         if (rec.get("extra_instructions") or "").strip():
             prompt += f"\n\nAdditional instructions from the business:\n{rec['extra_instructions'].strip()}"
     else:
-        staff_res = supabase.table("staff").select("name, role, specialties").eq("receptionist_id", receptionist_id).order("name").execute()
         services_res = supabase.table("services").select("name, description, price_cents, duration_minutes, category, requires_location, default_location_type").eq("receptionist_id", receptionist_id).execute()
-        locations_res = supabase.table("locations").select("name, address, notes").eq("receptionist_id", receptionist_id).execute()
         promos_res = supabase.table("promos").select("description, code, discount_type, discount_value").eq("receptionist_id", receptionist_id).execute()
         rules_res = supabase.table("reminder_rules").select("type, content").eq("receptionist_id", receptionist_id).execute()
 
-        staff = staff_res.data or []
+        # Solo/personal: staff/locations stay saved but are not used until Business mode.
+        staff: list = []
+        locations: list = []
+        if is_business:
+            staff_res = supabase.table("staff").select("name, role, specialties").eq("receptionist_id", receptionist_id).order("name").execute()
+            locations_res = supabase.table("locations").select("name, address, notes, hours, calendar_id").eq("receptionist_id", receptionist_id).execute()
+            staff = staff_res.data or []
+            locations = locations_res.data or []
+
         services = services_res.data or []
-        locations = locations_res.data or []
         promos = promos_res.data or []
         reminder_rules = rules_res.data or []
 

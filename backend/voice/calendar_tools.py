@@ -34,6 +34,14 @@ CALENDAR_TOOLS = [
                         "type": "boolean",
                         "description": "Set to true when the caller explicitly wants a general appointment with no specific service.",
                     },
+                    "store_name": {
+                        "type": "string",
+                        "description": "Store/branch name when the business has multiple locations. Pass the caller's chosen location so availability uses that store's calendar.",
+                    },
+                    "location_id": {
+                        "type": "string",
+                        "description": "UUID of the store/location if known. Prefer store_name when the caller spoke the location name.",
+                    },
                 },
                 "required": [],
             },
@@ -61,6 +69,14 @@ CALENDAR_TOOLS = [
                     "notes": {"type": "string", "description": "Optional notes (e.g. buzz code, gate instructions)."},
                     "price_cents": {"type": "integer", "description": "Optional price in cents for the appointment. For configured services, the backend prefers the stored service price when set."},
                     "caller_phone": {"type": "string", "description": "Caller phone number (E.164) for immediate post-booking SMS follow-up."},
+                    "store_name": {
+                        "type": "string",
+                        "description": "Store/branch name when the business has multiple locations. Pass so the booking lands on that store's calendar.",
+                    },
+                    "location_id": {
+                        "type": "string",
+                        "description": "UUID of the store/location if known. Prefer store_name when the caller spoke the location name.",
+                    },
                 },
                 "required": ["summary"],
             },

@@ -9,6 +9,7 @@ import '../../theme/echodesk_theme.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 import 'settings_tabs/calendar_tab.dart';
 import 'settings_tabs/staff_tab.dart';
+import 'settings_tabs/locations_tab.dart';
 import 'settings_tabs/instructions_tab.dart';
 import 'settings_tabs/website_tab.dart';
 
@@ -186,6 +187,10 @@ class _ReceptionistSettingsScreenState extends State<ReceptionistSettingsScreen>
             status: _calendarStatus,
             loading: _loadingCalendarStatus,
             onRefresh: _loadCalendarStatus,
+            onModeChanged: (mode) async {
+              setState(() => _mode = mode);
+              await _load();
+            },
           ));
           break;
         case 'Staff':
@@ -196,7 +201,7 @@ class _ReceptionistSettingsScreenState extends State<ReceptionistSettingsScreen>
           views.add(_ServicesTab(receptionistId: widget.receptionistId));
           break;
         case 'Locations':
-          views.add(_LocationsTab(receptionistId: widget.receptionistId));
+          views.add(ReceptionistLocationsTab(receptionistId: widget.receptionistId));
           break;
         case 'Promos':
           views.add(_PromosTab(receptionistId: widget.receptionistId));
@@ -931,119 +936,6 @@ class _InlineServiceFormState extends State<_InlineServiceForm> {
                   )
                 : const Text('Save service'),
           ),
-      ],
-    );
-  }
-}
-
-class _LocationsTab extends StatefulWidget {
-  final String receptionistId;
-
-  const _LocationsTab({required this.receptionistId});
-
-  @override
-  State<_LocationsTab> createState() => _LocationsTabState();
-}
-
-class _LocationsTabState extends State<_LocationsTab> {
-  List<Map<String, dynamic>> _locations = [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final res = await Supabase.instance.client
-        .from('locations')
-        .select('id, name, address')
-        .eq('receptionist_id', widget.receptionistId)
-        .order('name');
-    setState(() {
-      _locations = (res as List).cast<Map<String, dynamic>>();
-      _loading = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    return ListView(
-      padding: const EdgeInsets.all(EchoDeskSpacing.lg),
-      children: [
-        Text(
-          'Stores or branches for this receptionist.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: EchoDeskColors.muted,
-              ),
-        ),
-        const SizedBox(height: EchoDeskSpacing.md),
-        ..._locations.map((l) => Card(
-              margin: const EdgeInsets.only(bottom: 6),
-              child: ListTile(
-                dense: true,
-                visualDensity: VisualDensity.compact,
-                title: Text(
-                  l['name'] ?? '',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                subtitle: Text(
-                  l['address'] ?? '',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: EchoDeskColors.muted,
-                      ),
-                ),
-                trailing: IconButton(
-                  icon: Icon(Icons.delete_outline, color: EchoDeskColors.danger),
-                  onPressed: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Delete location?'),
-                        content: Text(
-                          'Remove "${l['name'] ?? 'this location'}"? This cannot be undone.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(ctx).pop(false),
-                            child: const Text('Cancel'),
-                          ),
-                          FilledButton(
-                            onPressed: () => Navigator.of(ctx).pop(true),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Theme.of(ctx).colorScheme.error,
-                            ),
-                            child: const Text('Delete'),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirm == true && mounted) {
-                      await Supabase.instance.client
-                          .from('locations')
-                          .delete()
-                          .eq('id', l['id'])
-                          .eq('receptionist_id', widget.receptionistId);
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '"${l['name'] ?? 'Location'}" deleted',
-                          ),
-                        ),
-                      );
-                      _load();
-                    }
-                  },
-                ),
-              ),
-            )),
       ],
     );
   }

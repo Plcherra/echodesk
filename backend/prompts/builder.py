@@ -109,12 +109,23 @@ def build_receptionist_prompt(
     if locations:
         parts = []
         for l in locations:
+            bit = l.get("name", "") or ""
             if l.get("address"):
-                note = f" ({l.get('notes')})" if l.get("notes") else ""
-                parts.append(f"{l.get('name', '')} at {l['address']}{note}")
-            else:
-                parts.append(l.get("name", ""))
+                bit += f" at {l['address']}"
+            hours = l.get("hours")
+            if isinstance(hours, dict) and (hours.get("text") or "").strip():
+                bit += f", hours: {hours['text'].strip()}"
+            if l.get("notes"):
+                bit += f" ({l.get('notes')})"
+            if (l.get("calendar_id") or "").strip():
+                bit += " [own calendar]"
+            parts.append(bit)
         sections.append(f"Locations: {'. '.join(parts)}.")
+        if len(locations) > 1:
+            sections.append(
+                "Stores: When more than one location exists and the caller has not named one, ask which store. "
+                "Pass store_name to check_availability and create_appointment so the correct store calendar is used."
+            )
 
     if payment_settings:
         ps = payment_settings

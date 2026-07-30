@@ -49,6 +49,62 @@ def _get_calendar_service(refresh_token: str):
     return build("calendar", "v3", credentials=creds)
 
 
+def _resolve_location_calendar_id(
+    supabase,
+    receptionist_id: str,
+    params: dict,
+    fallback_calendar_id: str,
+) -> str:
+    """Prefer a store/location calendar when the caller named a location."""
+    fallback = (fallback_calendar_id or "").strip() or "primary"
+    location_id = (params.get("location_id") or "").strip()
+    store_name = (
+        params.get("store_name")
+        or params.get("location_name")
+        or params.get("store")
+        or ""
+    ).strip()
+    try:
+        row = None
+        if location_id:
+            r = (
+                supabase.table("locations")
+                .select("calendar_id")
+                .eq("id", location_id)
+                .eq("receptionist_id", receptionist_id)
+                .limit(1)
+                .execute()
+            )
+            row = (r.data or [None])[0]
+        elif store_name:
+            r = (
+                supabase.table("locations")
+                .select("calendar_id, name")
+                .eq("receptionist_id", receptionist_id)
+                .ilike("name", f"%{store_name}%")
+                .limit(5)
+                .execute()
+            )
+            rows = r.data or []
+            if len(rows) == 1:
+                row = rows[0]
+            elif rows:
+                exact = next(
+                    (
+                        x
+                        for x in rows
+                        if (x.get("name") or "").strip().lower() == store_name.lower()
+                    ),
+                    None,
+                )
+                row = exact or rows[0]
+        if row and (row.get("calendar_id") or "").strip():
+            return (row.get("calendar_id") or "").strip()
+    except Exception as e:
+        logger.warning("location calendar resolve failed: %s", e)
+    return fallback
+
+
 async def handle_calendar_request(body: dict) -> dict:
     """Handle POST /api/voice/calendar. Returns dict for JSON response."""
     from fastapi import HTTPException
@@ -68,7 +124,7 @@ async def handle_calendar_request(body: dict) -> dict:
         raise HTTPException(status_code=400, detail="action must be check_availability, create_appointment, or reschedule_appointment")
 
     supabase = create_service_role_client()
-    rec_res = supabase.table("receptionists").select("id, user_id, calendar_id, status, active").eq("id", receptionist_id).execute()
+    rec_res = supabase.table("receptionists").select("id, user_id, calendar_id, status, active, mode").eq("id", receptionist_id).execute()
     if not rec_res.data or len(rec_res.data) == 0:
         raise HTTPException(status_code=404, detail="Receptionist not found")
     rec = rec_res.data[0]
@@ -82,8 +138,9 @@ async def handle_calendar_request(body: dict) -> dict:
             "message": "Google Calendar is not connected for this receptionist.",
         }
 
-    calendar_id = (rec.get("calendar_id") or "primary").strip() or "primary"
+    default_calendar_id = (rec.get("calendar_id") or "primary").strip() or "primary"
     refresh_token = user_res.data[0]["calendar_refresh_token"]
+    is_business = (rec.get("mode") or "personal").strip().lower() == "business"
 
     try:
         service = _get_calendar_service(refresh_token)
@@ -99,6 +156,12 @@ async def handle_calendar_request(body: dict) -> dict:
         return {"success": False, "error": "calendar_error", "message": "Calendar request failed."}
 
     try:
+        calendar_id = default_calendar_id
+        # Solo/personal: always use receptionist calendar; ignore store calendars.
+        if is_business and action in ("check_availability", "create_appointment"):
+            calendar_id = _resolve_location_calendar_id(
+                supabase, receptionist_id, params, default_calendar_id
+            )
         if action == "check_availability":
             guard_err = _check_service_first_guard(supabase, receptionist_id, params)
             if guard_err:

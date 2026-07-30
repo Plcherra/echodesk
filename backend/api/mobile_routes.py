@@ -1114,6 +1114,75 @@ async def get_receptionist(request: Request, receptionist_id: str):
     return data
 
 
+@router.get("/google/calendars")
+async def list_google_calendars(request: Request):
+    """List calendars under the user's connected Google account (for store picker)."""
+    user, supabase = _require_auth(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    user_row = (
+        supabase.table("users")
+        .select("calendar_refresh_token")
+        .eq("id", user["id"])
+        .single()
+        .execute()
+    )
+    refresh_token = ((user_row.data or {}).get("calendar_refresh_token") or "").strip()
+    if not refresh_token:
+        return JSONResponse(
+            {"error": "Google Calendar is not connected", "calendars": []},
+            status_code=400,
+        )
+
+    try:
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request as GoogleAuthRequest
+        from googleapiclient.discovery import build
+
+        creds = Credentials(
+            token=None,
+            refresh_token=refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=settings.google_client_id,
+            client_secret=settings.google_client_secret,
+            scopes=SCOPES,
+        )
+        creds.refresh(GoogleAuthRequest())
+        service = build("calendar", "v3", credentials=creds)
+        result = service.calendarList().list().execute()
+        items = result.get("items") or []
+        calendars = []
+        for item in items:
+            cid = (item.get("id") or "").strip()
+            if not cid:
+                continue
+            calendars.append(
+                {
+                    "id": cid,
+                    "summary": (item.get("summary") or cid).strip(),
+                    "primary": bool(item.get("primary")),
+                    "accessRole": item.get("accessRole"),
+                }
+            )
+        return {"calendars": calendars}
+    except Exception as e:
+        msg = str(e)
+        if "invalid_grant" in msg or "Token has been expired" in msg:
+            return JSONResponse(
+                {
+                    "error": "Calendar access expired. Please reconnect Google Calendar.",
+                    "calendars": [],
+                },
+                status_code=400,
+            )
+        logger.exception("[google/calendars] list failed: %s", e)
+        return JSONResponse(
+            {"error": "Could not list calendars", "calendars": []},
+            status_code=500,
+        )
+
+
 @router.get("/receptionists/{receptionist_id}/calendar-status")
 async def receptionist_calendar_status(request: Request, receptionist_id: str):
     """Return calendar connection details for a given receptionist."""
@@ -1188,6 +1257,7 @@ async def update_receptionist(request: Request, receptionist_id: str):
         return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
     updates = {"updated_at": datetime.utcnow().isoformat() + "Z"}
+    mode_changed = False
     if "payment_settings" in body:
         updates["payment_settings"] = body["payment_settings"]
     if "extra_instructions" in body:
@@ -1196,6 +1266,15 @@ async def update_receptionist(request: Request, receptionist_id: str):
         updates["system_prompt"] = (body["system_prompt"] or "").strip() or None
     if "greeting" in body:
         updates["greeting"] = (body["greeting"] or "").strip() or None
+    if "mode" in body:
+        mode = (body.get("mode") or "").strip().lower()
+        if mode not in ("personal", "business"):
+            return JSONResponse(
+                {"error": "mode must be personal or business"},
+                status_code=400,
+            )
+        updates["mode"] = mode
+        mode_changed = True
     if "voice_preset_key" in body:
         preset_key = (body.get("voice_preset_key") or "").strip() or None
         if preset_key:
@@ -1223,7 +1302,26 @@ async def update_receptionist(request: Request, receptionist_id: str):
             updates.get("voice_preset_key"),
             updates.get("voice_id"),
         )
-    return {"ok": True}
+    if mode_changed:
+        try:
+            rec = (
+                supabase.table("receptionists")
+                .select("business_id")
+                .eq("id", receptionist_id)
+                .limit(1)
+                .execute()
+            )
+            business_id = None
+            if rec.data:
+                business_id = (rec.data[0] or {}).get("business_id")
+            if business_id:
+                ensure_business_communication(supabase, str(business_id))
+        except Exception as ex:
+            logger.warning(
+                "[receptionists/update] ensure_business_communication after mode change failed: %s",
+                ex,
+            )
+    return {"ok": True, "mode": updates.get("mode")}
 
 
 @router.post("/receptionists/{receptionist_id}/delete")
