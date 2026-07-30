@@ -172,21 +172,11 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
   Widget build(BuildContext context) {
     final showFirstTimeOnboarding =
         _isSubscribed && _receptionists.isEmpty && !_loading && _error == null;
-    final showAddFab = _isSubscribed &&
-        _receptionists.isNotEmpty &&
-        !_loading &&
-        _error == null;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Receptionists'),
         actions: [
-          if (showAddFab)
-            IconButton(
-              icon: const Icon(Icons.add),
-              tooltip: 'Add receptionist',
-              onPressed: _navigateToCreate,
-            ),
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: 'Settings',
@@ -194,13 +184,6 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
           ),
         ],
       ),
-      floatingActionButton: showAddFab
-          ? FloatingActionButton.extended(
-              onPressed: _navigateToCreate,
-              icon: const Icon(Icons.add),
-              label: const Text('Add'),
-            )
-          : null,
       body: constrainedScaffoldBody(
         child: _loading
             ? const ListLoadingView()
@@ -229,7 +212,8 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
                             else ...[
                               Text(
                                 'Tap the phone icon or long-press a row to place an outbound call. '
-                                'New receptionists share your existing business number.',
+                                'For Business mode, add staff and store locations in Settings — '
+                                'each can use its own Google calendar.',
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall

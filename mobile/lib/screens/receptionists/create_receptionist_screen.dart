@@ -184,6 +184,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           )
           .eq('user_id', user.id)
           .order('created_at', ascending: true);
+
+      var activeCount = 0;
       String? sharedPhone;
       var hasLine = false;
       for (final raw in (recs as List)) {
@@ -191,6 +193,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         if (row['deleted_at'] != null) continue;
         if (row['status'] != null && row['status'] != 'active') continue;
         if (row['active'] == false) continue;
+        activeCount += 1;
         final tid = (row['telnyx_phone_number_id'] as String?)?.trim() ?? '';
         final phone = ((row['inbound_phone_number'] as String?) ??
                     (row['telnyx_phone_number'] as String?) ??
@@ -203,6 +206,26 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           if (tid.isNotEmpty && phone.isNotEmpty) break;
         }
       }
+
+      // One assistant per account/line — use Staff/Locations instead of a second create.
+      if (mounted && activeCount > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'You already have an assistant. Open Settings to switch Solo/Business '
+              'and add staff or store locations.',
+            ),
+            duration: Duration(seconds: 5),
+          ),
+        );
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/receptionists');
+        }
+        return;
+      }
+
       if (mounted && hasLine) {
         setState(() {
           _reusesSharedLine = true;

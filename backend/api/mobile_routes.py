@@ -810,9 +810,20 @@ async def create_receptionist(request: Request):
 
     target_business_id = str(target_business["id"])
     existing_for_business = list_active_receptionists_for_business(supabase, target_business_id)
-    is_additional = len(existing_for_business) > 0
+    if existing_for_business:
+        return JSONResponse(
+            {
+                "error": (
+                    "This business already has an assistant. "
+                    "Open Settings to switch Solo/Business, then add staff or store "
+                    "locations — each can use its own Google calendar under your "
+                    "connected account. Creating another assistant is not needed."
+                )
+            },
+            status_code=400,
+        )
 
-    # Wizard or legacy — only the first assistant for this business may provision a new Telnyx number.
+    # Wizard or legacy — only one assistant per business may provision a Telnyx number.
     phone_strategy = body.get("phone_strategy")
     if phone_strategy == "own":
         return JSONResponse(
@@ -829,79 +840,22 @@ async def create_receptionist(request: Request):
     inbound_number: str | None = None
     telnyx_phone: str | None = None
 
-    if is_additional:
-        primary = existing_for_business[0]
-        primary_tid = (primary.get("telnyx_phone_number_id") or "").strip() or None
-        primary_inb = (
-            primary.get("inbound_phone_number")
-            or primary.get("telnyx_phone_number")
-            or primary.get("phone_number")
-            or ""
-        ).strip()
-        primary_tel = (primary.get("telnyx_phone_number") or "").strip() or primary_inb
-        # Prefer canonical business line when receptionist mirrors are incomplete.
-        if not primary_tid:
-            try:
-                phone_res = (
-                    supabase.table("business_phone_numbers")
-                    .select("telnyx_number_id, phone_number_e164")
-                    .eq("business_id", target_business_id)
-                    .limit(1)
-                    .execute()
-                )
-                if phone_res.data:
-                    crow = phone_res.data[0] or {}
-                    primary_tid = (crow.get("telnyx_number_id") or "").strip() or None
-                    canon_e164 = (crow.get("phone_number_e164") or "").strip()
-                    if canon_e164:
-                        primary_inb = primary_inb or canon_e164
-                        primary_tel = primary_tel or canon_e164
-                    if primary_tid:
-                        try:
-                            from communication.ensure import mirror_business_phone_to_receptionists
-
-                            mirror_business_phone_to_receptionists(supabase, target_business_id)
-                        except Exception as mirror_ex:
-                            logger.warning(
-                                "[receptionists/create] mirror shared line failed: %s",
-                                mirror_ex,
-                            )
-            except Exception as canon_ex:
-                logger.warning(
-                    "[receptionists/create] load canonical phone failed: %s",
-                    canon_ex,
-                )
-        if not primary_tid:
-            return JSONResponse(
-                {
-                    "error": (
-                        "Your business phone line is not ready yet. Open your existing "
-                        "receptionist and finish phone setup, or contact support. "
-                        "Assistants under the same business share one phone line."
-                    )
-                },
-                status_code=400,
-            )
-        telnyx_id = primary_tid
-        inbound_number = primary_inb or primary_tel
-        telnyx_phone = primary_tel or primary_inb
-    else:
-        area_code = body.get("area_code") or "212"
-        if area_code == "other":
-            area_code = "212"
+    area_code = body.get("area_code") or "212"
+    if area_code == "other":
+        area_code = "212"
+    try:
+        tid, tphone = telnyx_provision.provision_number(area_code)
+        telnyx_id = tid
+        telnyx_phone = tphone
+        telnyx_provision.configure_voice_url(telnyx_id, f"{webhook_base}/api/telnyx/voice")
+        provisioned_new_number = True
+    except Exception as ex:
         try:
-            tid, tphone = telnyx_provision.provision_number(area_code)
-            telnyx_id = tid
-            telnyx_phone = tphone
-            telnyx_provision.configure_voice_url(telnyx_id, f"{webhook_base}/api/telnyx/voice")
-            provisioned_new_number = True
-        except Exception as ex:
-            try:
-                mark_business_phone_line_failed(supabase, target_business_id)
-            except Exception:
-                pass
-            return JSONResponse({"error": str(ex)}, status_code=400)
-        inbound_number = telnyx_phone
+            mark_business_phone_line_failed(supabase, target_business_id)
+        except Exception:
+            pass
+        return JSONResponse({"error": str(ex)}, status_code=400)
+    inbound_number = telnyx_phone
 
     # Canonical line on the business; receptionist row below mirrors these for Telnyx voice routing.
     upsert_canonical_business_phone(

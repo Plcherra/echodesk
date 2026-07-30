@@ -82,11 +82,19 @@ def build_receptionist_prompt(
                 sp = s["specialties"]
                 spec = ", ".join(sp) if isinstance(sp, list) else str(sp)
             role = s.get("role") or "staff"
+            cal = " [own calendar]" if (s.get("calendar_id") or "").strip() else ""
             if spec:
-                parts.append(f"{s.get('name', '')} ({role}): {spec}")
+                parts.append(f"{s.get('name', '')} ({role}): {spec}{cal}")
             else:
-                parts.append(f"{s.get('name', '')}{f', {role}' if role else ''}")
-        sections.append(f"Staff: {' '.join(parts)}. When relevant, suggest booking with a specific staff member or \"anyone available.\"")
+                parts.append(f"{s.get('name', '')}{f', {role}' if role else ''}{cal}")
+        sections.append(
+            f"Staff: {' '.join(parts)}. When relevant, suggest booking with a specific staff member or \"anyone available.\""
+        )
+        if len(staff_list) > 1:
+            sections.append(
+                "Staff calendars: When the caller wants a specific person and has not named one, ask who they prefer. "
+                "Pass staff_name to check_availability and create_appointment so that person's calendar is used."
+            )
 
     if services:
         svc_list = services[:COMPACT_SERVICES_LIMIT] if compact else services

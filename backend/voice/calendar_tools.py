@@ -42,6 +42,14 @@ CALENDAR_TOOLS = [
                         "type": "string",
                         "description": "UUID of the store/location if known. Prefer store_name when the caller spoke the location name.",
                     },
+                    "staff_name": {
+                        "type": "string",
+                        "description": "Staff/employee name when the caller wants a specific person (e.g. Bianca). Pass so availability uses that person's calendar.",
+                    },
+                    "staff_id": {
+                        "type": "string",
+                        "description": "UUID of the staff member if known. Prefer staff_name when the caller spoke the name.",
+                    },
                 },
                 "required": [],
             },
@@ -76,6 +84,14 @@ CALENDAR_TOOLS = [
                     "location_id": {
                         "type": "string",
                         "description": "UUID of the store/location if known. Prefer store_name when the caller spoke the location name.",
+                    },
+                    "staff_name": {
+                        "type": "string",
+                        "description": "Staff/employee name when booking with a specific person. Pass so the booking lands on that person's calendar.",
+                    },
+                    "staff_id": {
+                        "type": "string",
+                        "description": "UUID of the staff member if known. Prefer staff_name when the caller spoke the name.",
                     },
                 },
                 "required": ["summary"],

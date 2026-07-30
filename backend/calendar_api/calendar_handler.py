@@ -105,6 +105,62 @@ def _resolve_location_calendar_id(
     return fallback
 
 
+def _resolve_staff_calendar_id(
+    supabase,
+    receptionist_id: str,
+    params: dict,
+    fallback_calendar_id: str,
+) -> str:
+    """Prefer a staff member's calendar when the caller named one."""
+    fallback = (fallback_calendar_id or "").strip() or "primary"
+    staff_id = (params.get("staff_id") or "").strip()
+    staff_name = (
+        params.get("staff_name")
+        or params.get("employee_name")
+        or params.get("with_staff")
+        or ""
+    ).strip()
+    try:
+        row = None
+        if staff_id:
+            r = (
+                supabase.table("staff")
+                .select("calendar_id")
+                .eq("id", staff_id)
+                .eq("receptionist_id", receptionist_id)
+                .limit(1)
+                .execute()
+            )
+            row = (r.data or [None])[0]
+        elif staff_name:
+            r = (
+                supabase.table("staff")
+                .select("calendar_id, name")
+                .eq("receptionist_id", receptionist_id)
+                .ilike("name", f"%{staff_name}%")
+                .limit(5)
+                .execute()
+            )
+            rows = r.data or []
+            if len(rows) == 1:
+                row = rows[0]
+            elif rows:
+                exact = next(
+                    (
+                        x
+                        for x in rows
+                        if (x.get("name") or "").strip().lower() == staff_name.lower()
+                    ),
+                    None,
+                )
+                row = exact or rows[0]
+        if row and (row.get("calendar_id") or "").strip():
+            return (row.get("calendar_id") or "").strip()
+    except Exception as e:
+        logger.warning("staff calendar resolve failed: %s", e)
+    return fallback
+
+
 async def handle_calendar_request(body: dict) -> dict:
     """Handle POST /api/voice/calendar. Returns dict for JSON response."""
     from fastapi import HTTPException
@@ -157,10 +213,14 @@ async def handle_calendar_request(body: dict) -> dict:
 
     try:
         calendar_id = default_calendar_id
-        # Solo/personal: always use receptionist calendar; ignore store calendars.
+        # Solo/personal: always use receptionist calendar; ignore store/staff calendars.
         if is_business and action in ("check_availability", "create_appointment"):
             calendar_id = _resolve_location_calendar_id(
                 supabase, receptionist_id, params, default_calendar_id
+            )
+            # Staff calendar wins when a specific person is requested.
+            calendar_id = _resolve_staff_calendar_id(
+                supabase, receptionist_id, params, calendar_id
             )
         if action == "check_availability":
             guard_err = _check_service_first_guard(supabase, receptionist_id, params)

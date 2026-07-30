@@ -176,7 +176,8 @@ class _ReceptionistCalendarTabState extends State<ReceptionistCalendarTab> {
           ),
           const SizedBox(height: EchoDeskSpacing.xs),
           Text(
-            'Same phone number either way. Business unlocks staff and store locations.',
+            'Same phone number either way. Business unlocks staff and store locations — '
+            'each can use its own Google calendar under your connected account.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: EchoDeskColors.muted,
                 ),

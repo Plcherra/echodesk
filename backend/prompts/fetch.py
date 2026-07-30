@@ -112,7 +112,7 @@ def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str,
         staff: list = []
         locations: list = []
         if is_business:
-            staff_res = supabase.table("staff").select("name, role, specialties").eq("receptionist_id", receptionist_id).order("name").execute()
+            staff_res = supabase.table("staff").select("name, role, specialties, calendar_id").eq("receptionist_id", receptionist_id).order("name").execute()
             locations_res = supabase.table("locations").select("name, address, notes, hours, calendar_id").eq("receptionist_id", receptionist_id).execute()
             staff = staff_res.data or []
             locations = locations_res.data or []
