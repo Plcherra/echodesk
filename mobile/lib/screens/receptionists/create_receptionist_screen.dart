@@ -564,14 +564,14 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         _selectableOption(
           title: 'Personal / Solo',
           subtitle:
-              'Book time on my calendar. Shares your business phone line with other receptionists.',
+              'Book time on my calendar. One assistant, one phone number.',
           selected: _formData.mode == 'personal',
           onTap: () => setState(() => _formData.mode = 'personal'),
         ),
         _selectableOption(
           title: 'Business / Team',
           subtitle:
-              'Staff, services, and locations. Same shared phone line — not a second number.',
+              'Staff, services, and store locations — each can use its own calendar. Same phone number.',
           selected: _formData.mode == 'business',
           onTap: () => setState(() => _formData.mode = 'business'),
         ),
