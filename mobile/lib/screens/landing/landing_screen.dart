@@ -72,6 +72,11 @@ class _LandingHeader extends StatelessWidget {
       backgroundColor: EchoDeskColors.background.withValues(alpha: 0.94),
       surfaceTintColor: Colors.transparent,
       titleSpacing: 16,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        tooltip: 'Back',
+        onPressed: () => context.go('/'),
+      ),
       title: const BrandLockup(centered: true),
       actions: [
         TextButton(

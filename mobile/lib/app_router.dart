@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/landing/landing_screen.dart';
+import 'screens/landing/welcome_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/auth/signup_screen.dart';
@@ -38,6 +39,7 @@ GoRouter createAppRouter() {
       final session = Supabase.instance.client.auth.currentSession;
       final isLoggedIn = session != null;
       final isLanding = state.matchedLocation == '/' ||
+          state.matchedLocation.startsWith('/learn-more') ||
           state.matchedLocation.startsWith('/login') ||
           state.matchedLocation.startsWith('/reset-password') ||
           state.matchedLocation.startsWith('/signup');
@@ -50,7 +52,9 @@ GoRouter createAppRouter() {
       if (isLoggedIn && isAuthRoute) {
         return '/dashboard';
       }
-      if (isLoggedIn && state.matchedLocation == '/') {
+      if (isLoggedIn &&
+          (state.matchedLocation == '/' ||
+              state.matchedLocation.startsWith('/learn-more'))) {
         return '/dashboard';
       }
       // Redirect to onboarding if not yet complete.
@@ -88,6 +92,10 @@ GoRouter createAppRouter() {
     routes: [
       GoRoute(
         path: '/',
+        builder: (context, state) => const WelcomeScreen(),
+      ),
+      GoRoute(
+        path: '/learn-more',
         builder: (context, state) => const LandingScreen(),
       ),
       GoRoute(

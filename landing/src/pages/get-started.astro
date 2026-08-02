@@ -73,6 +73,13 @@ const planLabel =
         color: var(--muted);
         line-height: 1.5;
       }
+      .code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.92rem;
+        background: rgba(20, 32, 28, 0.06);
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
       .actions {
         display: flex;
         flex-wrap: wrap;
@@ -107,25 +114,32 @@ const planLabel =
   <body>
     <div class="shell">
       <a class="back" href="/">← Back to EchoDesk</a>
-      <h1>Create your {planLabel} account in the app</h1>
+      <h1>Create your {planLabel} account in the EchoDesk app</h1>
       <p class="lede">
-        EchoDesk signup happens in the mobile app — not by email. After you
-        confirm your address, come back to the app to finish onboarding.
+        There is no web signup form yet. Open the EchoDesk app on your phone or Mac,
+        then tap <strong>Create account</strong> on the first screen.
       </p>
       <div class="steps">
         <div class="step">
-          <strong>1. Open the EchoDesk app</strong>
-          <p>Use the installed iOS or Android build on your phone.</p>
-        </div>
-        <div class="step">
-          <strong>2. Tap Start free trial / Create account</strong>
-          <p>Sign up with your email and password inside the app.</p>
-        </div>
-        <div class="step">
-          <strong>3. Confirm your email, then return to the app</strong>
+          <strong>On iPhone</strong>
           <p>
-            The confirmation link opens a short handoff page and then EchoDesk.
-            If that fails, open the app and sign in with the same email.
+            Run the installed app build, or from the repo:
+            <span class="code">cd mobile && ./run_prod.sh &lt;device-id&gt; release</span>
+          </p>
+        </div>
+        <div class="step">
+          <strong>On Mac (desktop app)</strong>
+          <p>
+            From the repo:
+            <span class="code">cd mobile && ./run_prod.sh macos profile</span>
+            — then use Create account / Log in on the welcome screen.
+          </p>
+        </div>
+        <div class="step">
+          <strong>Confirm your email</strong>
+          <p>
+            After signup, confirm from the email link. You should return to the app
+            (or open the app and log in with the same email).
           </p>
         </div>
       </div>
@@ -134,7 +148,7 @@ const planLabel =
         <a class="button quiet" href="mailto:echodesk2@gmail.com?subject=EchoDesk%20help">Email support</a>
       </div>
       <p class="note">
-        Need help installing a build? Email
+        Need a build or help installing? Email
         <a href="mailto:echodesk2@gmail.com">echodesk2@gmail.com</a>.
       </p>
     </div>
