@@ -30,15 +30,19 @@ class AccountBootstrapService {
     });
   }
 
-  Future<void> ensureCurrentProfile() async {
+  Future<void> ensureCurrentProfile({bool force = false}) async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
-    if (_lastEnsuredUserId == user.id) return;
+    if (!force && _lastEnsuredUserId == user.id) return;
 
     final existing = _inFlight;
     if (existing != null) {
       await existing;
-      if (_lastEnsuredUserId == user.id) return;
+      if (!force && _lastEnsuredUserId == user.id) return;
+    }
+
+    if (force) {
+      _lastEnsuredUserId = null;
     }
 
     final future = _ensure(user.id);

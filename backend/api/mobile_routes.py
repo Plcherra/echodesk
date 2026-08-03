@@ -37,6 +37,7 @@ from billing.stripe_sync import (
 )
 from billing.subscriptions import get_billing_access_state
 from stripe_plans import get_price_id_for_plan_id, plan_from_subscription
+from billing.launch_trial import maybe_activate_launch_trial
 from supabase_client import create_service_role_client
 from telnyx import provision as telnyx_provision
 from telnyx.recording_download import fetch_fresh_recording_mp3_url
@@ -189,6 +190,12 @@ def _ensure_user_profile(supabase, user: dict) -> dict:
                 row = updated.data[0]
             else:
                 row = {**row, "email": email, "updated_at": now}
+        row = maybe_activate_launch_trial(
+            supabase,
+            user_id,
+            row,
+            sync_user_plan=_sync_user_plan_from_billing_plan,
+        )
         return {"created": False, "profile": row}
 
     insert_row = {
@@ -202,6 +209,12 @@ def _ensure_user_profile(supabase, user: dict) -> dict:
         .execute()
     )
     profile = created.data[0] if created.data else insert_row
+    profile = maybe_activate_launch_trial(
+        supabase,
+        user_id,
+        profile,
+        sync_user_plan=_sync_user_plan_from_billing_plan,
+    )
     return {"created": True, "profile": profile}
 
 

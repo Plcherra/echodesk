@@ -31,10 +31,11 @@ final _receptionistsNavigatorKey = GlobalKey<NavigatorState>();
 final _appointmentsNavigatorKey = GlobalKey<NavigatorState>();
 final _settingsNavigatorKey = GlobalKey<NavigatorState>();
 
-GoRouter createAppRouter() {
+GoRouter createAppRouter({Listenable? refreshListenable}) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
+    refreshListenable: refreshListenable,
     redirect: (context, state) async {
       final session = Supabase.instance.client.auth.currentSession;
       final isLoggedIn = session != null;
@@ -162,8 +163,10 @@ GoRouter createAppRouter() {
                 routes: [
                   GoRoute(
                     path: 'create',
-                    builder: (context, state) =>
-                        const CreateReceptionistScreen(),
+                    builder: (context, state) => CreateReceptionistScreen(
+                      firstRun:
+                          state.uri.queryParameters['firstRun'] == '1',
+                    ),
                   ),
                   GoRoute(
                     path: ':id',

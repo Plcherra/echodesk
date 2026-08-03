@@ -261,7 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _buildOnboardingAlert(context),
               if (isActive) _buildAppointmentsCard(context),
               if (!isActive) ...[
-                _buildUpgradeCard(context),
+                _buildUpgradeCard(context, profile),
               ] else ...[
                 _buildStatsGrid(profile),
                 const SizedBox(height: EchoDeskSpacing.md),
@@ -332,7 +332,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildUpgradeCard(BuildContext context) {
+  Widget _buildUpgradeCard(BuildContext context, UserProfile profile) {
+    final needsSetup = !profile.onboardingComplete;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -340,18 +341,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Subscribe to continue',
+              needsSetup ? 'Finish setup to continue' : 'Subscribe to continue',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Connect calendar to start. Upgrade for your AI assistant.',
+            Text(
+              needsSetup
+                  ? 'Connect your calendar and create your AI receptionist. Your free trial starts when your account is ready.'
+                  : 'Connect calendar to start. Upgrade for your AI assistant.',
             ),
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: () => _pushAndRefresh('/checkout'),
-              child: const Text('Subscribe'),
+              onPressed: () => _pushAndRefresh(
+                needsSetup ? '/onboarding' : '/checkout',
+              ),
+              child: Text(needsSetup ? 'Continue setup' : 'Subscribe'),
             ),
+            if (needsSetup) ...[
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => _pushAndRefresh('/checkout'),
+                child: const Text('Choose a paid plan'),
+              ),
+            ],
           ],
         ),
       ),

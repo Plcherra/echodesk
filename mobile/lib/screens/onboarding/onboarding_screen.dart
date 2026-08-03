@@ -6,12 +6,22 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../config/trial_offer.dart';
 import '../../services/api_client.dart';
 import '../../strings.dart';
 import '../../theme/echodesk_theme.dart';
+import '../../widgets/brand_lockup.dart';
 import '../../widgets/confirm_sign_out.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 import '../../widgets/state_views.dart';
+
+enum _OnboardingPhase {
+  welcome,
+  calendar,
+  assistant,
+  testCall,
+  ready,
+}
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -31,13 +41,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _hasReceptionist = false;
   String? _testCallNumber;
   bool _isSubscribed = false;
+  String? _subscriptionStatus;
+  String? _apiCurrentStep;
   String? _error;
   bool _loading = true;
+  bool _welcomeSeen = false;
+  bool _testAcknowledged = false;
+  bool _completing = false;
+  bool _handledCalendarReturn = false;
+  int _phaseAnimKey = 0;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final calendar = GoRouterState.of(context).uri.queryParameters['calendar'];
+    if (calendar == 'connected' && !_handledCalendarReturn) {
+      _handledCalendarReturn = true;
+      _welcomeSeen = true;
+      _load().then((_) {
+        if (!mounted) return;
+        // Drop the query so we don't loop.
+        context.go('/onboarding');
+      });
+    }
   }
 
   Future<void> _load() async {
@@ -54,13 +86,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       final data = _parseJson(res.body);
       final phone = data['phoneNumber'] as String?;
       if (!mounted) return;
+      final hasCalendar = data['hasCalendar'] == true;
+      final hasReceptionist = data['hasReceptionist'] == true;
       setState(() {
-        _hasCalendar = data['hasCalendar'] == true;
+        _hasCalendar = hasCalendar;
         _hasPhone = data['hasBusinessPhoneNumber'] == true;
         _isSubscribed = data['hasActiveSubscription'] == true;
-        _hasReceptionist = data['hasReceptionist'] == true;
+        _subscriptionStatus = data['subscriptionStatus'] as String?;
+        _hasReceptionist = hasReceptionist;
         _testCallNumber = phone;
+        _apiCurrentStep = data['currentStep'] as String?;
+        // Resume mid-setup without forcing the welcome screen again.
+        if (hasCalendar || hasReceptionist) {
+          _welcomeSeen = true;
+        }
         _loading = false;
+        _phaseAnimKey++;
       });
     } catch (e) {
       if (!mounted) return;
@@ -80,6 +121,51 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return <String, dynamic>{};
     }
   }
+
+  _OnboardingPhase get _phase {
+    if (!_welcomeSeen) return _OnboardingPhase.welcome;
+
+    // Prefer live flags; API currentStep is a hint (subscribe/create map to assistant).
+    if (!_hasCalendar || _apiCurrentStep == 'connect_calendar') {
+      return _OnboardingPhase.calendar;
+    }
+    if (!_isSubscribed ||
+        _apiCurrentStep == 'subscribe' ||
+        !_hasReceptionist ||
+        _apiCurrentStep == 'create_receptionist') {
+      if (_hasReceptionist && _isSubscribed) {
+        // Fall through to test call.
+      } else {
+        return _OnboardingPhase.assistant;
+      }
+    }
+    // Show test-call with the number before the celebration screen.
+    if (!_testAcknowledged) {
+      return _OnboardingPhase.testCall;
+    }
+    if (_hasPhone && _hasReceptionist && _hasCalendar && _isSubscribed) {
+      return _OnboardingPhase.ready;
+    }
+    return _OnboardingPhase.testCall;
+  }
+
+  int get _railIndex {
+    switch (_phase) {
+      case _OnboardingPhase.welcome:
+        return 0;
+      case _OnboardingPhase.calendar:
+        return 0;
+      case _OnboardingPhase.assistant:
+        return 1;
+      case _OnboardingPhase.testCall:
+        return 2;
+      case _OnboardingPhase.ready:
+        return 3;
+    }
+  }
+
+  bool get _isTrialing =>
+      (_subscriptionStatus ?? '').toLowerCase() == 'trialing';
 
   Future<void> _connectCalendar() async {
     try {
@@ -103,7 +189,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
+  Future<void> _openCreateAssistant() async {
+    final created = await context.push<bool>('/receptionists/create?firstRun=1');
+    if (!mounted) return;
+    await _load();
+    if (created == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Assistant created — next, try a test call')),
+      );
+    }
+  }
+
   Future<void> _completeOnboarding() async {
+    setState(() => _completing = true);
     try {
       final res = await ApiClient.post(
         '/api/mobile/onboarding/complete',
@@ -128,6 +226,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         SnackBar(content: Text(e.toString())),
       );
       await _load();
+    } finally {
+      if (mounted) setState(() => _completing = false);
     }
   }
 
@@ -151,15 +251,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (_loading && _apiCurrentStep == null && _error == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (_error != null) {
+    if (_error != null && _apiCurrentStep == null && !_hasCalendar) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Finish setup')),
+        appBar: AppBar(title: const Text('Setup')),
         body: Center(
           child: ErrorStateView(
             title: 'Could not load setup',
@@ -170,350 +270,632 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
     }
 
-    final currentStep = !_hasCalendar
-        ? 1
-        : !_hasReceptionist
-            ? 2
-            : !_hasPhone
-                ? 3
-                : 4;
-
-    const steps = [
-      ('Connect Calendar', Icons.calendar_today),
-      ('Create Receptionist', Icons.person_add),
-      ('Test Call', Icons.phone_in_talk),
-      ('Done', Icons.check_circle),
-    ];
+    final phase = _phase;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Finish setup'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: 'Settings',
-            onPressed: () => context.push('/settings'),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFE8F2F1),
+              EchoDeskColors.background,
+              Color(0xFFF7F5F2),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
-            onPressed: () => confirmSignOut(context),
-          ),
-        ],
-      ),
-      body: constrainedScaffoldBody(
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Text(
-              currentStep == 4
-                  ? 'Your AI receptionist is set up and ready for callers.'
-                  : 'Complete these steps to get the most out of your AI receptionist.',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        child: SafeArea(
+          child: constrainedScaffoldBody(
+            child: RefreshIndicator(
+              onRefresh: _load,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: BrandLockup(markSize: 32, centered: false),
+                          ),
+                          if (_isSubscribed)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: _TrialChip(isTrialing: _isTrialing),
+                            ),
+                          PopupMenuButton<String>(
+                            tooltip: 'Account',
+                            onSelected: (value) {
+                              if (value == 'signout') {
+                                confirmSignOut(context);
+                              }
+                            },
+                            itemBuilder: (context) => const [
+                              PopupMenuItem(
+                                value: 'signout',
+                                child: Text('Sign out'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
+                  if (phase != _OnboardingPhase.welcome)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                        child: _StepRail(activeIndex: _railIndex),
+                      ),
+                    ),
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 320),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) {
+                          final offset = Tween<Offset>(
+                            begin: const Offset(0.04, 0.06),
+                            end: Offset.zero,
+                          ).animate(animation);
+                          return FadeTransition(
+                            opacity: animation,
+                            child: SlideTransition(
+                              position: offset,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: KeyedSubtree(
+                          key: ValueKey('${phase.name}_$_phaseAnimKey'),
+                          child: _buildPhaseBody(phase),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 24),
-            _buildStepper(steps, currentStep),
-            const SizedBox(height: 24),
-            if (currentStep == 1) _buildCalendarStep(),
-            if (currentStep == 2) _buildCreateReceptionistStep(context),
-            if (currentStep == 3) _buildTestCallStep(context),
-            if (currentStep == 4) _buildReadyStep(context),
-            const SizedBox(height: 24),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildStepper(List<(String, IconData)> steps, int current) {
+  Widget _buildPhaseBody(_OnboardingPhase phase) {
+    switch (phase) {
+      case _OnboardingPhase.welcome:
+        return _WelcomeBody(
+          isTrialing: _isTrialing || _isSubscribed,
+          onStart: () => setState(() {
+            _welcomeSeen = true;
+            _phaseAnimKey++;
+          }),
+        );
+      case _OnboardingPhase.calendar:
+        return _StepBody(
+          kicker: 'Step 1 of 4',
+          headline: 'Connect Google Calendar',
+          body:
+              'EchoDesk checks real availability and books appointments on your calendar — no double-booking.',
+          footnote: 'We only use the calendar you choose for booking.',
+          primaryLabel: 'Connect Google Calendar',
+          onPrimary: _connectCalendar,
+          secondaryLabel: 'I’ve connected — refresh',
+          onSecondary: _load,
+        );
+      case _OnboardingPhase.assistant:
+        if (!_isSubscribed) {
+          return _StepBody(
+            kicker: 'Step 2 of 4',
+            headline: 'Activate your plan to continue',
+            body:
+                'Create your AI receptionist after choosing a plan — or claim a launch trial spot if one is still open.',
+            footnote: 'Takes about a minute. No long-term contract.',
+            primaryLabel: 'Choose a plan',
+            onPrimary: () => context.push('/checkout'),
+            secondaryLabel: 'Refresh status',
+            onSecondary: _load,
+          );
+        }
+        return _StepBody(
+          kicker: 'Step 2 of 4',
+          headline: 'Create your AI receptionist',
+          body:
+              'Name your assistant, pick a voice, and get a US business number that answers and books for you.',
+          footnote: 'About 3 minutes. You can change details later.',
+          primaryLabel: 'Create your AI receptionist',
+          onPrimary: _openCreateAssistant,
+          secondaryLabel: 'Refresh status',
+          onSecondary: _load,
+        );
+      case _OnboardingPhase.testCall:
+        return _TestCallBody(
+          phoneNumber: _testCallNumber,
+          isPhoneDevice: _isPhoneDevice,
+          onDial: _dialTestCall,
+          onCopy: _copyNumber,
+          onRefresh: _load,
+          showContinue: _hasPhone,
+          onContinue: () => setState(() {
+            _testAcknowledged = true;
+            _phaseAnimKey++;
+          }),
+        );
+      case _OnboardingPhase.ready:
+        return _ReadyBody(
+          phoneNumber: _testCallNumber,
+          isPhoneDevice: _isPhoneDevice,
+          completing: _completing,
+          onComplete: _completeOnboarding,
+          onDial: _dialTestCall,
+          onCopy: _copyNumber,
+        );
+    }
+  }
+}
+
+class _TrialChip extends StatelessWidget {
+  const _TrialChip({required this.isTrialing});
+
+  final bool isTrialing;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = isTrialing
+        ? '${TrialOffer.trialDays}-day trial · ${TrialOffer.includedMinutes} min'
+        : 'Active';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: EchoDeskColors.brandSoft,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: EchoDeskColors.line),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: EchoDeskColors.brand,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
+  }
+}
+
+class _StepRail extends StatelessWidget {
+  const _StepRail({required this.activeIndex});
+
+  final int activeIndex;
+
+  static const _labels = ['Calendar', 'Assistant', 'Test call', 'Ready'];
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
       children: [
-        for (var i = 0; i < steps.length; i++) ...[
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: i + 1 < current
-                ? EchoDeskColors.success
-                : i + 1 == current
-                    ? Theme.of(context).colorScheme.primary
-                    : EchoDeskColors.lineStrong,
-            child: Text(
-              i + 1 < current ? '✓' : '${i + 1}',
-              style: TextStyle(
-                color: i + 1 <= current ? Colors.white : EchoDeskColors.muted,
-                fontSize: 12,
-              ),
+        for (var i = 0; i < _labels.length; i++) ...[
+          Expanded(
+            child: Column(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 240),
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: i <= activeIndex
+                        ? EchoDeskColors.brandTeal
+                        : EchoDeskColors.lineStrong,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _labels[i],
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: i <= activeIndex
+                            ? EchoDeskColors.ink
+                            : EchoDeskColors.soft,
+                        fontWeight:
+                            i == activeIndex ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                ),
+              ],
             ),
           ),
-          if (i < steps.length - 1)
-            Expanded(
-              child: Container(
-                height: 2,
-                color: i + 1 < current
-                    ? EchoDeskColors.success
-                    : EchoDeskColors.lineStrong,
-              ),
-            ),
+          if (i < _labels.length - 1) const SizedBox(width: 8),
         ],
       ],
     );
   }
+}
 
-  Widget _buildCalendarStep() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '1. Connect Google Calendar',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Required for booking and availability.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            if (_hasCalendar)
-              const Row(
-                children: [
-                  Icon(Icons.check_circle, color: EchoDeskColors.success),
-                  SizedBox(width: 8),
-                  Text('Calendar connected'),
-                ],
-              )
-            else
-              FilledButton(
-                onPressed: _connectCalendar,
-                child: const Text('Connect Google Calendar'),
+class _WelcomeBody extends StatelessWidget {
+  const _WelcomeBody({
+    required this.isTrialing,
+    required this.onStart,
+  });
+
+  final bool isTrialing;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Spacer(flex: 2),
+        const BrandLockup(markSize: 56, centered: true),
+        const SizedBox(height: EchoDeskSpacing.xl),
+        Text(
+          isTrialing
+              ? 'Your ${TrialOffer.trialDays}-day trial is ready'
+              : 'Welcome to EchoDesk',
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.4,
+                height: 1.15,
               ),
-          ],
+          textAlign: TextAlign.center,
         ),
-      ),
+        const SizedBox(height: EchoDeskSpacing.md),
+        Text(
+          'In a few minutes you’ll have an AI receptionist that answers calls and books from your real calendar.',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: EchoDeskColors.muted,
+                fontWeight: FontWeight.w400,
+                height: 1.4,
+              ),
+          textAlign: TextAlign.center,
+        ),
+        const Spacer(flex: 3),
+        FilledButton(
+          onPressed: onStart,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+          ),
+          child: const Text('Start setup'),
+        ),
+        const SizedBox(height: EchoDeskSpacing.sm),
+        Text(
+          'Calendar → assistant → test call. About 5 minutes.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: EchoDeskColors.soft,
+              ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
+}
 
-  Widget _buildCreateReceptionistStep(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '2. Create your first receptionist',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Set up the assistant that will answer on your business line.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            if (_hasReceptionist)
-              const Row(
-                children: [
-                  Icon(Icons.check_circle, color: EchoDeskColors.success),
-                  SizedBox(width: 8),
-                  Text('Receptionist created'),
-                ],
-              )
-            else if (_isSubscribed)
-              FilledButton(
-                onPressed: () async {
-                  final created =
-                      await context.push<bool>('/receptionists/create');
-                  if (created == true) _load();
-                },
-                child: const Text('Create Receptionist'),
-              )
-            else
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text('You need an active subscription.'),
-                  ),
-                  TextButton(
-                    onPressed: () => context.push('/dashboard'),
-                    child: const Text('Upgrade first'),
-                  ),
-                ],
+class _StepBody extends StatelessWidget {
+  const _StepBody({
+    required this.kicker,
+    required this.headline,
+    required this.body,
+    required this.primaryLabel,
+    required this.onPrimary,
+    this.footnote,
+    this.secondaryLabel,
+    this.onSecondary,
+  });
+
+  final String kicker;
+  final String headline;
+  final String body;
+  final String primaryLabel;
+  final VoidCallback onPrimary;
+  final String? footnote;
+  final String? secondaryLabel;
+  final VoidCallback? onSecondary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          kicker,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: EchoDeskColors.brandTeal,
+                fontWeight: FontWeight.w700,
               ),
-          ],
         ),
-      ),
+        const SizedBox(height: EchoDeskSpacing.sm),
+        Text(
+          headline,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+                height: 1.15,
+              ),
+        ),
+        const SizedBox(height: EchoDeskSpacing.md),
+        Text(
+          body,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: EchoDeskColors.muted,
+                height: 1.45,
+              ),
+        ),
+        const Spacer(),
+        if (footnote != null) ...[
+          Text(
+            footnote!,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: EchoDeskColors.soft,
+                ),
+          ),
+          const SizedBox(height: EchoDeskSpacing.md),
+        ],
+        FilledButton(
+          onPressed: onPrimary,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+          ),
+          child: Text(primaryLabel),
+        ),
+        if (secondaryLabel != null && onSecondary != null) ...[
+          const SizedBox(height: EchoDeskSpacing.sm),
+          TextButton(
+            onPressed: onSecondary,
+            child: Text(secondaryLabel!),
+          ),
+        ],
+      ],
     );
   }
+}
 
-  /// Step 3: try the line — not the final Done state.
-  Widget _buildTestCallStep(BuildContext context) {
-    final hasNumber =
-        _testCallNumber != null && _testCallNumber!.trim().isNotEmpty;
+class _TestCallBody extends StatelessWidget {
+  const _TestCallBody({
+    required this.phoneNumber,
+    required this.isPhoneDevice,
+    required this.onDial,
+    required this.onCopy,
+    required this.onRefresh,
+    required this.onContinue,
+    required this.showContinue,
+  });
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '3. Test call',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Call your AI receptionist to hear it in action.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            if (hasNumber) ...[
-              Text(
-                'Your business line — give this number to customers so they can call and book.',
-                style: Theme.of(context).textTheme.bodyMedium,
+  final String? phoneNumber;
+  final bool isPhoneDevice;
+  final VoidCallback onDial;
+  final VoidCallback onCopy;
+  final Future<void> Function() onRefresh;
+  final VoidCallback onContinue;
+  final bool showContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasNumber = phoneNumber != null && phoneNumber!.trim().isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Step 3 of 4',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: EchoDeskColors.brandTeal,
+                fontWeight: FontWeight.w700,
               ),
-              const SizedBox(height: 8),
-              Text(
-                _testCallNumber!,
-                style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: EchoDeskSpacing.sm),
+        Text(
+          'Make a test call',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+                height: 1.15,
               ),
-              if (!_isPhoneDevice)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    'Call this number from your phone to test the AI.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+        ),
+        const SizedBox(height: EchoDeskSpacing.md),
+        Text(
+          hasNumber
+              ? 'Call your new business line and ask to book an appointment. Hear how your assistant answers.'
+              : 'Your number is almost ready. Refresh in a moment — provisioning usually takes a few seconds.',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: EchoDeskColors.muted,
+                height: 1.45,
+              ),
+        ),
+        const SizedBox(height: EchoDeskSpacing.xl),
+        if (hasNumber) ...[
+          Text(
+            'Your business line',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: EchoDeskColors.soft,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            phoneNumber!,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
+                ),
+          ),
+          const SizedBox(height: EchoDeskSpacing.md),
+          Text(
+            'Tip: say “I’d like to book a haircut tomorrow morning.”',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: EchoDeskColors.soft,
+                ),
+          ),
+          const Spacer(),
+          if (isPhoneDevice)
+            FilledButton.icon(
+              onPressed: onDial,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+              icon: const Icon(Icons.phone),
+              label: const Text('Call now'),
+            )
+          else
+            FilledButton.icon(
+              onPressed: onCopy,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+              icon: const Icon(Icons.copy),
+              label: const Text('Copy number'),
+            ),
+          const SizedBox(height: EchoDeskSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onRefresh,
+                  child: const Text('Refresh'),
+                ),
+              ),
+              if (showContinue) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: onContinue,
+                    child: const Text('I’m done testing'),
                   ),
                 ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (_isPhoneDevice)
-                    FilledButton.icon(
-                      onPressed: _dialTestCall,
-                      icon: const Icon(Icons.phone),
-                      label: const Text('Test call'),
-                    )
-                  else
-                    FilledButton.icon(
-                      onPressed: _copyNumber,
-                      icon: const Icon(Icons.copy),
-                      label: const Text('Copy number'),
-                    ),
-                  OutlinedButton.icon(
-                    onPressed: _load,
-                    icon: const Icon(Icons.refresh, size: 18),
-                    label: const Text('Refresh'),
-                  ),
-                ],
-              ),
-            ] else if (_hasReceptionist) ...[
-              Text(
-                'Your number will appear shortly. Pull to refresh or check Receptionists.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _load,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Refresh status'),
-              ),
-            ] else
-              Text(
-                'Create a receptionist first.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-          ],
-        ),
-      ),
+              ],
+            ],
+          ),
+        ] else ...[
+          const Spacer(),
+          FilledButton.icon(
+            onPressed: onRefresh,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+            ),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh status'),
+          ),
+        ],
+      ],
     );
   }
+}
 
-  /// Step 4: distinct Done / “You’re ready” — not a reuse of the test-call card.
-  Widget _buildReadyStep(BuildContext context) {
-    final hasNumber =
-        _testCallNumber != null && _testCallNumber!.trim().isNotEmpty;
+class _ReadyBody extends StatelessWidget {
+  const _ReadyBody({
+    required this.phoneNumber,
+    required this.isPhoneDevice,
+    required this.completing,
+    required this.onComplete,
+    required this.onDial,
+    required this.onCopy,
+  });
 
-    return Card(
-      color: EchoDeskColors.successSoft.withValues(alpha: 0.45),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Icon(
-              Icons.check_circle_rounded,
-              size: 56,
-              color: EchoDeskColors.success,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'You’re ready',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Calendar, receptionist, and business line are set. '
-              'Your assistant can answer calls and book appointments.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            if (hasNumber) ...[
-              const SizedBox(height: 20),
-              Text(
-                'Business line',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                textAlign: TextAlign.center,
+  final String? phoneNumber;
+  final bool isPhoneDevice;
+  final bool completing;
+  final VoidCallback onComplete;
+  final VoidCallback onDial;
+  final VoidCallback onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasNumber = phoneNumber != null && phoneNumber!.trim().isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Spacer(flex: 1),
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.85, end: 1),
+          duration: const Duration(milliseconds: 420),
+          curve: Curves.easeOutBack,
+          builder: (context, scale, child) => Transform.scale(
+            scale: scale,
+            child: child,
+          ),
+          child: const Icon(
+            Icons.check_circle_rounded,
+            size: 72,
+            color: EchoDeskColors.success,
+          ),
+        ),
+        const SizedBox(height: EchoDeskSpacing.lg),
+        Text(
+          'You’re live',
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.4,
               ),
-              const SizedBox(height: 4),
-              Text(
-                _testCallNumber!,
-                style: Theme.of(context).textTheme.titleMedium,
-                textAlign: TextAlign.center,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: EchoDeskSpacing.md),
+        Text(
+          'Calendar, assistant, and business line are ready. Callers can reach you — and book — anytime.',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: EchoDeskColors.muted,
+                height: 1.45,
               ),
-            ],
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _completeOnboarding,
-              child: const Text('Go to dashboard'),
-            ),
-            if (hasNumber) ...[
-              const SizedBox(height: 8),
-              if (_isPhoneDevice)
-                TextButton.icon(
-                  onPressed: _dialTestCall,
-                  icon: const Icon(Icons.phone_outlined, size: 18),
-                  label: const Text('Make a test call'),
+          textAlign: TextAlign.center,
+        ),
+        if (hasNumber) ...[
+          const SizedBox(height: EchoDeskSpacing.xl),
+          Text(
+            'Business line',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: EchoDeskColors.soft,
+                ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            phoneNumber!,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+        const SizedBox(height: EchoDeskSpacing.md),
+        Text(
+          'Share this number with customers — or forward your existing line later in Settings.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: EchoDeskColors.soft,
+              ),
+          textAlign: TextAlign.center,
+        ),
+        const Spacer(flex: 2),
+        FilledButton(
+          onPressed: completing ? null : onComplete,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+          ),
+          child: completing
+              ? const SizedBox(
+                  height: 22,
+                  width: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              else
-                TextButton.icon(
-                  onPressed: _copyNumber,
-                  icon: const Icon(Icons.copy, size: 18),
-                  label: const Text('Copy business number'),
-                ),
-            ],
-          ],
+              : const Text('Go to dashboard'),
         ),
-      ),
+        if (hasNumber) ...[
+          const SizedBox(height: EchoDeskSpacing.sm),
+          if (isPhoneDevice)
+            TextButton.icon(
+              onPressed: onDial,
+              icon: const Icon(Icons.phone_outlined, size: 18),
+              label: const Text('Make a test call'),
+            )
+          else
+            TextButton.icon(
+              onPressed: onCopy,
+              icon: const Icon(Icons.copy, size: 18),
+              label: const Text('Copy business number'),
+            ),
+        ],
+      ],
     );
   }
 }

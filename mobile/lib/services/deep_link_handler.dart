@@ -14,14 +14,17 @@ class DeepLinkHandler {
   void init(
     void Function(String message) onMessage, {
     Future<void> Function()? onGoogleCalendarConnected,
+    Future<void> Function()? onAuthSuccess,
   }) {
     _subscription = _appLinks.uriLinkStream.listen((uri) {
-      _handleUri(uri, onMessage, onGoogleCalendarConnected);
+      _handleUri(uri, onMessage, onGoogleCalendarConnected, onAuthSuccess);
     });
 
     // Handle cold start (app launched from link)
     _appLinks.getInitialLink().then((uri) {
-      if (uri != null) _handleUri(uri, onMessage, onGoogleCalendarConnected);
+      if (uri != null) {
+        _handleUri(uri, onMessage, onGoogleCalendarConnected, onAuthSuccess);
+      }
     });
   }
 
@@ -33,6 +36,7 @@ class DeepLinkHandler {
     Uri uri,
     void Function(String) onMessage,
     Future<void> Function()? onGoogleCalendarConnected,
+    Future<void> Function()? onAuthSuccess,
   ) async {
     if (uri.host == 'checkout') {
       final sessionId = uri.queryParameters['session_id'];
@@ -66,21 +70,34 @@ class DeepLinkHandler {
       }
     } else if (uri.host == 'auth-callback') {
       // Recover session from confirmation / OAuth / recovery links.
+      var recovered = false;
       try {
         await Supabase.instance.client.auth.getSessionFromUrl(uri);
+        recovered = Supabase.instance.client.auth.currentSession != null;
       } catch (_) {
         // PKCE email confirm often arrives as ?code=...
         final code = uri.queryParameters['code'];
         if (code != null && code.isNotEmpty) {
           try {
             await Supabase.instance.client.auth.exchangeCodeForSession(code);
+            recovered = true;
           } catch (_) {
             // Session may already be present or link may be a bare open-app handoff.
           }
         }
       }
-      if (uri.queryParameters['type'] != 'recovery') {
+      if (!recovered &&
+          Supabase.instance.client.auth.currentSession != null) {
+        recovered = true;
+      }
+      if (uri.queryParameters['type'] == 'recovery') {
+        return;
+      }
+      if (recovered) {
         onMessage('Signed in successfully');
+        await onAuthSuccess?.call();
+      } else {
+        onMessage('Open EchoDesk and sign in with the same email');
       }
     } else if (uri.host == 'settings') {
       onMessage('Billing updated');

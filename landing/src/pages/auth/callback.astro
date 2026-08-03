@@ -72,14 +72,28 @@ const title = "Opening EchoDesk…";
     </div>
     <script is:inline>
       (function () {
-        var q = window.location.search || "";
-        var h = window.location.hash || "";
-        var target = "echodesk://auth-callback" + q + h;
+        // iOS often drops URL hash when opening a custom scheme. Copy token
+        // params from the hash into the query string so the app still gets them.
+        function buildTarget() {
+          var searchParams = new URLSearchParams(
+            (window.location.search || "").replace(/^\?/, "")
+          );
+          var hash = (window.location.hash || "").replace(/^#/, "");
+          if (hash) {
+            var hashParams = new URLSearchParams(hash);
+            hashParams.forEach(function (value, key) {
+              if (!searchParams.has(key)) searchParams.set(key, value);
+            });
+          }
+          var qs = searchParams.toString();
+          return "echodesk://auth-callback" + (qs ? "?" + qs : "");
+        }
+
+        var target = buildTarget();
         var link = document.getElementById("open-app");
         if (link) link.setAttribute("href", target);
 
         function openApp() {
-          // Hidden iframe helps some iOS/WebKit builds fire the custom scheme.
           try {
             var iframe = document.createElement("iframe");
             iframe.style.display = "none";

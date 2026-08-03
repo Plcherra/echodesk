@@ -23,7 +23,10 @@ const _steps = [
 ];
 
 class CreateReceptionistScreen extends StatefulWidget {
-  const CreateReceptionistScreen({super.key});
+  const CreateReceptionistScreen({super.key, this.firstRun = false});
+
+  /// Opened from first-login onboarding — lighter framing, return via pop.
+  final bool firstRun;
 
   @override
   State<CreateReceptionistScreen> createState() =>
@@ -345,14 +348,52 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Receptionist'),
+        title: Text(
+          widget.firstRun ? 'Your AI receptionist' : 'Add Receptionist',
+        ),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => context.go('/receptionists'),
+          onPressed: () {
+            if (widget.firstRun && context.canPop()) {
+              context.pop(false);
+            } else {
+              context.go('/receptionists');
+            }
+          },
         ),
       ),
       body: Column(
         children: [
+          if (widget.firstRun)
+            Material(
+              color: Theme.of(context).colorScheme.secondaryContainer
+                  .withValues(alpha: 0.55),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.flag_outlined,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Step 2 of setup · About 3 minutes',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSecondaryContainer,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           _buildStepper(),
           if (_error != null)
             Material(
@@ -1524,28 +1565,43 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
               ),
             ],
             const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                OutlinedButton(
-                  onPressed: () {
-                    if (context.canPop()) {
-                      context.pop(true);
-                    } else {
-                      context.go('/receptionists');
-                    }
-                  },
-                  child: const Text('Done'),
+            if (widget.firstRun) ...[
+              FilledButton(
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop(true);
+                  } else {
+                    context.go('/onboarding');
+                  }
+                },
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
                 ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: _successId != null
-                      ? () => context.go('/receptionists/${_successId!}')
-                      : null,
-                  child: const Text('View receptionist'),
-                ),
-              ],
-            ),
+                child: const Text('Continue setup'),
+              ),
+            ] else
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop(true);
+                      } else {
+                        context.go('/receptionists');
+                      }
+                    },
+                    child: const Text('Done'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: _successId != null
+                        ? () => context.go('/receptionists/${_successId!}')
+                        : null,
+                    child: const Text('View receptionist'),
+                  ),
+                ],
+              ),
           ],
         ),
       ),
