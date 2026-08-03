@@ -848,45 +848,6 @@ async def create_receptionist(request: Request):
             },
             status_code=400,
         )
-    provisioned_new_number = False
-    telnyx_id: str | None = None
-    inbound_number: str | None = None
-    telnyx_phone: str | None = None
-
-    area_code = body.get("area_code") or "212"
-    if area_code == "other":
-        area_code = "212"
-    try:
-        tid, tphone = telnyx_provision.provision_number(area_code)
-        telnyx_id = tid
-        telnyx_phone = tphone
-        try:
-            telnyx_provision.configure_voice_url(
-                telnyx_id, f"{webhook_base}/api/telnyx/voice"
-            )
-        except Exception as cfg_ex:
-            # Number is already purchased; do not fail the whole create on webhook attach.
-            logger.warning(
-                "[create_receptionist] configure_voice_url failed id=%s: %s",
-                telnyx_id,
-                cfg_ex,
-            )
-        provisioned_new_number = True
-    except Exception as ex:
-        try:
-            mark_business_phone_line_failed(supabase, target_business_id)
-        except Exception:
-            pass
-        return JSONResponse({"error": str(ex)}, status_code=400)
-    inbound_number = telnyx_phone
-
-    # Canonical line on the business; receptionist row below mirrors these for Telnyx voice routing.
-    upsert_canonical_business_phone(
-        supabase,
-        target_business_id,
-        phone_number_e164=inbound_number or telnyx_phone,
-        telnyx_number_id=telnyx_id,
-    )
 
     name = (body.get("name") or "").strip()
     calendar_id = (body.get("calendar_id") or "").strip()
@@ -923,6 +884,117 @@ async def create_receptionist(request: Request):
     mode = (body.get("mode") or "personal").strip().lower()
     if mode not in ("personal", "business"):
         mode = "personal"
+
+    provisioned_new_number = False
+    telnyx_id: str | None = None
+    inbound_number: str | None = None
+    telnyx_phone: str | None = None
+
+    area_code = body.get("area_code") or "212"
+    if area_code == "other":
+        area_code = "212"
+
+    # Prefer an existing business line (partial create) before buying again.
+    existing_line = (
+        supabase.table("business_phone_numbers")
+        .select("phone_number_e164, telnyx_number_id, status")
+        .eq("business_id", target_business_id)
+        .limit(1)
+        .execute()
+    )
+    line_row = (existing_line.data or [None])[0]
+    if line_row:
+        existing_e164 = (line_row.get("phone_number_e164") or "").strip()
+        existing_tid = (line_row.get("telnyx_number_id") or "").strip()
+        if existing_e164 and existing_tid:
+            telnyx_id = existing_tid
+            telnyx_phone = existing_e164
+            inbound_number = existing_e164
+            logger.info(
+                "[receptionists/create] reusing business line e164=%s id=%s",
+                existing_e164,
+                existing_tid,
+            )
+
+    if not telnyx_id or not inbound_number:
+        used_ids: set[str] = set()
+        used_e164: set[str] = set()
+        try:
+            bp = (
+                supabase.table("business_phone_numbers")
+                .select("telnyx_number_id, phone_number_e164")
+                .execute()
+            )
+            for row in bp.data or []:
+                if row.get("telnyx_number_id"):
+                    used_ids.add(str(row["telnyx_number_id"]).strip())
+                if row.get("phone_number_e164"):
+                    used_e164.add(str(row["phone_number_e164"]).strip())
+            rr = (
+                supabase.table("receptionists")
+                .select(
+                    "telnyx_phone_number_id, inbound_phone_number, "
+                    "telnyx_phone_number, phone_number"
+                )
+                .is_("deleted_at", "null")
+                .execute()
+            )
+            for row in rr.data or []:
+                if row.get("telnyx_phone_number_id"):
+                    used_ids.add(str(row["telnyx_phone_number_id"]).strip())
+                for key in ("inbound_phone_number", "telnyx_phone_number", "phone_number"):
+                    if row.get(key):
+                        used_e164.add(str(row[key]).strip())
+        except Exception as scan_ex:
+            logger.warning("[receptionists/create] used-number scan failed: %s", scan_ex)
+
+        try:
+            tid, tphone, purchased_new = telnyx_provision.acquire_phone_number(
+                area_code,
+                used_ids=used_ids,
+                used_e164=used_e164,
+            )
+            telnyx_id = tid
+            telnyx_phone = tphone
+            inbound_number = tphone
+            provisioned_new_number = purchased_new
+            try:
+                telnyx_provision.configure_voice_url(
+                    telnyx_id, f"{webhook_base}/api/telnyx/voice"
+                )
+            except Exception as cfg_ex:
+                # Number is already owned; do not fail the whole create on webhook attach.
+                logger.warning(
+                    "[receptionists/create] configure_voice_url failed id=%s: %s",
+                    telnyx_id,
+                    cfg_ex,
+                )
+        except Exception as ex:
+            try:
+                mark_business_phone_line_failed(supabase, target_business_id)
+            except Exception:
+                pass
+            return JSONResponse({"error": str(ex)}, status_code=400)
+    else:
+        # Reused business line — still ensure voice webhook/connection.
+        try:
+            telnyx_provision.configure_voice_url(
+                telnyx_id, f"{webhook_base}/api/telnyx/voice"
+            )
+        except Exception as cfg_ex:
+            logger.warning(
+                "[receptionists/create] configure reused line failed id=%s: %s",
+                telnyx_id,
+                cfg_ex,
+            )
+
+    # Canonical line on the business; receptionist row below mirrors these for Telnyx voice routing.
+    upsert_canonical_business_phone(
+        supabase,
+        target_business_id,
+        phone_number_e164=inbound_number or telnyx_phone,
+        telnyx_number_id=telnyx_id,
+    )
 
     insert_data = {
         "user_id": user["id"],
@@ -972,12 +1044,14 @@ async def create_receptionist(request: Request):
             rec_id,
         )
         if not rec_id:
-            if provisioned_new_number and telnyx_id:
-                try:
-                    telnyx_provision.release_number(telnyx_id)
-                except Exception:
-                    pass
-            logger.warning("[receptionists/create] failed to resolve rec_id after insert")
+            # Do not release a purchased Telnyx number here — retry will reuse the
+            # business line / orphan instead of buying another DID.
+            logger.warning(
+                "[receptionists/create] failed to resolve rec_id after insert "
+                "(kept telnyx_id=%s e164=%s for retry)",
+                telnyx_id,
+                inbound_number,
+            )
             return JSONResponse({"error": "Failed to create receptionist"}, status_code=500)
 
         logger.info(
@@ -1056,11 +1130,7 @@ async def create_receptionist(request: Request):
         )
         return {"success": True, "id": rec_id, "phoneNumber": inbound_number}
     except Exception as e:
-        if provisioned_new_number and telnyx_id:
-            try:
-                telnyx_provision.release_number(telnyx_id)
-            except Exception:
-                pass
+        # Keep purchased numbers for retry (orphan reclaim) instead of releasing.
         logger.exception("[receptionists/create] failure: %s", e)
         logger.info("[receptionists/create] final result: failure reason=%s", str(e))
         return JSONResponse({"error": str(e)}, status_code=400)

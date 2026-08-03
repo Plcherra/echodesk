@@ -282,3 +282,125 @@ def release_number(phone_number_id: str) -> None:
         )
         if not r.is_success and r.status_code != 404:
             raise ValueError(_parse_error(r.text, "release"))
+
+
+def _digits_only(value: str) -> str:
+    return re.sub(r"\D", "", value or "")
+
+
+def us_area_code_from_e164(e164: str) -> str | None:
+    digits = _digits_only(e164)
+    if digits.startswith("1") and len(digits) >= 4:
+        return digits[1:4]
+    if len(digits) >= 3:
+        return digits[:3]
+    return None
+
+
+def normalize_e164(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    digits = _digits_only(raw)
+    if len(digits) == 10:
+        return f"+1{digits}"
+    if len(digits) == 11 and digits.startswith("1"):
+        return f"+{digits}"
+    if raw.startswith("+") and digits:
+        return f"+{digits}"
+    return raw
+
+
+def list_owned_phone_numbers(*, page_size: int = 50) -> list[dict[str, Any]]:
+    """Return owned Telnyx phone_numbers rows (optionally filtered by connection)."""
+    api_key = _get_api_key()
+    params: dict[str, Any] = {"page[size]": page_size}
+    conn_id = (settings.telnyx_connection_id or "").strip()
+    if conn_id:
+        params["filter[connection_id]"] = conn_id
+
+    with httpx.Client(timeout=30.0) as client:
+        r = client.get(
+            f"{TELNYX_API}/phone_numbers",
+            params=params,
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        if not r.is_success:
+            raise ValueError(_parse_error(r.text, "list numbers"))
+        rows = (r.json() or {}).get("data") or []
+        return [row for row in rows if isinstance(row, dict)]
+
+
+def find_orphaned_number(
+    *,
+    used_ids: set[str],
+    used_e164: set[str],
+    preferred_area_code: str | None = None,
+) -> tuple[str, str] | None:
+    """
+    Find an owned Telnyx number that is not referenced in our DB.
+
+    Used after a create failed post-purchase so retry can attach the orphan
+    instead of buying another number.
+    """
+    used_ids_n = {str(x).strip() for x in used_ids if str(x).strip()}
+    used_e164_n = {normalize_e164(str(x)) for x in used_e164 if str(x).strip()}
+    preferred = (preferred_area_code or "").strip() or None
+
+    try:
+        rows = list_owned_phone_numbers()
+    except Exception as e:
+        logger.warning("orphan number scan failed: %s", e)
+        return None
+
+    candidates: list[tuple[str, str]] = []
+    for row in rows:
+        pid = str(row.get("id") or "").strip()
+        e164 = normalize_e164(str(row.get("phone_number") or ""))
+        if not pid or not e164:
+            continue
+        if pid in used_ids_n or e164 in used_e164_n:
+            continue
+        status = str(row.get("status") or "").lower()
+        # Skip numbers pending deletion / port-out when possible.
+        if status in {"deleted", "porting_out", "purchase_pending"}:
+            continue
+        candidates.append((pid, e164))
+
+    if not candidates:
+        return None
+
+    if preferred:
+        matched = [
+            c for c in candidates if us_area_code_from_e164(c[1]) == preferred
+        ]
+        if matched:
+            return matched[0]
+    return candidates[0]
+
+
+def acquire_phone_number(
+    area_code: str,
+    *,
+    used_ids: set[str] | None = None,
+    used_e164: set[str] | None = None,
+) -> tuple[str, str, bool]:
+    """
+    Reuse an orphaned Telnyx number when possible; otherwise buy a new one.
+
+    Returns (phone_number_id, e164, purchased_new).
+    """
+    orphan = find_orphaned_number(
+        used_ids=used_ids or set(),
+        used_e164=used_e164 or set(),
+        preferred_area_code=area_code,
+    )
+    if orphan:
+        logger.info(
+            "Reusing orphaned Telnyx number id=%s e164=%s",
+            orphan[0],
+            orphan[1],
+        )
+        return orphan[0], orphan[1], False
+    tid, e164 = provision_number(area_code)
+    return tid, e164, True
