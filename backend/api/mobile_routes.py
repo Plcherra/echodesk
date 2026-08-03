@@ -860,7 +860,17 @@ async def create_receptionist(request: Request):
         tid, tphone = telnyx_provision.provision_number(area_code)
         telnyx_id = tid
         telnyx_phone = tphone
-        telnyx_provision.configure_voice_url(telnyx_id, f"{webhook_base}/api/telnyx/voice")
+        try:
+            telnyx_provision.configure_voice_url(
+                telnyx_id, f"{webhook_base}/api/telnyx/voice"
+            )
+        except Exception as cfg_ex:
+            # Number is already purchased; do not fail the whole create on webhook attach.
+            logger.warning(
+                "[create_receptionist] configure_voice_url failed id=%s: %s",
+                telnyx_id,
+                cfg_ex,
+            )
         provisioned_new_number = True
     except Exception as ex:
         try:
