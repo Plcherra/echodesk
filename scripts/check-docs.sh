@@ -15,6 +15,7 @@ ALLOWED=(
   "docs/core/ACCOUNT_ONBOARDING_PHASES.md"
   "docs/ops/RUNBOOK.md"
   "docs/README.md"
+  "docs/ECHODESK_LAUNCH_FIX_PLAN.md"
 )
 
 FAIL=0
