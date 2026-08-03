@@ -45,10 +45,14 @@ const title = "Opening EchoDesk…";
         background: var(--accent);
         color: white;
         text-decoration: none;
-        padding: 12px 18px;
+        padding: 14px 22px;
         border-radius: 999px;
         font-family: system-ui, sans-serif;
         font-weight: 600;
+        font-size: 1.05rem;
+      }
+      .hint {
+        font-size: 0.95rem;
       }
     </style>
   </head>
@@ -56,13 +60,13 @@ const title = "Opening EchoDesk…";
     <div class="card">
       <h1>Opening EchoDesk…</h1>
       <p>
-        Your email is confirmed. We’re sending you back to the app to finish
-        setup.
+        Your email is confirmed. Tap below if the app does not open
+        automatically (iPhone often requires one tap).
       </p>
       <p>
         <a class="button" id="open-app" href="echodesk://auth-callback">Open EchoDesk</a>
       </p>
-      <p>
+      <p class="hint">
         If nothing opens, launch the EchoDesk app and sign in with the same email.
       </p>
     </div>
@@ -73,7 +77,28 @@ const title = "Opening EchoDesk…";
         var target = "echodesk://auth-callback" + q + h;
         var link = document.getElementById("open-app");
         if (link) link.setAttribute("href", target);
-        window.location.replace(target);
+
+        function openApp() {
+          // Hidden iframe helps some iOS/WebKit builds fire the custom scheme.
+          try {
+            var iframe = document.createElement("iframe");
+            iframe.style.display = "none";
+            iframe.src = target;
+            document.body.appendChild(iframe);
+            setTimeout(function () {
+              try {
+                document.body.removeChild(iframe);
+              } catch (_) {}
+            }, 2000);
+          } catch (_) {}
+          try {
+            window.location.href = target;
+          } catch (_) {}
+        }
+
+        openApp();
+        setTimeout(openApp, 500);
+        setTimeout(openApp, 1500);
       })();
     </script>
   </body>

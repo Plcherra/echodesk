@@ -130,6 +130,13 @@ server {
         try_files /opt-in.html =404;
     }
 
+    # Auth email-confirm handoff (must not fall through to marketing index.html)
+    location ^~ /auth/callback {
+        root {{LANDING_ROOT}};
+        charset utf-8;
+        try_files /auth/callback/index.html =404;
+    }
+
     # Main landing/static site.
     # No redirect here; Cloudflare Tunnel sends HTTP to origin and handles HTTPS externally.
     # {{LANDING_ROOT}} must be replaced before deployment.
@@ -242,6 +249,13 @@ server {
         root {{LANDING_ROOT}};
         charset utf-8;
         try_files /opt-in.html =404;
+    }
+
+    # Auth email-confirm handoff (must not fall through to marketing index.html)
+    location ^~ /auth/callback {
+        root {{LANDING_ROOT}};
+        charset utf-8;
+        try_files /auth/callback/index.html =404;
     }
 
     # Static landing (served by nginx)

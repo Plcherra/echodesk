@@ -53,6 +53,13 @@ esac
 
 echo "Running Echodesk Mobile against $API_URL on $DEVICE ($MODE)"
 
+# Refresh iOS/Android launcher + splash from assets/icon (logo changes need this).
+if [ "${SKIP_ICON_GEN:-0}" != "1" ]; then
+  echo "Regenerating launcher icons + splash…"
+  dart run flutter_launcher_icons
+  dart run flutter_native_splash:create
+fi
+
 exec flutter run -d "$DEVICE" "${MODE_FLAG[@]}" \
   --dart-define=API_BASE_URL="$API_URL" \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \

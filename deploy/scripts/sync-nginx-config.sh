@@ -30,14 +30,14 @@ if [ ! -d "$LANDING_ROOT" ]; then
   echo "ERROR: LANDING_ROOT is not a directory: $LANDING_ROOT"
   exit 1
 fi
-for f in privacy.html terms.html opt-in.html; do
+for f in privacy.html terms.html opt-in.html auth/callback/index.html; do
   if [ ! -f "$LANDING_ROOT/$f" ]; then
     echo "ERROR: Required landing page missing: $LANDING_ROOT/$f"
     echo "Ensure landing/dist contains it, then run: bash deploy/scripts/deploy-landing.sh"
     exit 1
   fi
 done
-echo "OK: $LANDING_ROOT/privacy.html, terms.html, and opt-in.html present"
+echo "OK: $LANDING_ROOT privacy, terms, opt-in, and auth/callback present"
 
 # Use sudo so cert check works when run by deploy/user (letsencrypt dir may restrict access)
 if [ -f "$SSL_CERT" ] || sudo test -f "$SSL_CERT" 2>/dev/null; then

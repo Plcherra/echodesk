@@ -1,8 +1,8 @@
-<!DOCTYPE html><html lang="en" data-astro-cid-qbporkgn> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Opening EchoDesk…</title><style>:root{color-scheme:light;--ink: #14201c;--muted: #5a6b64;--bg: #f4f7f5;--accent: #1f6b4f}body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:Georgia,Times New Roman,serif;background:radial-gradient(circle at top left,rgba(31,107,79,.12),transparent 40%),linear-gradient(180deg,#eef5f1,var(--bg));color:var(--ink);padding:24px}.card[data-astro-cid-qbporkgn]{max-width:420px;text-align:center}h1[data-astro-cid-qbporkgn]{font-size:1.75rem;margin:0 0 12px}p[data-astro-cid-qbporkgn]{color:var(--muted);line-height:1.5;margin:0 0 16px}a[data-astro-cid-qbporkgn].button{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-family:system-ui,sans-serif;font-weight:600}
+<!DOCTYPE html><html lang="en" data-astro-cid-qbporkgn> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Opening EchoDesk…</title><style>:root{color-scheme:light;--ink: #14201c;--muted: #5a6b64;--bg: #f4f7f5;--accent: #1f6b4f}body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:Georgia,Times New Roman,serif;background:radial-gradient(circle at top left,rgba(31,107,79,.12),transparent 40%),linear-gradient(180deg,#eef5f1,var(--bg));color:var(--ink);padding:24px}.card[data-astro-cid-qbporkgn]{max-width:420px;text-align:center}h1[data-astro-cid-qbporkgn]{font-size:1.75rem;margin:0 0 12px}p[data-astro-cid-qbporkgn]{color:var(--muted);line-height:1.5;margin:0 0 16px}a[data-astro-cid-qbporkgn].button{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;padding:14px 22px;border-radius:999px;font-family:system-ui,sans-serif;font-weight:600;font-size:1.05rem}.hint[data-astro-cid-qbporkgn]{font-size:.95rem}
 </style></head> <body data-astro-cid-qbporkgn> <div class="card" data-astro-cid-qbporkgn> <h1 data-astro-cid-qbporkgn>Opening EchoDesk…</h1> <p data-astro-cid-qbporkgn>
-Your email is confirmed. We’re sending you back to the app to finish
-        setup.
-</p> <p data-astro-cid-qbporkgn> <a class="button" id="open-app" href="echodesk://auth-callback" data-astro-cid-qbporkgn>Open EchoDesk</a> </p> <p data-astro-cid-qbporkgn>
+Your email is confirmed. Tap below if the app does not open
+        automatically (iPhone often requires one tap).
+</p> <p data-astro-cid-qbporkgn> <a class="button" id="open-app" href="echodesk://auth-callback" data-astro-cid-qbporkgn>Open EchoDesk</a> </p> <p class="hint" data-astro-cid-qbporkgn>
 If nothing opens, launch the EchoDesk app and sign in with the same email.
 </p> </div> <script>
       (function () {
@@ -11,6 +11,27 @@ If nothing opens, launch the EchoDesk app and sign in with the same email.
         var target = "echodesk://auth-callback" + q + h;
         var link = document.getElementById("open-app");
         if (link) link.setAttribute("href", target);
-        window.location.replace(target);
+
+        function openApp() {
+          // Hidden iframe helps some iOS/WebKit builds fire the custom scheme.
+          try {
+            var iframe = document.createElement("iframe");
+            iframe.style.display = "none";
+            iframe.src = target;
+            document.body.appendChild(iframe);
+            setTimeout(function () {
+              try {
+                document.body.removeChild(iframe);
+              } catch (_) {}
+            }, 2000);
+          } catch (_) {}
+          try {
+            window.location.href = target;
+          } catch (_) {}
+        }
+
+        openApp();
+        setTimeout(openApp, 500);
+        setTimeout(openApp, 1500);
       })();
     </script> </body> </html>

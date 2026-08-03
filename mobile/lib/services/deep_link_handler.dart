@@ -69,7 +69,15 @@ class DeepLinkHandler {
       try {
         await Supabase.instance.client.auth.getSessionFromUrl(uri);
       } catch (_) {
-        // Session may already be present or link may be a bare open-app handoff.
+        // PKCE email confirm often arrives as ?code=...
+        final code = uri.queryParameters['code'];
+        if (code != null && code.isNotEmpty) {
+          try {
+            await Supabase.instance.client.auth.exchangeCodeForSession(code);
+          } catch (_) {
+            // Session may already be present or link may be a bare open-app handoff.
+          }
+        }
       }
       if (uri.queryParameters['type'] != 'recovery') {
         onMessage('Signed in successfully');

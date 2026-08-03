@@ -31,12 +31,17 @@ if [ "${RUN_MIGRATION_CHECK:-0}" = "1" ]; then
   ./venv/bin/python scripts/check-migrations.py
 fi
 
-# Landing deploy uses sudo rsync/chown/chmod (broad root). It's opt-in so a normal code
-# deploy never needs interactive sudo. Enable with DEPLOY_LANDING=1 once the deploy user
-# has the necessary passwordless rules (or run deploy-landing.sh manually).
+# Landing deploy uses sudo rsync/chown/chmod. Enable with DEPLOY_LANDING=1 (CI sets this).
+# Soft-fail so a missing passwordless sudo rule does not block backend deploys.
 if [ "${DEPLOY_LANDING:-0}" = "1" ]; then
   echo "=== Deploying landing ==="
-  bash ./deploy/scripts/deploy-landing.sh
+  if bash ./deploy/scripts/deploy-landing.sh; then
+    echo "Landing deploy OK"
+  else
+    echo "WARNING: landing deploy failed (often sudo). On the VPS run:"
+    echo "  bash deploy/scripts/deploy-landing.sh"
+    echo "Without this, https://echodesk.us/auth/callback falls back to the marketing homepage."
+  fi
 else
   echo "=== Skipping landing deploy (set DEPLOY_LANDING=1 to enable) ==="
 fi

@@ -34,6 +34,13 @@ if [ ! -f "$SRC_DIR/index.html" ]; then
 fi
 
 echo "Creating target directory (if needed)..."
+# Prefer passwordless wrapper when installed (install-landing-sudoers.sh).
+if [ -x /usr/local/bin/echodesk-sync-landing ] && sudo -n /usr/local/bin/echodesk-sync-landing "$SRC_DIR" 2>/dev/null; then
+  echo "=== Landing deploy complete (via echodesk-sync-landing) ==="
+  echo "You should now see the updated landing at: https://echodesk.us"
+  exit 0
+fi
+
 sudo mkdir -p "$TARGET_DIR"
 
 echo "Syncing landing files to $TARGET_DIR ..."

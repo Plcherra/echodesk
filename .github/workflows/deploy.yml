@@ -56,6 +56,8 @@ jobs:
             [ \"\$ENABLE_NGINX_SYNC\" != 'true' ] && export SKIP_NGINX_SYNC=1 || true
             [ \"\$ENABLE_VALIDATE_INFRA\" != 'true' ] && export SKIP_VALIDATE_INFRA=1 || true
             [ \"\$ENABLE_GOOGLE_TTS_VALIDATION\" != 'true' ] && export SKIP_GOOGLE_TTS_VALIDATION=1 || true
+            # Always sync marketing + /auth/callback handoff page (email confirm → app).
+            export DEPLOY_LANDING=1
             if [ -x ./deploy/scripts/deploy-systemd.sh ]; then
               bash ./deploy/scripts/deploy-systemd.sh || { echo 'Deploy failed'; exit 1; }
             else
