@@ -885,7 +885,6 @@ async def create_receptionist(request: Request):
     if mode not in ("personal", "business"):
         mode = "personal"
 
-    provisioned_new_number = False
     telnyx_id: str | None = None
     inbound_number: str | None = None
     telnyx_phone: str | None = None
@@ -957,7 +956,12 @@ async def create_receptionist(request: Request):
             telnyx_id = tid
             telnyx_phone = tphone
             inbound_number = tphone
-            provisioned_new_number = purchased_new
+            logger.info(
+                "[receptionists/create] acquired number e164=%s id=%s purchased_new=%s",
+                tphone,
+                tid,
+                purchased_new,
+            )
             try:
                 telnyx_provision.configure_voice_url(
                     telnyx_id, f"{webhook_base}/api/telnyx/voice"
