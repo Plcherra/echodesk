@@ -227,9 +227,10 @@ async def google_callback_get(request: Request):
         logger.info("[Google callback] Connected calendar for user %s", user_id)
 
         scheme = settings.mobile_redirect_scheme
-        is_mobile = return_to in ("mobile", "settings")
+        # mobile / settings / onboarding → custom-scheme handoff into the app
+        is_mobile = return_to in ("mobile", "settings", "onboarding")
         if is_mobile:
-            deep_link = f"{scheme}://google-callback?success=1"
+            deep_link = f"{scheme}://google-callback?success=1&return_to={return_to}"
             return HTMLResponse(_mobile_success_html(deep_link))
         app_url = settings.get_app_url()
         path = "/onboarding" if return_to == "onboarding" else ("/receptionists" if return_to == "receptionists" else "/dashboard")
@@ -237,7 +238,7 @@ async def google_callback_get(request: Request):
     except Exception as e:
         logger.exception("[Google callback] %s", e)
         msg = f"Connection failed: {e}"
-        if return_to in ("mobile", "settings"):
+        if return_to in ("mobile", "settings", "onboarding"):
             return HTMLResponse(_error_html(msg), status_code=400)
         return _redirect_error(msg, return_to)
 
@@ -245,9 +246,11 @@ async def google_callback_get(request: Request):
 def _redirect_error(msg: str, return_to: str = "dashboard"):
     scheme = settings.mobile_redirect_scheme
     app_url = settings.get_app_url()
-    is_mobile = return_to in ("mobile", "settings")
+    is_mobile = return_to in ("mobile", "settings", "onboarding")
     if is_mobile:
-        return RedirectResponse(url=f"{scheme}://google-callback?success=0&error={_encode(msg)}")
+        return RedirectResponse(
+            url=f"{scheme}://google-callback?success=0&error={_encode(msg)}&return_to={return_to}"
+        )
     path = "/onboarding" if return_to == "onboarding" else ("/receptionists" if return_to == "receptionists" else "/dashboard")
     return RedirectResponse(url=f"{app_url}{path}?calendar=error&message={_encode(msg)}")
 

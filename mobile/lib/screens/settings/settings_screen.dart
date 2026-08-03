@@ -245,7 +245,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final res = await ApiClient.get(
         '/api/mobile/google-auth-url',
-        queryParams: {'return_to': 'mobile'},
+        queryParams: {'return_to': 'settings'},
       );
       if (res.statusCode == 200) {
         final data = (res.body.isNotEmpty

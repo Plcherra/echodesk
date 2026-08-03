@@ -43,7 +43,7 @@ class _EchodeskAppState extends State<EchodeskApp> {
     );
     _accountBootstrapService.init();
     _authSubscription =
-        Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+        Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
       if (data.event == AuthChangeEvent.passwordRecovery) {
         _router.go('/reset-password');
         return;
@@ -58,7 +58,7 @@ class _EchodeskAppState extends State<EchodeskApp> {
             path.startsWith('/learn-more') ||
             path.startsWith('/login') ||
             path.startsWith('/signup')) {
-          _router.go('/dashboard');
+          _router.go(await _homeAfterAuth());
         }
       }
     });
@@ -84,10 +84,32 @@ class _EchodeskAppState extends State<EchodeskApp> {
     );
   }
 
+  Future<bool> _isOnboardingComplete() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return false;
+    try {
+      final res = await Supabase.instance.client
+          .from('users')
+          .select('onboarding_completed_at')
+          .eq('id', user.id)
+          .maybeSingle();
+      return ((res?['onboarding_completed_at'] as String?) ?? '')
+          .trim()
+          .isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<String> _homeAfterAuth() async {
+    if (await _isOnboardingComplete()) return '/dashboard';
+    return '/onboarding';
+  }
+
   Future<void> _afterAuthDeepLink() async {
     await _accountBootstrapService.ensureCurrentProfile(force: true);
     if (!mounted) return;
-    _router.go('/dashboard');
+    _router.go(await _homeAfterAuth());
   }
 
   Future<void> _routePendingPlanIfNeeded() async {
@@ -100,17 +122,26 @@ class _EchodeskAppState extends State<EchodeskApp> {
     _router.go('/checkout?plan=${Uri.encodeComponent(pendingPlanId)}');
   }
 
-  Future<void> _refreshAfterCalendarConnect() async {
+  Future<void> _refreshAfterCalendarConnect(String? returnTo) async {
     if (!mounted) return;
-    final uri = _router.routerDelegate.currentConfiguration.uri;
-    final path = uri.path;
-    if (path == '/onboarding') {
-      _router.go('/onboarding?calendar=connected');
-    } else if (path.startsWith('/settings')) {
+    final path = _router.routerDelegate.currentConfiguration.uri.path;
+
+    if (returnTo == 'settings' || path.startsWith('/settings')) {
       _router.go('/settings?calendar=connected');
-    } else {
-      _router.refresh();
+      return;
     }
+
+    // First-run calendar OAuth often resumes from Safari onto `/` or `/dashboard`.
+    // Always send incomplete accounts back into onboarding (assistant step).
+    final onboardingDone = await _isOnboardingComplete();
+    if (!onboardingDone ||
+        returnTo == 'onboarding' ||
+        path == '/onboarding') {
+      _router.go('/onboarding?calendar=connected');
+      return;
+    }
+
+    _router.refresh();
   }
 
   @override

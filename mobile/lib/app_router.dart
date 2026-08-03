@@ -53,9 +53,23 @@ GoRouter createAppRouter({Listenable? refreshListenable}) {
       if (isLoggedIn && isAuthRoute) {
         return '/dashboard';
       }
+      // Logged-in users on marketing/auth routes: finish setup or dashboard.
       if (isLoggedIn &&
           (state.matchedLocation == '/' ||
               state.matchedLocation.startsWith('/learn-more'))) {
+        try {
+          final user = Supabase.instance.client.auth.currentUser;
+          if (user != null) {
+            final res = await Supabase.instance.client
+                .from('users')
+                .select('onboarding_completed_at')
+                .eq('id', user.id)
+                .maybeSingle();
+            final completedAt = res?['onboarding_completed_at'] as String?;
+            final onboardingComplete = (completedAt ?? '').trim().isNotEmpty;
+            return onboardingComplete ? '/dashboard' : '/onboarding';
+          }
+        } catch (_) {}
         return '/dashboard';
       }
       // Redirect to onboarding if not yet complete.

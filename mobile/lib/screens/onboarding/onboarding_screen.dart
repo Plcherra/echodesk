@@ -171,7 +171,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     try {
       final res = await ApiClient.get(
         '/api/mobile/google-auth-url',
-        queryParams: {'return_to': 'mobile'},
+        queryParams: {'return_to': 'onboarding'},
       );
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;

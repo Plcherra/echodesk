@@ -13,7 +13,7 @@ class DeepLinkHandler {
 
   void init(
     void Function(String message) onMessage, {
-    Future<void> Function()? onGoogleCalendarConnected,
+    Future<void> Function(String? returnTo)? onGoogleCalendarConnected,
     Future<void> Function()? onAuthSuccess,
   }) {
     _subscription = _appLinks.uriLinkStream.listen((uri) {
@@ -35,7 +35,7 @@ class DeepLinkHandler {
   Future<void> _handleUri(
     Uri uri,
     void Function(String) onMessage,
-    Future<void> Function()? onGoogleCalendarConnected,
+    Future<void> Function(String? returnTo)? onGoogleCalendarConnected,
     Future<void> Function()? onAuthSuccess,
   ) async {
     if (uri.host == 'checkout') {
@@ -61,8 +61,9 @@ class DeepLinkHandler {
       }
     } else if (uri.host == 'google-callback') {
       final success = uri.queryParameters['success'];
+      final returnTo = uri.queryParameters['return_to'];
       if (success == '1') {
-        await onGoogleCalendarConnected?.call();
+        await onGoogleCalendarConnected?.call(returnTo);
         onMessage('Google Calendar connected!');
       } else {
         final err = uri.queryParameters['error'] ?? 'Connection failed';
