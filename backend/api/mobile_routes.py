@@ -916,42 +916,32 @@ async def create_receptionist(request: Request):
             )
 
     if not telnyx_id or not inbound_number:
+        allow_orphan_reuse = True
         used_ids: set[str] = set()
         used_e164: set[str] = set()
         try:
-            bp = (
-                supabase.table("business_phone_numbers")
-                .select("telnyx_number_id, phone_number_e164")
-                .execute()
+            used_ids, used_e164 = telnyx_provision.collect_db_assigned_numbers(
+                supabase
             )
-            for row in bp.data or []:
-                if row.get("telnyx_number_id"):
-                    used_ids.add(str(row["telnyx_number_id"]).strip())
-                if row.get("phone_number_e164"):
-                    used_e164.add(str(row["phone_number_e164"]).strip())
-            rr = (
-                supabase.table("receptionists")
-                .select(
-                    "telnyx_phone_number_id, inbound_phone_number, "
-                    "telnyx_phone_number, phone_number"
-                )
-                .is_("deleted_at", "null")
-                .execute()
+            logger.info(
+                "[receptionists/create] assigned inventory ids=%s e164=%s",
+                len(used_ids),
+                len(used_e164),
             )
-            for row in rr.data or []:
-                if row.get("telnyx_phone_number_id"):
-                    used_ids.add(str(row["telnyx_phone_number_id"]).strip())
-                for key in ("inbound_phone_number", "telnyx_phone_number", "phone_number"):
-                    if row.get(key):
-                        used_e164.add(str(row[key]).strip())
         except Exception as scan_ex:
-            logger.warning("[receptionists/create] used-number scan failed: %s", scan_ex)
+            # Fail closed: never reuse orphans without a complete inventory.
+            allow_orphan_reuse = False
+            logger.warning(
+                "[receptionists/create] used-number scan failed; buying new only: %s",
+                scan_ex,
+            )
 
         try:
             tid, tphone, purchased_new = telnyx_provision.acquire_phone_number(
                 area_code,
                 used_ids=used_ids,
                 used_e164=used_e164,
+                allow_orphan_reuse=allow_orphan_reuse,
             )
             telnyx_id = tid
             telnyx_phone = tphone

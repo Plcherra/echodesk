@@ -314,21 +314,82 @@ def normalize_e164(value: str) -> str:
 def list_owned_phone_numbers(*, page_size: int = 50) -> list[dict[str, Any]]:
     """Return owned Telnyx phone_numbers rows (optionally filtered by connection)."""
     api_key = _get_api_key()
-    params: dict[str, Any] = {"page[size]": page_size}
     conn_id = (settings.telnyx_connection_id or "").strip()
-    if conn_id:
-        params["filter[connection_id]"] = conn_id
-
+    out: list[dict[str, Any]] = []
+    page = 1
     with httpx.Client(timeout=30.0) as client:
-        r = client.get(
-            f"{TELNYX_API}/phone_numbers",
-            params=params,
-            headers={"Authorization": f"Bearer {api_key}"},
+        while page <= 20:
+            params: dict[str, Any] = {"page[size]": page_size, "page[number]": page}
+            if conn_id:
+                params["filter[connection_id]"] = conn_id
+            r = client.get(
+                f"{TELNYX_API}/phone_numbers",
+                params=params,
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+            if not r.is_success:
+                raise ValueError(_parse_error(r.text, "list numbers"))
+            rows = (r.json() or {}).get("data") or []
+            batch = [row for row in rows if isinstance(row, dict)]
+            out.extend(batch)
+            if len(batch) < page_size:
+                break
+            page += 1
+    return out
+
+
+def collect_db_assigned_numbers(supabase: Any) -> tuple[set[str], set[str]]:
+    """
+    Every Telnyx id / E.164 currently claimed in EchoDesk.
+
+    Includes soft-deleted receptionists: delete does not auto-release the DID
+    (ops releases in 24–48h). Reuse is only safe after the number is cleared
+    from DB rows and no longer referenced.
+    """
+    used_ids: set[str] = set()
+    used_e164: set[str] = set()
+
+    def _add_id(value: Any) -> None:
+        s = str(value or "").strip()
+        if s:
+            used_ids.add(s)
+
+    def _add_e164(value: Any) -> None:
+        n = normalize_e164(str(value or ""))
+        if n:
+            used_e164.add(n)
+
+    bp = (
+        supabase.table("business_phone_numbers")
+        .select("telnyx_number_id, phone_number_e164")
+        .execute()
+    )
+    for row in bp.data or []:
+        _add_id(row.get("telnyx_number_id"))
+        _add_e164(row.get("phone_number_e164"))
+
+    # Soft-deleted rows still hold the DID until ops release / detach.
+    rr = (
+        supabase.table("receptionists")
+        .select(
+            "telnyx_phone_number_id, inbound_phone_number, "
+            "telnyx_phone_number, phone_number"
         )
-        if not r.is_success:
-            raise ValueError(_parse_error(r.text, "list numbers"))
-        rows = (r.json() or {}).get("data") or []
-        return [row for row in rows if isinstance(row, dict)]
+        .execute()
+    )
+    for row in rr.data or []:
+        _add_id(row.get("telnyx_phone_number_id"))
+        for key in ("inbound_phone_number", "telnyx_phone_number", "phone_number"):
+            _add_e164(row.get(key))
+
+    try:
+        ur = supabase.table("users").select("phone").execute()
+        for row in ur.data or []:
+            _add_e164(row.get("phone"))
+    except Exception as e:
+        logger.warning("users.phone scan skipped: %s", e)
+
+    return used_ids, used_e164
 
 
 def find_orphaned_number(
@@ -340,8 +401,9 @@ def find_orphaned_number(
     """
     Find an owned Telnyx number that is not referenced in our DB.
 
-    Used after a create failed post-purchase so retry can attach the orphan
-    instead of buying another number.
+    used_ids / used_e164 must be the full assigned inventory from
+    collect_db_assigned_numbers — never call with empty sets unless the DB
+    truly has zero assigned numbers.
     """
     used_ids_n = {str(x).strip() for x in used_ids if str(x).strip()}
     used_e164_n = {normalize_e164(str(x)) for x in used_e164 if str(x).strip()}
@@ -384,23 +446,32 @@ def acquire_phone_number(
     *,
     used_ids: set[str] | None = None,
     used_e164: set[str] | None = None,
+    allow_orphan_reuse: bool = True,
 ) -> tuple[str, str, bool]:
     """
     Reuse an orphaned Telnyx number when possible; otherwise buy a new one.
 
     Returns (phone_number_id, e164, purchased_new).
+
+    Orphan reuse is skipped unless allow_orphan_reuse is True and inventory
+    sets are provided (fail closed — never guess with empty inventory).
     """
-    orphan = find_orphaned_number(
-        used_ids=used_ids or set(),
-        used_e164=used_e164 or set(),
-        preferred_area_code=area_code,
-    )
-    if orphan:
-        logger.info(
-            "Reusing orphaned Telnyx number id=%s e164=%s",
-            orphan[0],
-            orphan[1],
+    if allow_orphan_reuse and used_ids is not None and used_e164 is not None:
+        orphan = find_orphaned_number(
+            used_ids=used_ids,
+            used_e164=used_e164,
+            preferred_area_code=area_code,
         )
-        return orphan[0], orphan[1], False
+        if orphan:
+            logger.info(
+                "Reusing orphaned Telnyx number id=%s e164=%s",
+                orphan[0],
+                orphan[1],
+            )
+            return orphan[0], orphan[1], False
+    elif allow_orphan_reuse:
+        logger.warning(
+            "Skipping orphan reuse: assigned-number inventory was not provided"
+        )
     tid, e164 = provision_number(area_code)
     return tid, e164, True
