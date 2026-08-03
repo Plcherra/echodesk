@@ -42,10 +42,18 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
+  macos:
+    generate: true
   image_path: "assets/icon/app_icon.png"
   adaptive_icon_background: "#FBFAF8"
   remove_alpha_ios: true
 
 flutter_native_splash:
-  color: "#FBFAF8"
-  image: "assets/icon/app_icon.png"
+  color: "#0B1C2C"
+  image: "assets/brand/logo_ribbon_navy_teal_transparent.png"
+  android_12:
+    color: "#0B1C2C"
+    image: "assets/brand/logo_ribbon_navy_teal_transparent.png"
+  ios: true
+  android: true
+  web: false

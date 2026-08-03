@@ -16,13 +16,16 @@ class BrandMark extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
-      child: Image.asset(
-        'assets/icon/app_icon.png',
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        alignment: Alignment.center,
-        filterQuality: FilterQuality.high,
+      child: ColoredBox(
+        color: EchoDeskColors.background,
+        child: Image.asset(
+          'assets/icon/app_icon.png',
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          alignment: Alignment.center,
+          filterQuality: FilterQuality.high,
+        ),
       ),
     );
   }
