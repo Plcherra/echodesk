@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../models/bookable_hours.dart';
+import '../../theme/echodesk_theme.dart';
 
-/// Required weekly open/closed + 24h start–end editor for assistant setup.
-class BookableHoursEditor extends StatelessWidget {
+/// Compact weekly hours editor: day chips + shared start/end dropdowns.
+class BookableHoursEditor extends StatefulWidget {
   const BookableHoursEditor({
     super.key,
     required this.value,
@@ -13,42 +15,91 @@ class BookableHoursEditor extends StatelessWidget {
   final BookableHours value;
   final ValueChanged<BookableHours> onChanged;
 
-  void _notify() => onChanged(value);
+  @override
+  State<BookableHoursEditor> createState() => _BookableHoursEditorState();
+}
 
-  Future<void> _pickTime({
-    required BuildContext context,
-    required String dayKey,
-    required bool isStart,
-  }) async {
-    final day = value.weekly[dayKey]!;
-    final initialMinutes = isStart ? day.startMinutes : day.endMinutes;
-    final initial = TimeOfDay(
-      hour: initialMinutes ~/ 60,
-      minute: initialMinutes % 60,
-    );
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initial,
-      builder: (context, child) {
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
-          child: child ?? const SizedBox.shrink(),
-        );
-      },
-    );
-    if (picked == null) return;
-    final minutes = picked.hour * 60 + picked.minute;
-    if (isStart) {
-      day.startMinutes = minutes;
-    } else {
-      day.endMinutes = minutes;
+class _BookableHoursEditorState extends State<BookableHoursEditor> {
+  static const _dayLetters = {
+    'sun': 'S',
+    'mon': 'M',
+    'tue': 'T',
+    'wed': 'W',
+    'thu': 'T',
+    'fri': 'F',
+    'sat': 'S',
+  };
+
+  /// 30-minute slots across 24h.
+  static final List<int> _slotMinutes = [
+    for (var m = 0; m < 24 * 60; m += 30) m,
+  ];
+
+  void _notify() => widget.onChanged(widget.value);
+
+  void _toggleDay(String key) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final day = widget.value.weekly[key]!;
+    final willOpen = !day.open;
+    day.open = willOpen;
+    if (willOpen) {
+      for (final k in BookableHours.dayKeys) {
+        final other = widget.value.weekly[k]!;
+        if (k == key || !other.open) continue;
+        day.startMinutes = other.startMinutes;
+        day.endMinutes = other.endMinutes;
+        break;
+      }
     }
-    _notify();
+    setState(_notify);
+  }
+
+  void _setSharedTime({required bool isStart, required int minutes}) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    for (final key in BookableHours.dayKeys) {
+      final day = widget.value.weekly[key]!;
+      if (!day.open) continue;
+      if (isStart) {
+        day.startMinutes = minutes;
+      } else {
+        day.endMinutes = minutes;
+      }
+    }
+    setState(_notify);
+  }
+
+  int _sharedStart() {
+    for (final key in BookableHours.dayKeys) {
+      final day = widget.value.weekly[key]!;
+      if (day.open) return day.startMinutes;
+    }
+    return 9 * 60;
+  }
+
+  int _sharedEnd() {
+    for (final key in BookableHours.dayKeys) {
+      final day = widget.value.weekly[key]!;
+      if (day.open) return day.endMinutes;
+    }
+    return 17 * 60;
+  }
+
+  bool get _anyOpen =>
+      BookableHours.dayKeys.any((k) => widget.value.weekly[k]?.open == true);
+
+  bool get _overnight {
+    if (!_anyOpen) return false;
+    final s = _sharedStart();
+    final e = _sharedEnd();
+    return e <= s;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final start = _sharedStart();
+    final end = _sharedEnd();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -60,112 +111,177 @@ class BookableHoursEditor extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Required. Set every day of the week. Use 24-hour times — overnight '
-          'is allowed (e.g. 22:00–06:00). Callers can only book inside these windows.',
+          'Tap days that are open, then set one start and end time for those days.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton(
-            onPressed: () {
-              value.copyWeekdaysFromMonday();
-              _notify();
-            },
-            child: const Text('Copy Monday to weekdays'),
-          ),
-        ),
-        const SizedBox(height: 4),
-        ...BookableHours.dayKeys.map((key) {
-          final day = value.weekly[key]!;
-          final label = BookableHours.dayLabels[key]!;
-          final overnight =
-              day.open && day.endMinutes <= day.startMinutes;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border.all(color: theme.dividerColor),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            label,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        Switch(
-                          value: day.open,
-                          onChanged: (v) {
-                            day.open = v;
-                            _notify();
-                          },
-                        ),
-                        Text(day.open ? 'Open' : 'Closed'),
-                        const SizedBox(width: 4),
-                      ],
-                    ),
-                    if (day.open) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => _pickTime(
-                                context: context,
-                                dayKey: key,
-                                isStart: true,
-                              ),
-                              child: Text(
-                                'Start ${formatHhMm(day.startMinutes)}',
-                              ),
-                            ),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8),
-                            child: Text('–'),
-                          ),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => _pickTime(
-                                context: context,
-                                dayKey: key,
-                                isStart: false,
-                              ),
-                              child: Text(
-                                'End ${formatHhMm(day.endMinutes)}',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (overnight)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            'Overnight (ends next day)',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ],
-                ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Text(
+              'On',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
               ),
             ),
-          );
-        }),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: BookableHours.dayKeys.map((key) {
+                  final open = widget.value.weekly[key]?.open == true;
+                  return _DayChip(
+                    letter: _dayLetters[key]!,
+                    selected: open,
+                    onTap: () => _toggleDay(key),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        if (_anyOpen) ...[
+          Row(
+            children: [
+              Expanded(
+                child: _TimeDropdown(
+                  label: 'Start',
+                  minutes: start,
+                  options: _slotMinutes,
+                  onChanged: (m) => _setSharedTime(isStart: true, minutes: m),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10),
+                child: Text('–'),
+              ),
+              Expanded(
+                child: _TimeDropdown(
+                  label: 'End',
+                  minutes: end,
+                  options: _slotMinutes,
+                  onChanged: (m) => _setSharedTime(isStart: false, minutes: m),
+                ),
+              ),
+            ],
+          ),
+          if (_overnight) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Overnight — ends the next day',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () {
+              FocusManager.instance.primaryFocus?.unfocus();
+              widget.value.copyWeekdaysFromMonday();
+              // Ensure weekend stays as currently toggled; copyWeekdays only Mon–Fri.
+              setState(_notify);
+            },
+            child: const Text('Copy Monday hours to Tue–Fri'),
+          ),
+        ] else
+          Text(
+            'Select at least one open day.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: EchoDeskColors.danger,
+            ),
+          ),
       ],
+    );
+  }
+}
+
+class _DayChip extends StatelessWidget {
+  const _DayChip({
+    required this.letter,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String letter;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? EchoDeskColors.brand : Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Container(
+          width: 36,
+          height: 36,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? EchoDeskColors.brand : EchoDeskColors.lineStrong,
+            ),
+          ),
+          child: Text(
+            letter,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              color: selected ? Colors.white : EchoDeskColors.ink,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimeDropdown extends StatelessWidget {
+  const _TimeDropdown({
+    required this.label,
+    required this.minutes,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int minutes;
+  final List<int> options;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = options.contains(minutes) ? minutes : options.first;
+    return DropdownButtonFormField<int>(
+      // ignore: deprecated_member_use
+      value: value,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        isDense: true,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+      isExpanded: true,
+      items: options
+          .map(
+            (m) => DropdownMenuItem<int>(
+              value: m,
+              child: Text(formatHhMm(m)),
+            ),
+          )
+          .toList(),
+      onChanged: (m) {
+        if (m == null) return;
+        FocusManager.instance.primaryFocus?.unfocus();
+        SystemChannels.textInput.invokeMethod('TextInput.hide');
+        onChanged(m);
+      },
     );
   }
 }

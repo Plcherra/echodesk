@@ -1260,10 +1260,24 @@ async def list_google_calendars(request: Request):
             cid = (item.get("id") or "").strip()
             if not cid:
                 continue
+            summary = (item.get("summary") or cid).strip()
+            cid_l = cid.lower()
+            summary_l = summary.lower()
+            # Skip Google holiday / read-only calendars — not useful for booking.
+            if (
+                "#holiday" in cid_l
+                or "holiday@group" in cid_l
+                or "holidays in" in summary_l
+                or summary_l.startswith("holidays ")
+            ):
+                continue
+            role = str(item.get("accessRole") or "").strip().lower()
+            if role in ("reader", "freebusyreader"):
+                continue
             calendars.append(
                 {
                     "id": cid,
-                    "summary": (item.get("summary") or cid).strip(),
+                    "summary": summary,
                     "primary": bool(item.get("primary")),
                     "accessRole": item.get("accessRole"),
                 }

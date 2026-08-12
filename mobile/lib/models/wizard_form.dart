@@ -74,8 +74,7 @@ class WizardFormData {
     this.areaCode = '212',
     this.ownPhone,
     this.providerSid,
-    this.systemPrompt =
-        "You are a friendly, professional receptionist for a [business or personal context, e.g. salon, consulting, personal]. Answer calls politely, book appointments into Google Calendar, confirm details, and be helpful. Never be pushy.",
+    String? systemPrompt,
     this.greeting,
     this.voiceId,
     this.voicePresetKey = 'friendly_warm',
@@ -92,7 +91,9 @@ class WizardFormData {
     this.consent = false,
   })  : staff = staff ?? [],
         services = services ?? [],
-        bookableHours = bookableHours ?? BookableHours.defaults();
+        bookableHours = bookableHours ?? BookableHours.defaults(),
+        systemPrompt = systemPrompt ??
+            defaultReceptionistPrompt(name: name, mode: mode);
 
   Map<String, dynamic> toApiBody() {
     final body = <String, dynamic>{
@@ -138,6 +139,20 @@ class WizardFormData {
     }
     return body;
   }
+}
+
+/// Short default system prompt using receptionist name + solo/business context.
+String defaultReceptionistPrompt({
+  required String name,
+  required String mode,
+}) {
+  final trimmed = name.trim();
+  final identity = trimmed.isNotEmpty ? trimmed : 'Alex';
+  final contextLabel =
+      mode == 'business' ? 'this business' : 'a personal calendar';
+  return 'You are $identity, a friendly professional receptionist for $contextLabel. '
+      'Answer calls politely, book appointments into Google Calendar, confirm details, '
+      'and be helpful. Never be pushy.';
 }
 
 /// Normalizes user input to E.164 (e.g. +16176137764).

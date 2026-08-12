@@ -43,6 +43,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
 
   int _step = 1;
   final _formData = WizardFormData(calendarId: 'primary');
+  late final TextEditingController _systemPromptController;
+  bool _promptCustomized = false;
   bool _loading = false;
   String? _error;
   String? _successId;
@@ -118,13 +120,32 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   @override
   void initState() {
     super.initState();
+    _systemPromptController =
+        TextEditingController(text: _formData.systemPrompt);
     _loadDefaults();
   }
 
   @override
   void dispose() {
     _previewPlayer.dispose();
+    _systemPromptController.dispose();
     super.dispose();
+  }
+
+  void _applyDefaultPrompt() {
+    final prompt = defaultReceptionistPrompt(
+      name: _formData.name,
+      mode: _formData.mode,
+    );
+    _formData.systemPrompt = prompt;
+    _systemPromptController.text = prompt;
+    _promptCustomized = false;
+  }
+
+  void _goToStep(int step) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
+    setState(() => _step = step);
   }
 
   Future<void> _loadVoicePresets() async {
@@ -273,6 +294,14 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           if (id.isEmpty) continue;
           final summary = (raw['summary'] ?? id).toString().trim();
           final primary = raw['primary'] == true;
+          final idL = id.toLowerCase();
+          final summaryL = summary.toLowerCase();
+          if (idL.contains('#holiday') ||
+              idL.contains('holiday@group') ||
+              summaryL.contains('holidays in') ||
+              summaryL.startsWith('holidays ')) {
+            continue;
+          }
           options.add({
             'id': id,
             'label': primary
@@ -556,16 +585,25 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
               ),
             ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(24),
-              children: [
-                if (_step == 1) _buildStep1(),
-                if (_step == 2) _buildStep2(),
-                if (_step == 3) _buildStep3(),
-                if (_step == 4) _buildStep4(),
-                if (_step == 5) _buildStep5(),
-                if (_step == 6) _buildStep6(),
-              ],
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () {
+                FocusManager.instance.primaryFocus?.unfocus();
+                SystemChannels.textInput.invokeMethod('TextInput.hide');
+              },
+              child: ListView(
+                padding: const EdgeInsets.all(24),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                children: [
+                  if (_step == 1) _buildStep1(),
+                  if (_step == 2) _buildStep2(),
+                  if (_step == 3) _buildStep3(),
+                  if (_step == 4) _buildStep4(),
+                  if (_step == 5) _buildStep5(),
+                  if (_step == 6) _buildStep6(),
+                ],
+              ),
             ),
           ),
           SafeArea(
@@ -593,10 +631,10 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                         OutlinedButton(
                           onPressed: _loading
                               ? null
-                              : () => setState(() {
-                                    _step = _prevStepFrom(_step);
-                                    _error = null;
-                                  }),
+                              : () {
+                                  _error = null;
+                                  _goToStep(_prevStepFrom(_step));
+                                },
                           child: const Text('Back'),
                         )
                       else
@@ -605,10 +643,10 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                         children: [
                           if (_step == 4 || _step == 5)
                             TextButton(
-                              onPressed: () => setState(() {
-                                _step = _nextStepFrom(_step);
+                              onPressed: () {
                                 _error = null;
-                              }),
+                                _goToStep(_nextStepFrom(_step));
+                              },
                               child: const Text('Skip'),
                             ),
                           FilledButton(
@@ -617,10 +655,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                                 : () async {
                                     if (_step < 6) {
                                       if (_validateStep()) {
-                                        setState(() {
-                                          _step = _nextStepFrom(_step);
-                                          _error = null;
-                                        });
+                                        _error = null;
+                                        _goToStep(_nextStepFrom(_step));
                                       }
                                     } else {
                                       await _submit();
@@ -662,7 +698,10 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
               for (var i = 0; i < _steps.length; i++) ...[
                 GestureDetector(
                   onTap: i + 1 < _step
-                      ? () => setState(() => _step = i + 1)
+                      ? () {
+                          _error = null;
+                          _goToStep(i + 1);
+                        }
                       : null,
                   child: CircleAvatar(
                     radius: 18,
@@ -734,16 +773,22 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         _selectableOption(
           title: 'Personal / Solo',
           subtitle:
-              'Book time on my calendar. One assistant, one phone number.',
+              'Book time on my calendar. One receptionist, one phone number.',
           selected: _formData.mode == 'personal',
-          onTap: () => setState(() => _formData.mode = 'personal'),
+          onTap: () => setState(() {
+            _formData.mode = 'personal';
+            if (!_promptCustomized) _applyDefaultPrompt();
+          }),
         ),
         _selectableOption(
           title: 'Business / Team',
           subtitle:
               'Staff, services, and store locations — each can use its own calendar. Same phone number.',
           selected: _formData.mode == 'business',
-          onTap: () => setState(() => _formData.mode = 'business'),
+          onTap: () => setState(() {
+            _formData.mode = 'business';
+            if (!_promptCustomized) _applyDefaultPrompt();
+          }),
         ),
         const SizedBox(height: 16),
         TextFormField(
@@ -753,7 +798,12 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
             hintText: 'e.g. Eve, Alex, My AI Receptionist',
             border: OutlineInputBorder(),
           ),
-          onChanged: (v) => _formData.name = v,
+          onChanged: (v) {
+            _formData.name = v;
+            if (!_promptCustomized) {
+              setState(_applyDefaultPrompt);
+            }
+          },
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
@@ -1004,7 +1054,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           _selectableOption(
             title: 'Get a different new number',
             subtitle:
-                "We'll buy a new US number (~\$1–2/month). Your held number stays pending release.",
+                'Provision another US number. Included with your plan; your held number stays pending release.',
             selected: _formData.phoneStrategy == 'new',
             onTap: () => setState(() => _formData.phoneStrategy = 'new'),
           ),
@@ -1012,7 +1062,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           _selectableOption(
             title: 'Get a new business number',
             subtitle:
-                "We'll set up a US business number for you (~\$1–2/month). Ready quickly.",
+                "We'll set up a US business number for you. Included with your plan.",
             selected: _formData.phoneStrategy == 'new',
             onTap: () => setState(() => _formData.phoneStrategy = 'new'),
           ),
@@ -1224,19 +1274,21 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         const Text('Core instructions for your receptionist'),
         const SizedBox(height: 8),
         TextButton(
-          onPressed: () => setState(() {
-            _formData.systemPrompt =
-                "You are a friendly, professional receptionist for a [business or personal context, e.g. salon, consulting, personal]. Answer calls politely, book appointments into Google Calendar, confirm details, and be helpful. Never be pushy.";
-          }),
+          onPressed: () => setState(_applyDefaultPrompt),
           child: const Text('Use default prompt'),
         ),
-        TextFormField(
-          initialValue: _formData.systemPrompt,
+        TextField(
+          controller: _systemPromptController,
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
+            helperText:
+                'Default uses the receptionist name from Step 1. Edit anytime.',
           ),
-          maxLines: 8,
-          onChanged: (v) => _formData.systemPrompt = v,
+          maxLines: 6,
+          onChanged: (v) {
+            _formData.systemPrompt = v;
+            _promptCustomized = true;
+          },
         ),
         const SizedBox(height: 16),
         TextFormField(
