@@ -929,6 +929,46 @@ async def create_receptionist(request: Request):
                 existing_tid,
             )
 
+    # Same business: reclaim DID from soft-deleted assistant before orphan/buy.
+    reclaimed_from_id: str | None = None
+    if not telnyx_id or not inbound_number:
+        from telnyx.phone_lifecycle import (
+            detach_phone_from_receptionist,
+            find_reclaimable_number_for_business,
+        )
+
+        reclaim = find_reclaimable_number_for_business(supabase, target_business_id)
+        if reclaim:
+            telnyx_id = reclaim["telnyx_id"]
+            telnyx_phone = reclaim["e164"]
+            inbound_number = reclaim["e164"]
+            reclaimed_from_id = reclaim.get("receptionist_id") or None
+            logger.info(
+                "[receptionists/create] reclaiming soft-deleted DID e164=%s id=%s from=%s",
+                inbound_number,
+                telnyx_id,
+                reclaimed_from_id,
+            )
+            try:
+                telnyx_provision.configure_voice_url(
+                    telnyx_id, f"{webhook_base}/api/telnyx/voice"
+                )
+            except Exception as cfg_ex:
+                logger.warning(
+                    "[receptionists/create] configure reclaimed line failed id=%s: %s",
+                    telnyx_id,
+                    cfg_ex,
+                )
+            if reclaimed_from_id:
+                try:
+                    detach_phone_from_receptionist(supabase, reclaimed_from_id)
+                except Exception as det_ex:
+                    logger.warning(
+                        "[receptionists/create] detach after reclaim failed from=%s: %s",
+                        reclaimed_from_id,
+                        det_ex,
+                    )
+
     if not telnyx_id or not inbound_number:
         allow_orphan_reuse = True
         used_ids: set[str] = set()
@@ -1475,9 +1515,28 @@ async def delete_receptionist(request: Request, receptionist_id: str):
 
     return {
         "success": True,
-        "message": "Deletion requested. The number will be fully released in 24–48 hours.",
+        "message": (
+            "Assistant deleted. Your number is held so you can attach it to a new "
+            "assistant. If you don't reuse it, we'll release it within 24–48 hours."
+            if needs_manual_release
+            else "Assistant deleted. Calls will no longer route to this receptionist."
+        ),
         "number_release_pending": needs_manual_release,
+        "held_phone_number": inbound_phone if needs_manual_release else None,
     }
+
+
+@router.get("/phone-numbers/pending-release")
+async def list_pending_release_numbers(request: Request):
+    """Soft-deleted assistants still holding a DID — reclaimable on create."""
+    user, supabase = _require_auth(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    from telnyx.phone_lifecycle import list_pending_release_numbers_for_user
+
+    numbers = list_pending_release_numbers_for_user(supabase, user["id"])
+    return {"numbers": numbers}
 
 
 @router.post("/receptionists/{receptionist_id}/website")

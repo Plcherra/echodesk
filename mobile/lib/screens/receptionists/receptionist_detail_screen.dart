@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -385,14 +387,17 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
   }
 
   void _showDeleteConfirm(BuildContext context, Receptionist r) {
+    final phone = r.displayPhone.trim();
+    final phoneBit = phone.isNotEmpty && phone != '—'
+        ? ' Your number $phone stays with your account so you can attach it to a new assistant.'
+        : ' Your business number stays with your account so you can attach it to a new assistant.';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete receptionist?'),
+        title: const Text('Delete assistant?'),
         content: Text(
-          'This will remove "${r.name}". We\'ll stop routing calls to this receptionist. '
-          'If this was the last receptionist on the business number, we\'ll release the number within 24–48 hours. '
-          'This cannot be undone.',
+          'This will remove "${r.name}". Calls will stop.$phoneBit '
+          'If you don’t reuse it, we’ll release it within 24–48 hours.',
         ),
         actions: [
           TextButton(
@@ -403,14 +408,23 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
             onPressed: () async {
               Navigator.of(ctx).pop();
               try {
-                await ApiClient.post(
+                final res = await ApiClient.post(
                   '/api/mobile/receptionists/${r.id}/delete',
                 );
+                String snack = AppStrings.receptionistDeletionRequested;
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                  try {
+                    final data =
+                        jsonDecode(res.body) as Map<String, dynamic>?;
+                    final msg = (data?['message'] as String?)?.trim();
+                    if (msg != null && msg.isNotEmpty) snack = msg;
+                  } catch (_) {}
+                }
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(AppStrings.receptionistDeletionRequested),
-                    duration: Duration(seconds: 6),
+                  SnackBar(
+                    content: Text(snack),
+                    duration: const Duration(seconds: 6),
                   ),
                 );
                 context.go('/receptionists');

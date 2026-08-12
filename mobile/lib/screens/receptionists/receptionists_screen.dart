@@ -21,6 +21,7 @@ class ReceptionistsScreen extends StatefulWidget {
 
 class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
   List<Receptionist> _receptionists = [];
+  List<Map<String, dynamic>> _pendingRelease = [];
   bool _loading = true;
   String? _error;
   bool _isSubscribed = false;
@@ -68,8 +69,25 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
           .map((e) => Receptionist.fromJson(e as Map<String, dynamic>))
           .toList();
 
+      var pending = <Map<String, dynamic>>[];
+      try {
+        final pendingRes =
+            await ApiClient.get('/api/mobile/phone-numbers/pending-release');
+        if (pendingRes.statusCode >= 200 && pendingRes.statusCode < 300) {
+          final data = jsonDecode(pendingRes.body) as Map<String, dynamic>?;
+          final nums = data?['numbers'] as List<dynamic>? ?? [];
+          pending = nums
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+      } catch (_) {
+        // Banner is best-effort; list still loads.
+      }
+
       setState(() {
         _receptionists = list;
+        _pendingRelease = pending;
         _loading = false;
       });
     } catch (e) {
@@ -203,6 +221,10 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 24, vertical: 16),
                           children: [
+                            if (_pendingRelease.isNotEmpty) ...[
+                              ..._pendingRelease.map(_buildPendingReleaseCard),
+                              const SizedBox(height: 16),
+                            ],
                             if (showFirstTimeOnboarding) ...[
                               _buildCreateStepper(),
                               const SizedBox(height: 24),
@@ -439,6 +461,76 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
                   ),
                 ],
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPendingReleaseCard(Map<String, dynamic> item) {
+    final display = (item['phone_display'] as String?)?.trim().isNotEmpty == true
+        ? item['phone_display'] as String
+        : (item['phone_number'] as String? ?? '');
+    return Material(
+      color: EchoDeskColors.surfaceMuted,
+      borderRadius: BorderRadius.circular(EchoDeskRadii.md),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.phone_paused_outlined,
+                    size: 20, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    AppStrings.pendingReleaseTitle,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(EchoDeskRadii.sm),
+                  ),
+                  child: Text(
+                    'Release pending',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              display,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              AppStrings.pendingReleaseSubtitle,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: EchoDeskColors.soft,
+                  ),
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.tonal(
+                onPressed: _navigateToCreate,
+                child: const Text(AppStrings.pendingReleaseCta),
+              ),
+            ),
           ],
         ),
       ),
