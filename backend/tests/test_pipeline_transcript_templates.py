@@ -123,7 +123,39 @@ def test_template_check_availability_success_bucket_then_times():
     )
     assert out
     assert "afternoon openings" in out.lower()
-    assert "which time works best" in out.lower()
+    assert "what time works for you" in out.lower()
+
+
+def test_template_check_availability_full_openings_asks_for_time():
+    payload = json.dumps(
+        {
+            "success": True,
+            "suggested_slots": [
+                "2026-04-11T09:00:00-04:00",
+                "2026-04-11T14:00:00-04:00",
+            ],
+            "summary_periods": ["morning", "afternoon"],
+        }
+    )
+    out = pipeline_templates.template_from_tool_result(
+        "check_availability",
+        payload,
+        requested_date="tomorrow",
+        requested_time=None,
+        voice_session=None,
+    )
+    assert out
+    assert "full openings" in out.lower()
+    assert "what time works for you" in out.lower()
+    assert "morning and afternoon" not in out.lower()
+
+
+def test_daypart_preference_is_whitelisted_and_clear_intent():
+    for text in ("afternoons", "mornings", "in the afternoon", "evening"):
+        assert pipeline_transcript.is_whitelisted_short_utterance(text) is True
+        assert pipeline_transcript.contains_clear_intent(text) is True
+    assert pipeline_transcript.extract_daypart("good morning") is None
+    assert pipeline_transcript.contains_clear_intent("good morning") is False
 
 
 def test_template_check_availability_exact_time_available_answers_yes():

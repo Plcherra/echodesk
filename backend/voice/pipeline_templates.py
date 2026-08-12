@@ -140,17 +140,28 @@ def _compact_range_spoken(slots: list[str]) -> str:
 
 
 def _availability_reply_bucket_first(day_text: str, slots: list[str], periods_norm: list[str]) -> str:
-    """Step 1: bucket summary; ask preference before listing every slot (reduces cognitive load)."""
+    """Ask for a clock time; hint coverage (full day vs morning/afternoon/evening only).
+
+    Prefer "what time?" over forcing a morning/afternoon choice — callers can still
+    answer with a daypart and daypart_narrowing_reply will list concrete times.
+    """
     if len(periods_norm) >= 2:
+        # Morning + afternoon (business-day coverage) → speak as full openings.
+        period_set = {p.lower() for p in periods_norm}
+        if {"morning", "afternoon"}.issubset(period_set) or len(period_set) >= 3:
+            return f"What time works for you? I have full openings {day_text}."
         bucket = _openings_line_from_summary_periods(periods_norm)
-        return f"I checked {day_text}—{bucket}. What works best for you?"
+        return f"What time works for you? {bucket} {day_text}."
     if len(periods_norm) == 1:
         p = periods_norm[0]
         span = _compact_range_spoken(slots)
         if span:
-            return f"I only have {p} openings {day_text}, around {span}. Which time works best for you?"
-        return f"I only have {p} openings {day_text}. Which time works best for you?"
-    return f"I found {slots_sentence(slots)} for {day_text}. Which works best?"
+            return (
+                f"What time works for you? I only have {p} openings {day_text}, "
+                f"around {span}."
+            )
+        return f"What time works for you? I only have {p} openings {day_text}."
+    return f"What time works for you? I found {slots_sentence(slots)} for {day_text}."
 
 
 def daypart_narrowing_reply(daypart: str, offered_slots_state: dict[str, Any]) -> Optional[str]:

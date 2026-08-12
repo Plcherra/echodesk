@@ -14,6 +14,10 @@ FILLER_WORDS = frozenset({"um", "uh", "hmm", "eh", "er", "ah", "like", "well", "
 SHORT_UTTERANCE_WHITELIST = frozenset({
     "hello", "hi", "hey", "yes", "yeah", "yup", "no", "okay", "ok",
     "book", "booking", "pricing", "price", "tomorrow", "today",
+    # Daypart preference after availability offer (often low STT confidence).
+    "morning", "mornings", "afternoon", "afternoons", "evening", "evenings",
+    "the morning", "the afternoon", "the evening",
+    "in the morning", "in the afternoon", "in the evening",
     "9am", "9 am", "10am", "10 am", "11am", "11 am", "8am", "8 am",
     "can you hear me", "you there", "anybody there",
     "book that", "book it", "the first one", "first one", "the second one",
@@ -156,6 +160,10 @@ def contains_clear_intent(text: str) -> bool:
     if not norm:
         return False
     if is_post_booking_followup_message(text):
+        return True
+    # Bare daypart after an availability offer ("afternoons") — treat as intent so
+    # debounce / low-confidence guards do not drop the turn into silence.
+    if extract_daypart(text) is not None:
         return True
     if extract_time_hint(text) is not None and any(
         h in norm

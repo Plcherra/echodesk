@@ -119,6 +119,27 @@ def test_daypart_narrowing_keeps_day_context_without_llm():
     assert "2" not in reply.split("which")[0]  # no afternoon 2pm slot listed
 
 
+def test_daypart_narrowing_afternoon_lists_afternoon_slots():
+    # Regression: "afternoons" must not go silent — same path as mornings.
+    state = {
+        "exact_slots": [
+            "2026-04-11T09:00:00-04:00",
+            "2026-04-11T14:00:00-04:00",
+            "2026-04-11T15:00:00-04:00",
+        ],
+        "suggested_slots": [],
+        "summary_periods": ["morning", "afternoon"],
+        "last_date_text": "tomorrow",
+    }
+    result = _resolve("afternoons", use_calendar=True, offered_slots_state=state)
+
+    assert result.handled is True
+    assert result.reason == "daypart_narrowing"
+    reply = (result.reply or "").lower()
+    assert "tomorrow afternoon" in reply
+    assert "2" in reply or "3" in reply or "14" in reply or "15" in reply
+
+
 def test_daypart_narrowing_when_bucket_empty_steers_to_available():
     state = {
         "exact_slots": ["2026-04-11T14:00:00-04:00", "2026-04-11T15:00:00-04:00"],
