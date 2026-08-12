@@ -389,8 +389,8 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
   void _showDeleteConfirm(BuildContext context, Receptionist r) {
     final phone = r.displayPhone.trim();
     final phoneBit = phone.isNotEmpty && phone != '—'
-        ? ' Your number $phone stays with your account so you can attach it to a new assistant.'
-        : ' Your business number stays with your account so you can attach it to a new assistant.';
+        ? ' Your number $phone stays with your account so you can attach it to a new receptionist.'
+        : ' Your business number stays with your account so you can attach it to a new receptionist.';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
