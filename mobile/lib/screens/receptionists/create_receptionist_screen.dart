@@ -50,8 +50,12 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   String? _successId;
   String? _successPhone;
   String? _successName;
-  List<Map<String, dynamic>> _calendarOptions = [];
   bool _calendarsLoading = false;
+  /// 'primary' | 'custom'
+  String _calendarChoice = 'primary';
+  String _primaryCalendarId = 'primary';
+  String _primaryCalendarLabel = 'Primary calendar';
+  late final TextEditingController _customCalendarController;
   List<Map<String, dynamic>> _voicePresets = [];
   bool _voicePresetsLoading = false;
   final AudioPlayer _previewPlayer = AudioPlayer();
@@ -122,6 +126,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
     super.initState();
     _systemPromptController =
         TextEditingController(text: _formData.systemPrompt);
+    _customCalendarController =
+        TextEditingController(text: _formData.calendarId);
     _loadDefaults();
   }
 
@@ -129,6 +135,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   void dispose() {
     _previewPlayer.dispose();
     _systemPromptController.dispose();
+    _customCalendarController.dispose();
     super.dispose();
   }
 
@@ -282,7 +289,9 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   }) async {
     if (!mounted) return;
     setState(() => _calendarsLoading = true);
-    final options = <Map<String, dynamic>>[];
+
+    String? primaryId;
+    String? primaryLabel;
     try {
       final res = await ApiClient.get('/api/mobile/google/calendars');
       if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -293,7 +302,6 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           final id = (raw['id'] ?? '').toString().trim();
           if (id.isEmpty) continue;
           final summary = (raw['summary'] ?? id).toString().trim();
-          final primary = raw['primary'] == true;
           final idL = id.toLowerCase();
           final summaryL = summary.toLowerCase();
           if (idL.contains('#holiday') ||
@@ -302,69 +310,57 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
               summaryL.startsWith('holidays ')) {
             continue;
           }
-          options.add({
-            'id': id,
-            'label': primary
-                ? '$summary · primary'
-                : (id.contains('@') ? '$summary · $id' : summary),
-            'primary': primary,
-          });
+          if (raw['primary'] == true) {
+            primaryId = id;
+            primaryLabel = id.contains('@')
+                ? 'Primary · $id'
+                : 'Primary · $summary';
+            break;
+          }
         }
       }
     } catch (_) {
-      // Fall back to profile/email suggestions below.
-    }
-
-    void ensureOption(String id, String label, {bool primary = false}) {
-      if (id.trim().isEmpty) return;
-      if (options.any((o) => o['id'] == id)) return;
-      options.insert(0, {'id': id, 'label': label, 'primary': primary});
+      // Fallbacks below.
     }
 
     final preferred = (preferredId ?? '').trim();
-    if (preferred.isNotEmpty) {
-      ensureOption(
-        preferred,
-        preferred.contains('@')
-            ? 'Connected account · $preferred'
-            : 'Connected calendar · $preferred',
-        primary: preferred == 'primary',
-      );
-    }
     final email = (fallbackEmail ?? '').trim();
-    if (email.contains('@')) {
-      ensureOption(email, 'Google account · $email');
-    }
-    ensureOption('primary', 'Primary calendar', primary: true);
+    primaryId ??= preferred.isNotEmpty
+        ? preferred
+        : (email.contains('@') ? email : 'primary');
+    primaryLabel ??= email.contains('@')
+        ? 'Primary · $email'
+        : 'Primary calendar';
 
-    String selected = _formData.calendarId.trim().isNotEmpty
-        ? _formData.calendarId.trim()
-        : 'primary';
-    if (preferred.isNotEmpty && options.any((o) => o['id'] == preferred)) {
-      selected = preferred;
-    } else {
-      Map<String, dynamic>? primaryOpt;
-      for (final o in options) {
-        if (o['primary'] == true) {
-          primaryOpt = o;
-          break;
-        }
-      }
-      if (primaryOpt != null) {
-        selected = primaryOpt['id'] as String;
-      } else if (email.contains('@') &&
-          options.any((o) => o['id'] == email)) {
-        selected = email;
-      } else if (options.isNotEmpty) {
-        selected = options.first['id'] as String;
-      }
-    }
+    final current = _formData.calendarId.trim();
+    final isPrimary = current.isEmpty ||
+        current == 'primary' ||
+        current == primaryId ||
+        (email.isNotEmpty && current == email);
 
     if (!mounted) return;
     setState(() {
-      _calendarOptions = options;
-      _formData.calendarId = selected;
+      _primaryCalendarId = primaryId!;
+      _primaryCalendarLabel = primaryLabel!;
+      _calendarChoice = isPrimary ? 'primary' : 'custom';
+      if (isPrimary) {
+        _formData.calendarId = _primaryCalendarId;
+        _customCalendarController.text = _primaryCalendarId;
+      } else {
+        _customCalendarController.text = current;
+      }
       _calendarsLoading = false;
+    });
+  }
+
+  void _setCalendarChoice(String choice) {
+    setState(() {
+      _calendarChoice = choice;
+      if (choice == 'primary') {
+        _formData.calendarId = _primaryCalendarId;
+      } else {
+        _formData.calendarId = _customCalendarController.text.trim();
+      }
     });
   }
 
@@ -408,6 +404,16 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
     if (_step == 1) {
       if (_formData.name.trim().isEmpty) {
         _showVisibleError('Name is required');
+        return false;
+      }
+      if (_calendarChoice == 'primary') {
+        _formData.calendarId = _primaryCalendarId;
+      } else {
+        _formData.calendarId = _customCalendarController.text.trim();
+      }
+      if (_calendarChoice == 'custom' &&
+          _customCalendarController.text.trim().isEmpty) {
+        _showVisibleError('Enter a custom calendar ID');
         return false;
       }
       if (_formData.calendarId.trim().isEmpty) {
@@ -824,36 +830,61 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
             padding: EdgeInsets.symmetric(vertical: 8),
             child: LinearProgressIndicator(minHeight: 2),
           ),
-        DropdownButtonFormField<String>(
-          // ignore: deprecated_member_use -- value matches current selection
-          value: _calendarOptions.any((o) => o['id'] == _formData.calendarId)
-              ? _formData.calendarId
-              : (_calendarOptions.isNotEmpty
-                  ? _calendarOptions.first['id'] as String
-                  : null),
-          decoration: const InputDecoration(
-            labelText: 'Google calendar',
-            helperText:
-                'Usually your Google account email or Primary calendar.',
-            border: OutlineInputBorder(),
-          ),
-          isExpanded: true,
-          items: _calendarOptions
-              .map(
-                (o) => DropdownMenuItem<String>(
-                  value: o['id'] as String,
-                  child: Text(
-                    o['label'] as String,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              )
-              .toList(),
+        Text(
+          'Google calendar',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 8),
+        RadioGroup<String>(
+          groupValue: _calendarChoice,
           onChanged: (v) {
             if (v == null) return;
-            setState(() => _formData.calendarId = v);
+            _setCalendarChoice(v);
           },
+          child: Column(
+            children: [
+              RadioListTile<String>(
+                value: 'primary',
+                title: Text(
+                  _primaryCalendarLabel,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: const Text(
+                  'Your Google primary calendar (usually your email).',
+                ),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+              ),
+              RadioListTile<String>(
+                value: 'custom',
+                title: const Text('Custom calendar ID'),
+                subtitle: const Text(
+                  'Paste another Google Calendar ID if you use a shared or secondary calendar.',
+                ),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+              ),
+            ],
+          ),
         ),
+        if (_calendarChoice == 'custom') ...[
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _customCalendarController,
+            decoration: const InputDecoration(
+              labelText: 'Calendar ID',
+              hintText: 'name@group.calendar.google.com',
+              helperText:
+                  'Find it in Google Calendar → Settings → Integrate calendar.',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) {
+              setState(() => _formData.calendarId = v.trim());
+            },
+          ),
+        ],
       ],
     );
   }

@@ -116,13 +116,6 @@ class BookableHours {
     }
     return null;
   }
-
-  void copyWeekdaysFromMonday() {
-    final mon = weekly['mon']?.copy() ?? DayHours.openDefault();
-    for (final k in ['tue', 'wed', 'thu', 'fri']) {
-      weekly[k] = mon.copy();
-    }
-  }
 }
 
 String formatHhMm(int minutes) {

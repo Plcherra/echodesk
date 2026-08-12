@@ -1,10 +1,10 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../models/bookable_hours.dart';
 import '../../theme/echodesk_theme.dart';
 
-/// Compact weekly hours editor: day chips + shared start/end dropdowns.
+/// Compact weekly hours: day chips + per-day start/end via bottom-sheet pickers.
 class BookableHoursEditor extends StatefulWidget {
   const BookableHoursEditor({
     super.key,
@@ -30,12 +30,21 @@ class _BookableHoursEditorState extends State<BookableHoursEditor> {
     'sat': 'S',
   };
 
-  /// 30-minute slots across 24h.
-  static final List<int> _slotMinutes = [
-    for (var m = 0; m < 24 * 60; m += 30) m,
-  ];
+  /// Which open day is being edited (start/end apply to this day).
+  String? _editingKey;
 
   void _notify() => widget.onChanged(widget.value);
+
+  String? get _effectiveEditingKey {
+    final openKeys = BookableHours.dayKeys
+        .where((k) => widget.value.weekly[k]?.open == true)
+        .toList();
+    if (openKeys.isEmpty) return null;
+    if (_editingKey != null && openKeys.contains(_editingKey)) {
+      return _editingKey;
+    }
+    return openKeys.first;
+  }
 
   void _toggleDay(String key) {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -43,62 +52,72 @@ class _BookableHoursEditorState extends State<BookableHoursEditor> {
     final willOpen = !day.open;
     day.open = willOpen;
     if (willOpen) {
-      for (final k in BookableHours.dayKeys) {
-        final other = widget.value.weekly[k]!;
-        if (k == key || !other.open) continue;
-        day.startMinutes = other.startMinutes;
-        day.endMinutes = other.endMinutes;
-        break;
+      final editKey = _effectiveEditingKey;
+      if (editKey != null && editKey != key) {
+        final src = widget.value.weekly[editKey]!;
+        day.startMinutes = src.startMinutes;
+        day.endMinutes = src.endMinutes;
       }
+      _editingKey = key;
+    } else if (_editingKey == key) {
+      _editingKey = null;
     }
     setState(_notify);
   }
 
-  void _setSharedTime({required bool isStart, required int minutes}) {
-    FocusManager.instance.primaryFocus?.unfocus();
-    for (final key in BookableHours.dayKeys) {
-      final day = widget.value.weekly[key]!;
-      if (!day.open) continue;
-      if (isStart) {
-        day.startMinutes = minutes;
-      } else {
-        day.endMinutes = minutes;
-      }
+  void _selectDayForEdit(String key) {
+    if (widget.value.weekly[key]?.open != true) return;
+    setState(() => _editingKey = key);
+  }
+
+  Future<void> _pickTime({required bool isStart}) async {
+    final key = _effectiveEditingKey;
+    if (key == null) return;
+    final day = widget.value.weekly[key]!;
+    final initial = TimeOfDay(
+      hour: (isStart ? day.startMinutes : day.endMinutes) ~/ 60,
+      minute: (isStart ? day.startMinutes : day.endMinutes) % 60,
+    );
+
+    final picked = await showModalBottomSheet<TimeOfDay>(
+      context: context,
+      isScrollControlled: false,
+      builder: (ctx) => _TimeSheet(
+        title: isStart ? 'Start time' : 'End time',
+        initial: initial,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final minutes = picked.hour * 60 + picked.minute;
+    if (isStart) {
+      day.startMinutes = minutes;
+    } else {
+      day.endMinutes = minutes;
     }
     setState(_notify);
   }
 
-  int _sharedStart() {
-    for (final key in BookableHours.dayKeys) {
-      final day = widget.value.weekly[key]!;
-      if (day.open) return day.startMinutes;
+  void _applyEditingToAllOpen() {
+    final key = _effectiveEditingKey;
+    if (key == null) return;
+    final src = widget.value.weekly[key]!;
+    for (final k in BookableHours.dayKeys) {
+      final d = widget.value.weekly[k]!;
+      if (!d.open || k == key) continue;
+      d.startMinutes = src.startMinutes;
+      d.endMinutes = src.endMinutes;
     }
-    return 9 * 60;
-  }
-
-  int _sharedEnd() {
-    for (final key in BookableHours.dayKeys) {
-      final day = widget.value.weekly[key]!;
-      if (day.open) return day.endMinutes;
-    }
-    return 17 * 60;
-  }
-
-  bool get _anyOpen =>
-      BookableHours.dayKeys.any((k) => widget.value.weekly[k]?.open == true);
-
-  bool get _overnight {
-    if (!_anyOpen) return false;
-    final s = _sharedStart();
-    final e = _sharedEnd();
-    return e <= s;
+    setState(_notify);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final start = _sharedStart();
-    final end = _sharedEnd();
+    final editKey = _effectiveEditingKey;
+    final editDay = editKey == null ? null : widget.value.weekly[editKey];
+    final overnight = editDay != null &&
+        editDay.open &&
+        editDay.endMinutes <= editDay.startMinutes;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,7 +130,7 @@ class _BookableHoursEditorState extends State<BookableHoursEditor> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Tap days that are open, then set one start and end time for those days.',
+          'Tap days to open them. Select an open day to set its hours. Long-press to close.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -131,26 +150,64 @@ class _BookableHoursEditorState extends State<BookableHoursEditor> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: BookableHours.dayKeys.map((key) {
                   final open = widget.value.weekly[key]?.open == true;
+                  final editing = key == editKey;
                   return _DayChip(
                     letter: _dayLetters[key]!,
-                    selected: open,
-                    onTap: () => _toggleDay(key),
+                    open: open,
+                    editing: editing,
+                    onTap: () {
+                      if (open) {
+                        _selectDayForEdit(key);
+                      } else {
+                        _toggleDay(key);
+                      }
+                    },
+                    onLongPress: () {
+                      if (open) _toggleDay(key);
+                    },
                   );
                 }).toList(),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 18),
-        if (_anyOpen) ...[
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: BookableHours.dayKeys
+              .where((k) => widget.value.weekly[k]?.open == true)
+              .map((k) {
+            final d = widget.value.weekly[k]!;
+            final label = BookableHours.dayLabels[k]!.substring(0, 3);
+            final active = k == editKey;
+            return GestureDetector(
+              onTap: () => _selectDayForEdit(k),
+              child: Text(
+                '$label ${formatHhMm(d.startMinutes)}–${formatHhMm(d.endMinutes)}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: active ? EchoDeskColors.brand : EchoDeskColors.muted,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 14),
+        if (editDay != null) ...[
+          Text(
+            'Hours for ${BookableHours.dayLabels[editKey]}',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
-                child: _TimeDropdown(
-                  label: 'Start',
-                  minutes: start,
-                  options: _slotMinutes,
-                  onChanged: (m) => _setSharedTime(isStart: true, minutes: m),
+                child: OutlinedButton(
+                  onPressed: () => _pickTime(isStart: true),
+                  child: Text('Start ${formatHhMm(editDay.startMinutes)}'),
                 ),
               ),
               const Padding(
@@ -158,16 +215,14 @@ class _BookableHoursEditorState extends State<BookableHoursEditor> {
                 child: Text('–'),
               ),
               Expanded(
-                child: _TimeDropdown(
-                  label: 'End',
-                  minutes: end,
-                  options: _slotMinutes,
-                  onChanged: (m) => _setSharedTime(isStart: false, minutes: m),
+                child: OutlinedButton(
+                  onPressed: () => _pickTime(isStart: false),
+                  child: Text('End ${formatHhMm(editDay.endMinutes)}'),
                 ),
               ),
             ],
           ),
-          if (_overnight) ...[
+          if (overnight) ...[
             const SizedBox(height: 8),
             Text(
               'Overnight — ends the next day',
@@ -176,15 +231,10 @@ class _BookableHoursEditorState extends State<BookableHoursEditor> {
               ),
             ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
           TextButton(
-            onPressed: () {
-              FocusManager.instance.primaryFocus?.unfocus();
-              widget.value.copyWeekdaysFromMonday();
-              // Ensure weekend stays as currently toggled; copyWeekdays only Mon–Fri.
-              setState(_notify);
-            },
-            child: const Text('Copy Monday hours to Tue–Fri'),
+            onPressed: _applyEditingToAllOpen,
+            child: const Text('Apply these hours to all open days'),
           ),
         ] else
           Text(
@@ -201,22 +251,28 @@ class _BookableHoursEditorState extends State<BookableHoursEditor> {
 class _DayChip extends StatelessWidget {
   const _DayChip({
     required this.letter,
-    required this.selected,
+    required this.open,
+    required this.editing,
     required this.onTap,
+    required this.onLongPress,
   });
 
   final String letter;
-  final bool selected;
+  final bool open;
+  final bool editing;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
+    final fill = open ? EchoDeskColors.brand : Colors.transparent;
     return Material(
-      color: selected ? EchoDeskColors.brand : Colors.transparent,
+      color: fill,
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Container(
           width: 36,
           height: 36,
@@ -224,7 +280,10 @@ class _DayChip extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
-              color: selected ? EchoDeskColors.brand : EchoDeskColors.lineStrong,
+              color: editing
+                  ? EchoDeskColors.brandTeal
+                  : (open ? EchoDeskColors.brand : EchoDeskColors.lineStrong),
+              width: editing ? 2.5 : 1,
             ),
           ),
           child: Text(
@@ -232,7 +291,7 @@ class _DayChip extends StatelessWidget {
             style: TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 13,
-              color: selected ? Colors.white : EchoDeskColors.ink,
+              color: open ? Colors.white : EchoDeskColors.ink,
             ),
           ),
         ),
@@ -241,47 +300,82 @@ class _DayChip extends StatelessWidget {
   }
 }
 
-class _TimeDropdown extends StatelessWidget {
-  const _TimeDropdown({
-    required this.label,
-    required this.minutes,
-    required this.options,
-    required this.onChanged,
-  });
+class _TimeSheet extends StatefulWidget {
+  const _TimeSheet({required this.title, required this.initial});
 
-  final String label;
-  final int minutes;
-  final List<int> options;
-  final ValueChanged<int> onChanged;
+  final String title;
+  final TimeOfDay initial;
+
+  @override
+  State<_TimeSheet> createState() => _TimeSheetState();
+}
+
+class _TimeSheetState extends State<_TimeSheet> {
+  late DateTime _date;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    // CupertinoDatePicker requires minutes divisible by minuteInterval.
+    var minute = widget.initial.minute;
+    if (minute % 30 != 0) {
+      minute = ((minute + 15) ~/ 30) * 30;
+      if (minute == 60) minute = 0;
+    }
+    var hour = widget.initial.hour;
+    if (widget.initial.minute >= 45 && minute == 0) {
+      hour = (hour + 1) % 24;
+    }
+    _date = DateTime(now.year, now.month, now.day, hour, minute);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final value = options.contains(minutes) ? minutes : options.first;
-    return DropdownButtonFormField<int>(
-      // ignore: deprecated_member_use
-      value: value,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      ),
-      isExpanded: true,
-      items: options
-          .map(
-            (m) => DropdownMenuItem<int>(
-              value: m,
-              child: Text(formatHhMm(m)),
+    return SafeArea(
+      child: SizedBox(
+        height: 280,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(
+                        TimeOfDay(hour: _date.hour, minute: _date.minute),
+                      );
+                    },
+                    child: const Text('Done'),
+                  ),
+                ],
+              ),
             ),
-          )
-          .toList(),
-      onChanged: (m) {
-        if (m == null) return;
-        FocusManager.instance.primaryFocus?.unfocus();
-        SystemChannels.textInput.invokeMethod('TextInput.hide');
-        onChanged(m);
-      },
+            Expanded(
+              child: CupertinoDatePicker(
+                mode: CupertinoDatePickerMode.time,
+                use24hFormat: true,
+                minuteInterval: 30,
+                initialDateTime: _date,
+                onDateTimeChanged: (d) => setState(() => _date = d),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
