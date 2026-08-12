@@ -48,6 +48,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   String? _successId;
   String? _successPhone;
   String? _successName;
+  List<Map<String, dynamic>> _calendarOptions = [];
+  bool _calendarsLoading = false;
   List<Map<String, dynamic>> _voicePresets = [];
   bool _voicePresetsLoading = false;
   final AudioPlayer _previewPlayer = AudioPlayer();
@@ -173,12 +175,17 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
     final supabase = Supabase.instance.client;
     final res = await supabase
         .from('users')
-        .select('calendar_id')
+        .select('calendar_id, email')
         .eq('id', user.id)
         .maybeSingle();
-    if (res != null && res['calendar_id'] != null) {
-      setState(() => _formData.calendarId = res['calendar_id'] as String);
-    }
+    final profileCalendarId = (res?['calendar_id'] as String?)?.trim();
+    final profileEmail = (res?['email'] as String?)?.trim() ??
+        user.email?.trim();
+
+    await _loadCalendarOptions(
+      preferredId: profileCalendarId,
+      fallbackEmail: profileEmail,
+    );
 
     try {
       final recs = await supabase
@@ -239,8 +246,92 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         });
       }
     } catch (_) {
-      // Keep full phone step if lookup fails.
+      // Non-fatal — create can still proceed.
     }
+  }
+
+  Future<void> _loadCalendarOptions({
+    String? preferredId,
+    String? fallbackEmail,
+  }) async {
+    if (!mounted) return;
+    setState(() => _calendarsLoading = true);
+    final options = <Map<String, dynamic>>[];
+    try {
+      final res = await ApiClient.get('/api/mobile/google/calendars');
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>?;
+        final list = data?['calendars'] as List<dynamic>? ?? [];
+        for (final raw in list) {
+          if (raw is! Map) continue;
+          final id = (raw['id'] ?? '').toString().trim();
+          if (id.isEmpty) continue;
+          final summary = (raw['summary'] ?? id).toString().trim();
+          final primary = raw['primary'] == true;
+          options.add({
+            'id': id,
+            'label': primary
+                ? '$summary · primary'
+                : (id.contains('@') ? '$summary · $id' : summary),
+            'primary': primary,
+          });
+        }
+      }
+    } catch (_) {
+      // Fall back to profile/email suggestions below.
+    }
+
+    void ensureOption(String id, String label, {bool primary = false}) {
+      if (id.trim().isEmpty) return;
+      if (options.any((o) => o['id'] == id)) return;
+      options.insert(0, {'id': id, 'label': label, 'primary': primary});
+    }
+
+    final preferred = (preferredId ?? '').trim();
+    if (preferred.isNotEmpty) {
+      ensureOption(
+        preferred,
+        preferred.contains('@')
+            ? 'Connected account · $preferred'
+            : 'Connected calendar · $preferred',
+        primary: preferred == 'primary',
+      );
+    }
+    final email = (fallbackEmail ?? '').trim();
+    if (email.contains('@')) {
+      ensureOption(email, 'Google account · $email');
+    }
+    ensureOption('primary', 'Primary calendar', primary: true);
+
+    String selected = _formData.calendarId.trim().isNotEmpty
+        ? _formData.calendarId.trim()
+        : 'primary';
+    if (preferred.isNotEmpty && options.any((o) => o['id'] == preferred)) {
+      selected = preferred;
+    } else {
+      Map<String, dynamic>? primaryOpt;
+      for (final o in options) {
+        if (o['primary'] == true) {
+          primaryOpt = o;
+          break;
+        }
+      }
+      if (primaryOpt != null) {
+        selected = primaryOpt['id'] as String;
+      } else if (email.contains('@') &&
+          options.any((o) => o['id'] == email)) {
+        selected = email;
+      } else if (options.isNotEmpty) {
+        selected = options.first['id'] as String;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _calendarOptions = options;
+      _formData.calendarId = selected;
+      _calendarsLoading = false;
+    });
   }
 
   int _nextStepFrom(int step) {
@@ -646,14 +737,40 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           onChanged: (v) => setState(() => _formData.country = v ?? 'US'),
         ),
         const SizedBox(height: 16),
-        TextFormField(
-          initialValue: _formData.calendarId,
+        if (_calendarsLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: LinearProgressIndicator(minHeight: 2),
+          ),
+        DropdownButtonFormField<String>(
+          // ignore: deprecated_member_use -- value matches current selection
+          value: _calendarOptions.any((o) => o['id'] == _formData.calendarId)
+              ? _formData.calendarId
+              : (_calendarOptions.isNotEmpty
+                  ? _calendarOptions.first['id'] as String
+                  : null),
           decoration: const InputDecoration(
-            labelText: 'Calendar ID',
-            hintText: 'primary or email@example.com',
+            labelText: 'Google calendar',
+            helperText:
+                'Usually your Google account email or Primary calendar.',
             border: OutlineInputBorder(),
           ),
-          onChanged: (v) => _formData.calendarId = v,
+          isExpanded: true,
+          items: _calendarOptions
+              .map(
+                (o) => DropdownMenuItem<String>(
+                  value: o['id'] as String,
+                  child: Text(
+                    o['label'] as String,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (v) {
+            if (v == null) return;
+            setState(() => _formData.calendarId = v);
+          },
         ),
       ],
     );
