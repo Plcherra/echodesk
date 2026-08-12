@@ -1047,14 +1047,14 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           _selectableOption(
             title: 'Keep $heldDisplay',
             subtitle:
-                'Attach this held number to your new receptionist. No new DID purchase.',
+                'Attach this held number to your new receptionist.',
             selected: _formData.phoneStrategy == 'reclaim',
             onTap: () => setState(() => _formData.phoneStrategy = 'reclaim'),
           ),
           _selectableOption(
             title: 'Get a different new number',
             subtitle:
-                'Provision another US number. Included with your plan; your held number stays pending release.',
+                'Set up a new US business number. Your held number stays available to release later.',
             selected: _formData.phoneStrategy == 'new',
             onTap: () => setState(() => _formData.phoneStrategy = 'new'),
           ),
@@ -1062,7 +1062,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           _selectableOption(
             title: 'Get a new business number',
             subtitle:
-                "We'll set up a US business number for you. Included with your plan.",
+                "We'll set up a US business number for you. Ready quickly.",
             selected: _formData.phoneStrategy == 'new',
             onTap: () => setState(() => _formData.phoneStrategy = 'new'),
           ),
