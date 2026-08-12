@@ -1516,10 +1516,10 @@ async def delete_receptionist(request: Request, receptionist_id: str):
     return {
         "success": True,
         "message": (
-            "Assistant deleted. Your number is held so you can attach it to a new "
-            "assistant. If you don't reuse it, we'll release it within 24–48 hours."
+            "Receptionist deleted. Your number is held so you can attach it to a new "
+            "receptionist. If you don't reuse it, we'll release it within 24–48 hours."
             if needs_manual_release
-            else "Assistant deleted. Calls will no longer route to this receptionist."
+            else "Receptionist deleted. Calls will no longer route to this receptionist."
         ),
         "number_release_pending": needs_manual_release,
         "held_phone_number": inbound_phone if needs_manual_release else None,

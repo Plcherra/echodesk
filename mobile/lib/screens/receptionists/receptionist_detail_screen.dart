@@ -394,7 +394,7 @@ class _ReceptionistDetailScreenState extends State<ReceptionistDetailScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete assistant?'),
+        title: const Text('Delete receptionist?'),
         content: Text(
           'This will remove "${r.name}". Calls will stop.$phoneBit '
           'If you don’t reuse it, we’ll release it within 24–48 hours.',

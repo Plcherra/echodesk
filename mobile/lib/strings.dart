@@ -30,18 +30,18 @@ class AppStrings {
 
   // Receptionist
   static const receptionistDeletionRequested =
-      'Assistant deleted. Your number is held so you can attach it to a new assistant. '
+      'Receptionist deleted. Your number is held so you can attach it to a new receptionist. '
       'If unused, we release it within 24–48 hours.';
   static const receptionistDeleteConfirmBody =
-      'Calls will stop for this assistant. Your business number stays with your account '
-      'so you can attach it when you create a new assistant. If you don’t reuse it, '
+      'Calls will stop for this receptionist. Your business number stays with your account '
+      'so you can attach it when you create a new receptionist. If you don’t reuse it, '
       'we’ll release it within 24–48 hours.';
   static const couldNotDeleteReceptionist =
       "Couldn't delete receptionist. Please try again.";
   static const pendingReleaseTitle = 'Number held';
   static const pendingReleaseSubtitle =
-      'Release pending — create a new assistant to keep this number.';
-  static const pendingReleaseCta = 'Create assistant';
+      'Create a receptionist to keep this line. Unused numbers are released in 24–48 hours.';
+  static const pendingReleaseCta = 'Create receptionist';
   static const couldNotSaveSettings = "Couldn't save. Please try again.";
   static const callInitiated = "Call initiated";
   static const couldNotStartCall = "Couldn't start call. Please try again.";
