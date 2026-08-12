@@ -1,4 +1,6 @@
 /// Wizard form data for creating a receptionist (matches AddReceptionistWizardModal)
+import 'bookable_hours.dart';
+
 class StaffItem {
   final String name;
   final String description;
@@ -55,7 +57,7 @@ class WizardFormData {
   List<StaffItem> staff;
   List<ServiceItem> services;
   String? promotions;
-  String? businessHours;
+  BookableHours bookableHours;
   String? extraInstructions;
   String? voicePersonality;
   String? fallbackBehavior;
@@ -81,7 +83,7 @@ class WizardFormData {
     List<StaffItem>? staff,
     List<ServiceItem>? services,
     this.promotions,
-    this.businessHours,
+    BookableHours? bookableHours,
     this.extraInstructions,
     this.voicePersonality = 'friendly',
     this.fallbackBehavior = 'voicemail',
@@ -89,7 +91,8 @@ class WizardFormData {
     this.maxCallDurationMinutes,
     this.consent = false,
   })  : staff = staff ?? [],
-        services = services ?? [];
+        services = services ?? [],
+        bookableHours = bookableHours ?? BookableHours.defaults();
 
   Map<String, dynamic> toApiBody() {
     final body = <String, dynamic>{
@@ -115,9 +118,7 @@ class WizardFormData {
     if (extraInstructions != null && extraInstructions!.trim().isNotEmpty) {
       body['extra_instructions'] = extraInstructions!.trim();
     }
-    if (businessHours != null && businessHours!.trim().isNotEmpty) {
-      body['business_hours'] = businessHours!.trim();
-    }
+    body['bookable_hours'] = bookableHours.toJson();
     final servicePayload = services
         .where((s) => s.name.trim().isNotEmpty)
         .map((s) => s.toJson())

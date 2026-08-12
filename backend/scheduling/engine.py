@@ -20,6 +20,8 @@ def check_availability(
     business_day_end_hour: int,
     suggested_slots_max: int,
     staff_id: str | None = None,
+    bookable_hours: Any = None,
+    closed_dates: Any = None,
 ) -> dict:
     _ = staff_id  # Reserved for multi-staff calendars (Phase 2).
     return handle_check_availability(
@@ -32,6 +34,8 @@ def check_availability(
         business_day_start_hour=business_day_start_hour,
         business_day_end_hour=business_day_end_hour,
         suggested_slots_max=suggested_slots_max,
+        bookable_hours=bookable_hours,
+        closed_dates=closed_dates,
     )
 
 

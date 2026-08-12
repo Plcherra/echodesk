@@ -40,6 +40,7 @@ def build_receptionist_prompt(
     persona_key: Optional[str] = None,
     business_type: Optional[str] = None,
     compact: bool = False,
+    bookable_hours: Optional[dict[str, Any]] = None,
 ) -> str:
     sections = []
     persona = get_persona(persona_key)
@@ -68,6 +69,16 @@ def build_receptionist_prompt(
     sections.append(
         f"Calendar tools: The calendar ID is {calendar_id}. Use tools for availability, booking, and rescheduling. Accept natural dates like 'tomorrow at 4' or 'next Friday morning'. Ask a follow-up only when date/time/service is missing or genuinely ambiguous. Speak only returned exact_slots, suggested_slots, or summary_periods. If slot_unavailable returns suggestions, offer only those suggestions."
     )
+
+    if bookable_hours:
+        from scheduling.bookable_hours import format_bookable_hours_for_prompt
+
+        sections.append(format_bookable_hours_for_prompt(bookable_hours))
+        sections.append(
+            "Hours guidance: When availability returns empty because the business is closed, "
+            "say you are closed that day and offer another day. Prefer asking what time works; "
+            "only mention morning/afternoon/evening when the returned summary_periods show partial coverage."
+        )
 
     # 4. Business knowledge
     if website_content and website_content.strip():

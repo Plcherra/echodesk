@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from typing import Any, Optional
 
+from scheduling.bookable_hours import apply_bookable_window_to_range
 from ._parsing import get_free_slots, parse_datetime_range, parse_iso_datetime_or_natural
 
 logger = logging.getLogger(__name__)
@@ -42,6 +44,8 @@ def handle_check_availability(
     business_day_start_hour: int,
     business_day_end_hour: int,
     suggested_slots_max: int,
+    bookable_hours: Any = None,
+    closed_dates: Optional[set[date] | list[date]] = None,
 ) -> dict:
     timezone = (params.get("timezone") or default_timezone).strip() or default_timezone
     date_text = params.get("date_text")
@@ -59,6 +63,32 @@ def handle_check_availability(
     )
     if not range_data:
         return {"success": False, "error": "date_parse_failed", "message": "I couldn't understand the date/time. Could you rephrase it (e.g. 'March 17 at 7pm')?"}
+
+    constrained, hours_err = apply_bookable_window_to_range(
+        range_data=range_data,
+        parse_mode=parse_mode,
+        bookable_hours=bookable_hours,
+        closed_dates=closed_dates,
+        timezone_name=timezone,
+    )
+    if hours_err == "closed":
+        return {
+            "success": True,
+            "exact_slots": [],
+            "suggested_slots": [],
+            "summary_periods": [],
+            "message": "We're closed that day. Want to try another day?",
+        }
+    if hours_err == "no_hours":
+        return {
+            "success": True,
+            "exact_slots": [],
+            "suggested_slots": [],
+            "summary_periods": [],
+            "message": "I don't have openings in that part of the day. Want a different time or day?",
+        }
+    if constrained:
+        range_data = constrained
 
     # Duration: for range-based queries default to 60 min for spoken availability; otherwise 30.
     range_modes = ("full_day", "range_morning", "range_afternoon", "range_evening")

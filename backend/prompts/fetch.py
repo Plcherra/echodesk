@@ -84,7 +84,8 @@ def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str,
 
     rec_res = supabase.table("receptionists").select(
         "id, name, user_id, phone_number, calendar_id, payment_settings, website_content, "
-        "extra_instructions, system_prompt, greeting, voice_id, voice_preset_key, assistant_identity, mode"
+        "extra_instructions, system_prompt, greeting, voice_id, voice_preset_key, assistant_identity, mode, "
+        "bookable_hours"
     ).eq("id", receptionist_id).execute()
 
     if not rec_res.data or len(rec_res.data) == 0:
@@ -101,6 +102,10 @@ def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str,
     custom_prompt = (rec.get("system_prompt") or "").strip()
     if custom_prompt:
         prompt = f"{CUSTOM_PROMPT_GUARDRAILS}\n\nBusiness prompt:\n{custom_prompt}"
+        if rec.get("bookable_hours"):
+            from scheduling.bookable_hours import format_bookable_hours_for_prompt
+
+            prompt += f"\n\n{format_bookable_hours_for_prompt(rec.get('bookable_hours'))}"
         if (rec.get("extra_instructions") or "").strip():
             prompt += f"\n\nAdditional instructions from the business:\n{rec['extra_instructions'].strip()}"
     else:
@@ -135,6 +140,7 @@ def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str,
             extra_instructions=rec.get("extra_instructions"),
             persona_key=persona_key,
             compact=True,
+            bookable_hours=rec.get("bookable_hours"),
         )
 
     # Precedence: greeting if set, else default with identity

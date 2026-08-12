@@ -180,7 +180,9 @@ async def handle_calendar_request(body: dict) -> dict:
         raise HTTPException(status_code=400, detail="action must be check_availability, create_appointment, or reschedule_appointment")
 
     supabase = create_service_role_client()
-    rec_res = supabase.table("receptionists").select("id, user_id, calendar_id, status, active, mode").eq("id", receptionist_id).execute()
+    rec_res = supabase.table("receptionists").select(
+        "id, user_id, calendar_id, status, active, mode, bookable_hours"
+    ).eq("id", receptionist_id).execute()
     if not rec_res.data or len(rec_res.data) == 0:
         raise HTTPException(status_code=404, detail="Receptionist not found")
     rec = rec_res.data[0]
@@ -226,7 +228,14 @@ async def handle_calendar_request(body: dict) -> dict:
             guard_err = _check_service_first_guard(supabase, receptionist_id, params)
             if guard_err:
                 return guard_err
-            return _handle_check_availability(service, calendar_id, params)
+            closed = _load_closed_dates(supabase, receptionist_id)
+            return _handle_check_availability(
+                service,
+                calendar_id,
+                params,
+                bookable_hours=rec.get("bookable_hours"),
+                closed_dates=closed,
+            )
         if action == "create_appointment":
             return _handle_create_appointment(service, calendar_id, params, receptionist_id, supabase, call_control_id=call_control_id)
         return _handle_reschedule(service, calendar_id, params, receptionist_id, supabase)
@@ -271,7 +280,43 @@ def _check_service_first_guard(supabase, receptionist_id: str, params: dict) -> 
     return None
 
 
-def _handle_check_availability(service, calendar_id: str, params: dict) -> dict:
+def _load_closed_dates(supabase, receptionist_id: str) -> set:
+    """Load one-off closed dates (holidays / special closures) for this receptionist."""
+    from datetime import date as date_cls
+
+    try:
+        res = (
+            supabase.table("receptionist_closed_dates")
+            .select("closed_on")
+            .eq("receptionist_id", receptionist_id)
+            .execute()
+        )
+    except Exception as e:
+        logger.warning("closed_dates load failed receptionist_id=%s: %s", receptionist_id, e)
+        return set()
+    out: set = set()
+    for row in res.data or []:
+        raw = row.get("closed_on")
+        if not raw:
+            continue
+        try:
+            if isinstance(raw, date_cls):
+                out.add(raw)
+            else:
+                out.add(date_cls.fromisoformat(str(raw)[:10]))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _handle_check_availability(
+    service,
+    calendar_id: str,
+    params: dict,
+    *,
+    bookable_hours=None,
+    closed_dates=None,
+) -> dict:
     return check_availability(
         service,
         calendar_id,
@@ -283,6 +328,8 @@ def _handle_check_availability(service, calendar_id: str, params: dict) -> dict:
         business_day_end_hour=BUSINESS_DAY_END_HOUR,
         suggested_slots_max=SUGGESTED_SLOTS_MAX,
         staff_id=params.get("staff_id"),
+        bookable_hours=bookable_hours,
+        closed_dates=closed_dates,
     )
 
 
@@ -340,7 +387,7 @@ def load_scheduling_context_for_receptionist(receptionist_id: str) -> dict:
     supabase = create_service_role_client()
     rec_res = (
         supabase.table("receptionists")
-        .select("id, user_id, calendar_id, status, active")
+        .select("id, user_id, calendar_id, status, active, bookable_hours")
         .eq("id", receptionist_id)
         .execute()
     )

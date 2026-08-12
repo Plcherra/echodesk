@@ -875,6 +875,20 @@ async def create_receptionist(request: Request):
     if not voice_id:
         return JSONResponse({"error": "Voice configuration missing"}, status_code=400)
 
+    from scheduling.bookable_hours import normalize_bookable_hours
+
+    bookable_hours = normalize_bookable_hours(body.get("bookable_hours"))
+    if not bookable_hours:
+        return JSONResponse(
+            {
+                "error": (
+                    "Bookable hours are required. Set open/closed and a 24-hour start–end "
+                    "time for each day of the week (at least one open day)."
+                )
+            },
+            status_code=400,
+        )
+
     # Ensure mobile-created records always store a preset key.
     # But if caller supplied a raw voice_id (admin/legacy), don't stamp a potentially-wrong preset label.
     if not voice_preset_key and not raw_voice_id:
@@ -1008,6 +1022,7 @@ async def create_receptionist(request: Request):
         "voice_id": voice_id,
         "voice_preset_key": voice_preset_key,
         "assistant_identity": assistant_identity,
+        "bookable_hours": bookable_hours,
     }
     try:
         logger.info("[receptionists/create] receptionist insert starting for user_id=%s name=%s", user["id"], name)

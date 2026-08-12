@@ -14,6 +14,7 @@ from calendar_api.calendar_handler import (
     DEFAULT_TIMEZONE,
     SUGGESTED_SLOTS_MAX,
     _check_service_first_guard,
+    _load_closed_dates,
     load_scheduling_context_for_receptionist,
 )
 from scheduling import check_availability, create_booking
@@ -356,6 +357,8 @@ def handle_incoming_message(
         business_day_end_hour=BUSINESS_DAY_END_HOUR,
         suggested_slots_max=SUGGESTED_SLOTS_MAX,
         staff_id=None,
+        bookable_hours=(ctx.get("receptionist") or {}).get("bookable_hours"),
+        closed_dates=_load_closed_dates(supabase, receptionist_id),
     )
 
     if not avail.get("success"):

@@ -9,15 +9,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/wizard_form.dart';
+import '../../models/bookable_hours.dart';
 import '../../config/env.dart';
 import '../../services/api_client.dart';
 import '../../strings.dart';
+import '../../widgets/bookable_hours_editor.dart';
 
 const _steps = [
   'Basics',
   'Phone',
   'Instructions',
-  'Business',
+  'Hours & details',
   'Call behavior',
   'Review',
 ];
@@ -265,8 +267,12 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
       }
       return true;
     }
-    if (_step == 4 && _formData.mode == 'personal') {
-      // No validation needed for business-only step in personal mode.
+    if (_step == 4) {
+      final hoursErr = _formData.bookableHours.validationError();
+      if (hoursErr != null) {
+        _showVisibleError(hoursErr);
+        return false;
+      }
       return true;
     }
     if (_step == 2) {
@@ -1082,6 +1088,11 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          BookableHoursEditor(
+            value: _formData.bookableHours,
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 24),
           const Text('Services (optional)'),
           const SizedBox(height: 8),
           const Text(
@@ -1248,6 +1259,11 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        BookableHoursEditor(
+          value: _formData.bookableHours,
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 24),
         const Text('Business details (optional)'),
         const SizedBox(height: 16),
         Row(
@@ -1311,20 +1327,10 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         ),
         const SizedBox(height: 16),
         TextFormField(
-          initialValue: _formData.businessHours,
-          decoration: const InputDecoration(
-            labelText: 'Business hours',
-            hintText: 'e.g. Mon–Fri 9am–6pm, Sat 10am–4pm',
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (v) => _formData.businessHours = v,
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
           initialValue: _formData.extraInstructions,
           decoration: const InputDecoration(
             labelText: 'Extra notes for AI',
-            hintText: 'e.g. Opening hours, cancellation policy',
+            hintText: 'e.g. Cancellation policy, parking notes',
             border: OutlineInputBorder(),
             alignLabelWithHint: true,
           ),
@@ -1460,6 +1466,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                         : (found.first['label'] as String? ?? 'Default');
                   }(),
                 ),
+                _ReviewRow('Hours', _bookableHoursSummary()),
               ],
             ),
           ),
@@ -1478,6 +1485,20 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
         ),
       ],
     );
+  }
+
+  String _bookableHoursSummary() {
+    final openDays = <String>[];
+    for (final key in BookableHours.dayKeys) {
+      final day = _formData.bookableHours.weekly[key];
+      if (day == null || !day.open) continue;
+      final label = BookableHours.dayLabels[key]!.substring(0, 3);
+      openDays.add(
+        '$label ${formatHhMm(day.startMinutes)}–${formatHhMm(day.endMinutes)}',
+      );
+    }
+    if (openDays.isEmpty) return 'No open days';
+    return openDays.join(', ');
   }
 
   Widget _buildSuccessState() {
