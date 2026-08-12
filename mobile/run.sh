@@ -24,6 +24,14 @@ if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON" ]; then
   exit 1
 fi
 
+case "$SUPABASE_URL" in
+  *your-project.supabase.co*|*"your_project"*)
+    echo "ERROR: SUPABASE_URL is still the placeholder: $SUPABASE_URL"
+    echo "Edit ../.env.local with your real Supabase project URL (Project Settings → API)."
+    exit 1
+    ;;
+esac
+
 API_URL=${API_URL:-http://localhost:3000}
 DEVICE=${1:-macos}
 

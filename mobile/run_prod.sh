@@ -112,6 +112,18 @@ if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
   exit 1
 fi
 
+case "$SUPABASE_URL" in
+  *your-project.supabase.co*|*"your_project"*)
+    echo "ERROR: SUPABASE_URL is still the placeholder: $SUPABASE_URL"
+    echo "Edit ../.env.local with your real Supabase project URL (Project Settings → API)."
+    exit 1
+    ;;
+esac
+if echo "$SUPABASE_ANON_KEY" | grep -qiE 'your_anon|changeme|replace'; then
+  echo "ERROR: SUPABASE_ANON_KEY looks like a placeholder. Fix ../.env.local."
+  exit 1
+fi
+
 DEVICE="${1:-macos}"
 MODE="${2:-debug}"
 MODE_FLAG=()

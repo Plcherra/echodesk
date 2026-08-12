@@ -32,6 +32,15 @@ void main() async {
         'NEXT_PUBLIC_SUPABASE_ANON_KEY to ../.env.local or run ./run.sh macos.',
       );
     }
+    final supabaseHost = Env.supabaseUrl.toLowerCase();
+    if (supabaseHost.contains('your-project.supabase.co') ||
+        Env.supabaseAnonKey.toLowerCase().contains('your_anon')) {
+      throw StateError(
+        'Supabase is still set to placeholder values (your-project.supabase.co). '
+        'Put the real NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY '
+        'in ../.env.local, then rebuild with ./run_prod.sh <device>.',
+      );
+    }
     try {
       await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform);
