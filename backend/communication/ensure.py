@@ -225,7 +225,22 @@ def ensure_business_communication(supabase: Any, business_id: str) -> dict[str, 
         supabase.table("businesses").update(
             {"primary_receptionist_id": None, "updated_at": now}
         ).eq("id", business_id).execute()
-        ensure_business_phone_not_started(supabase, business_id)
+        # Keep a held DID on the business so the owner can reclaim it and we
+        # do not buy another number. Only seed an empty row when there is none.
+        phone_res = (
+            supabase.table("business_phone_numbers")
+            .select("telnyx_number_id, phone_number_e164")
+            .eq("business_id", business_id)
+            .limit(1)
+            .execute()
+        )
+        phone = (phone_res.data or [None])[0] or {}
+        has_held = bool(
+            (phone.get("telnyx_number_id") or "").strip()
+            and (phone.get("phone_number_e164") or "").strip()
+        )
+        if not has_held:
+            ensure_business_phone_not_started(supabase, business_id)
         _ensure_child_rows(supabase, business_id)
         return {**business, "primary_receptionist_id": None}
 

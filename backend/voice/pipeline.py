@@ -387,7 +387,10 @@ async def run_voice_pipeline(
                     )
                     return
                 if confidence is not None and confidence < MIN_CONFIDENCE:
-                    if not is_whitelisted_short_utterance(user_text):
+                    if not (
+                        is_whitelisted_short_utterance(user_text)
+                        or contains_clear_intent(user_text)
+                    ):
                         logger.info("[TURN_GUARD] dispatch_skipped reason=low_confidence commit_id=%s", cid)
                         return
                     logger.info(

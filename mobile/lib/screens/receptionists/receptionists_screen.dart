@@ -280,15 +280,22 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
     }
 
     if (hasPending) {
-      final item = _pendingRelease.first;
-      final display = _pendingDisplay(item);
+      final numbers = _pendingRelease
+          .map(_pendingDisplay)
+          .where((s) => s.isNotEmpty)
+          .toList();
+      final title = numbers.length == 1
+          ? numbers.first
+          : '${numbers.length} numbers held';
+      final extra = numbers.length > 1 ? numbers.join('\n') : null;
       return _buildSetupCard(
         eyebrow: 'Number held · release pending',
-        title: display.isNotEmpty ? display : 'Number held',
+        title: title.isNotEmpty ? title : 'Number held',
         body: AppStrings.pendingReleaseSubtitle,
         ctaLabel: AppStrings.pendingReleaseCta,
         onPressed: _navigateToCreate,
         emphasizeTitle: true,
+        trailingNote: extra,
       );
     }
 

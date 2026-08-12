@@ -78,8 +78,14 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   bool _reusesSharedLine = false;
   String? _sharedLinePhone;
 
-  /// Soft-deleted DID held for reclaim (from pending-release API).
-  Map<String, dynamic>? _heldNumber;
+  /// Soft-deleted DIDs held for reclaim (from pending-release API).
+  List<Map<String, dynamic>> _heldNumbers = [];
+  bool _canPurchaseExtra = false;
+  Map<String, dynamic>? get _heldNumber =>
+      _heldNumbers.isEmpty ? null : _heldNumbers.firstWhere(
+        (n) => n['phone_number'] == _formData.heldPhoneNumber,
+        orElse: () => _heldNumbers.first,
+      );
 
   bool get _canGoNext {
     if (_loading) return false;
@@ -372,12 +378,17 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
       final data = jsonDecode(res.body) as Map<String, dynamic>?;
       final nums = data?['numbers'] as List<dynamic>? ?? [];
       if (nums.isEmpty) return;
-      final first = nums.first;
-      if (first is! Map) return;
-      final held = Map<String, dynamic>.from(first);
+      final held = <Map<String, dynamic>>[];
+      for (final raw in nums) {
+        if (raw is Map) held.add(Map<String, dynamic>.from(raw));
+      }
+      if (held.isEmpty) return;
       if (!mounted) return;
       setState(() {
-        _heldNumber = held;
+        _heldNumbers = held;
+        _canPurchaseExtra = data?['can_purchase_extra'] == true;
+        final first = (held.first['phone_number'] as String?)?.trim() ?? '';
+        _formData.heldPhoneNumber = first.isNotEmpty ? first : null;
         // Default: keep the held number instead of buying another DID.
         if (!_reusesSharedLine) {
           _formData.phoneStrategy = 'reclaim';
@@ -1074,21 +1085,22 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
               : 'How do you want to set up your business phone line?',
         ),
         const SizedBox(height: 16),
-        if (_heldNumber != null) ...[
+        if (_heldNumbers.isNotEmpty) ...[
           _selectableOption(
             title: 'Keep $heldDisplay',
             subtitle:
-                'Attach this held number to your new receptionist.',
+                'This number stays on your account. We’ll attach it to the new receptionist.',
             selected: _formData.phoneStrategy == 'reclaim',
             onTap: () => setState(() => _formData.phoneStrategy = 'reclaim'),
           ),
-          _selectableOption(
-            title: 'Get a different new number',
-            subtitle:
-                'Set up a new US business number. Your held number stays available to release later.',
-            selected: _formData.phoneStrategy == 'new',
-            onTap: () => setState(() => _formData.phoneStrategy = 'new'),
-          ),
+          if (_canPurchaseExtra)
+            _selectableOption(
+              title: 'Get a different new number',
+              subtitle:
+                  'One extra line only. Your current number stays held for 48 hours, then we release it.',
+              selected: _formData.phoneStrategy == 'new',
+              onTap: () => setState(() => _formData.phoneStrategy = 'new'),
+            ),
         ] else
           _selectableOption(
             title: 'Get a new business number',
@@ -1097,7 +1109,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
             selected: _formData.phoneStrategy == 'new',
             onTap: () => setState(() => _formData.phoneStrategy = 'new'),
           ),
-        if (_formData.phoneStrategy == 'new')
+        if (_formData.phoneStrategy == 'new' &&
+            (_heldNumbers.isEmpty || _canPurchaseExtra))
           Padding(
             padding: const EdgeInsets.only(left: 16, top: 8),
             child: DropdownButtonFormField<String>(

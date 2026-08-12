@@ -81,14 +81,20 @@ def notify_phone_number_release_needed(
 
     subject = f"[EchoDesk] Release phone number: {phone}"
     body = (
-        "A customer deleted a receptionist. Manual number release is required "
-        "(do not auto-release yet — ops handles within 24–48 hours).\n\n"
+        "A customer deleted a receptionist. The number stays on their account.\n"
+        "If they recreate and Keep it, nothing to do.\n"
+        "If unused for 48 hours, cron auto-releases it in Telnyx "
+        "(/api/cron/release-held-numbers) and emails the customer.\n\n"
         f"Phone number: {phone}\n"
         f"Telnyx phone number ID: {telnyx_id}\n"
         f"Receptionist: {name} ({receptionist_id})\n"
         f"Owner user ID: {owner_user_id}\n"
         f"Owner email: {owner_em}\n"
-        f"Business ID: {business_id or '(none)'}\n"
+        f"Business ID: {business_id or '(none)'}\n\n"
+        "No action needed unless cron is down. Manual fallback:\n"
+        "POST /api/internal/phone-numbers/release\n"
+        "Authorization: Bearer $INTERNAL_API_KEY\n"
+        '{"phone_number": "' + phone + '", "telnyx_phone_number_id": "' + telnyx_id + '"}\n'
     )
 
     logger.warning(
@@ -141,7 +147,15 @@ def notify_number_transfer_requested(
         f"Customer note: {note}\n"
         f"Owner user ID: {owner_user_id}\n"
         f"Owner email: {owner_em}\n"
-        f"Business ID: {business_id or '(none yet)'}\n"
+        f"Business ID: {business_id or '(none yet)'}\n\n"
+        "Approve (emails the customer):\n"
+        f"PATCH /api/internal/number-transfers/{request_id}\n"
+        "Authorization: Bearer $INTERNAL_API_KEY\n"
+        '{"status":"completed"}\n\n'
+        "Reject (emails the customer; optional reason):\n"
+        f"PATCH /api/internal/number-transfers/{request_id}\n"
+        "Authorization: Bearer $INTERNAL_API_KEY\n"
+        '{"status":"rejected","ops_note":"Carrier cannot port this number"}\n'
     )
 
     logger.warning(
@@ -196,4 +210,26 @@ def notify_customer_number_transfer_status(
     else:
         return False
 
+    return _send_resend_email(to=email, subject=subject, text=text)
+
+
+def notify_customer_number_released(
+    *,
+    owner_email: str,
+    phone_number: str,
+) -> bool:
+    """Email the customer after ops fully removes a held DID from the account."""
+    email = (owner_email or "").strip()
+    if not email or "@" not in email:
+        logger.warning("[ops] No customer email for number-released notify")
+        return False
+
+    phone = (phone_number or "").strip() or "your number"
+    subject = "EchoDesk: your business number has been released"
+    text = (
+        f"We've released {phone} from your EchoDesk account.\n\n"
+        "That line is no longer held. If you create a receptionist again, "
+        "we'll set up a new US business number for you.\n\n"
+        f"Questions? Email {_support_email()}.\n"
+    )
     return _send_resend_email(to=email, subject=subject, text=text)

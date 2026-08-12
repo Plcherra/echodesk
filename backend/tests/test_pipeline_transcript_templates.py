@@ -32,6 +32,7 @@ def test_contains_clear_intent_time_availability_question():
     "text",
     [
         "do you have tomorrow morning",
+        "do you have any time tomorrow",
         "can you do 9",
         "book that",
         "the first one",

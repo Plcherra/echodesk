@@ -10,8 +10,6 @@ from typing import Any, Optional
 from voice.pipeline_transcript import (
     extract_date_text_hint,
     extract_time_hint,
-    is_availability_intent,
-    is_booking_confirmation_intent,
 )
 from voice.slot_selection import (
     SlotResolution,
@@ -38,17 +36,12 @@ def resolve_calendar_fast_path(
     slot_pre_attempted: bool,
     last_slot_resolution: Optional[SlotResolution],
 ) -> CalendarFastPathDecision:
-    """Choose check_availability vs create_appointment and tool args without LLM when possible."""
+    """Book an offered slot in the backend. New availability/booking phrasing goes to Grok."""
     fast_date = extract_date_text_hint(user_text)
     fast_time = extract_time_hint(user_text)
     fast_tool_name = None
     fast_tool_args: dict[str, Any] = {}
     slot_fast = False
-
-    def _date_and_time_text() -> str:
-        return " ".join(
-            [p for p in [fast_date, ("at " + fast_time) if fast_time else None] if p]
-        ).strip()
 
     sr_pre = last_slot_resolution
     if slot_pre_attempted and sr_pre and sr_pre.ok and sr_pre.slot_iso:
@@ -93,23 +86,6 @@ def resolve_calendar_fast_path(
             logger.info("[CALL_DIAG] slot_selection_fallback_to_llm reason=ambiguous")
         else:
             logger.debug("[CALL_DIAG] slot_selection_no_match transcript=%s", user_text[:80])
-
-    if not slot_fast and is_booking_confirmation_intent(user_text):
-        fast_tool_name = "create_appointment"
-        date_and_time = _date_and_time_text()
-        if date_and_time:
-            fast_tool_args["date_text"] = date_and_time
-        if not fast_tool_args.get("date_text"):
-            fast_tool_name = None
-        else:
-            fast_tool_args["summary"] = "Appointment"
-            fast_tool_args["generic_appointment_requested"] = True
-    elif not slot_fast and is_availability_intent(user_text):
-        fast_tool_name = "check_availability"
-        fast_tool_args = {
-            "date_text": _date_and_time_text() or fast_date or "tomorrow",
-            "generic_appointment_requested": True,
-        }
 
     if fast_tool_name:
         logger.info(

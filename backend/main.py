@@ -32,6 +32,7 @@ from fastapi.responses import JSONResponse
 from api.google_routes import google_callback_get
 from api.admin_billing import router as admin_billing_router
 from api.admin_number_transfers import router as admin_number_transfers_router
+from api.admin_phone_release import router as admin_phone_release_router
 from api.mobile_routes import router as mobile_router
 from api.public_routes import router as public_router
 from api.stripe_routes import stripe_webhook_post
@@ -150,6 +151,7 @@ app = FastAPI(title="Echodesk Voice Backend", lifespan=lifespan)
 app.include_router(mobile_router)
 app.include_router(admin_billing_router)
 app.include_router(admin_number_transfers_router)
+app.include_router(admin_phone_release_router)
 app.include_router(public_router)
 
 
@@ -577,6 +579,27 @@ async def cron_usage_alerts(
         return {"ok": True, **result}
     except Exception as e:
         logger.exception("Cron usage-alerts failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/cron/release-held-numbers")
+async def cron_release_held_numbers(
+    authorization: str = Header(None, alias="Authorization"),
+):
+    """Release unused held DIDs after 48h. Run hourly. Safe to repeat."""
+    secret = (settings.cron_secret or "").strip()
+    if not secret:
+        raise HTTPException(status_code=503, detail="Cron not configured (CRON_SECRET required)")
+    if (authorization or "") != f"Bearer {secret}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        from cron.release_held_numbers import release_expired_held_numbers
+
+        supabase = create_service_role_client()
+        result = release_expired_held_numbers(supabase)
+        return {"ok": True, **result}
+    except Exception as e:
+        logger.exception("Cron release-held-numbers failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -75,3 +75,5 @@ def test_new_search_skips_slot_resolution():
 def test_do_you_have_time_is_new_availability_search_not_stale_slot_choice():
     assert is_new_availability_search_intent("do you have tomorrow at 2pm") is True
     assert is_new_availability_search_intent("what time do you have") is True
+    assert is_new_availability_search_intent("do you have any time tomorrow") is True
+    assert is_new_availability_search_intent("anytime tomorrow") is True

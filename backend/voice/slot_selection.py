@@ -95,6 +95,9 @@ def is_new_availability_search_intent(text: str) -> bool:
             "do you have",
             "do you got",
             "you have anything",
+            "any time",
+            "anytime",
+            "any times",
             "any openings",
             "any slots",
         )

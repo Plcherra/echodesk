@@ -907,7 +907,12 @@ async def create_receptionist(request: Request):
     if area_code == "other":
         area_code = "212"
 
-    # Prefer an existing business line (partial create) before buying again.
+    # One DID per account, with an optional extra while the old line is held.
+    # Default: reuse the business line. Buying another is allowed only when
+    # there is exactly one held DID and no live receptionist (1 live + 1 held).
+    use_held_number = body.get("use_held_number")
+    want_keep = True if use_held_number is None else bool(use_held_number)
+
     existing_line = (
         supabase.table("business_phone_numbers")
         .select("phone_number_e164, telnyx_number_id, status")
@@ -916,65 +921,91 @@ async def create_receptionist(request: Request):
         .execute()
     )
     line_row = (existing_line.data or [None])[0]
+    existing_e164 = ""
+    existing_tid = ""
     if line_row:
         existing_e164 = (line_row.get("phone_number_e164") or "").strip()
         existing_tid = (line_row.get("telnyx_number_id") or "").strip()
-        if existing_e164 and existing_tid:
-            telnyx_id = existing_tid
-            telnyx_phone = existing_e164
-            inbound_number = existing_e164
-            logger.info(
-                "[receptionists/create] reusing business line e164=%s id=%s",
-                existing_e164,
-                existing_tid,
-            )
-
-    # Same business: reclaim DID from soft-deleted assistant before orphan/buy.
-    # Clients can opt out with use_held_number=false (buy a different new number).
-    use_held_number = body.get("use_held_number")
-    if use_held_number is None:
-        want_reclaim = True
-    else:
-        want_reclaim = bool(use_held_number)
 
     reclaimed_from_id: str | None = None
-    if want_reclaim and (not telnyx_id or not inbound_number):
+    if existing_e164 and existing_tid and want_keep:
+        telnyx_id = existing_tid
+        telnyx_phone = existing_e164
+        inbound_number = existing_e164
+        logger.info(
+            "[receptionists/create] reusing business line e164=%s id=%s",
+            existing_e164,
+            existing_tid,
+        )
+    elif existing_e164 and existing_tid and not want_keep:
+        from telnyx.phone_lifecycle import (
+            can_purchase_extra_number,
+            collect_account_phone_inventory,
+            park_did_on_latest_deleted,
+        )
+
+        inventory = collect_account_phone_inventory(supabase, user["id"])
+        if not can_purchase_extra_number(inventory):
+            return JSONResponse(
+                {
+                    "error": (
+                        "You already have a business number. Keep it, or wait until "
+                        "the unused held number is released (about 48 hours)."
+                    )
+                },
+                status_code=400,
+            )
+        parked = park_did_on_latest_deleted(
+            supabase,
+            target_business_id,
+            e164=existing_e164,
+            telnyx_id=existing_tid,
+        )
+        logger.info(
+            "[receptionists/create] buying extra DID; parked previous e164=%s parked=%s",
+            existing_e164,
+            parked,
+        )
+        # Fall through to acquire a new number.
+
+    if not telnyx_id or not inbound_number:
         from telnyx.phone_lifecycle import (
             detach_phone_from_receptionist,
             find_reclaimable_number_for_business,
         )
 
-        reclaim = find_reclaimable_number_for_business(supabase, target_business_id)
-        if reclaim:
-            telnyx_id = reclaim["telnyx_id"]
-            telnyx_phone = reclaim["e164"]
-            inbound_number = reclaim["e164"]
-            reclaimed_from_id = reclaim.get("receptionist_id") or None
-            logger.info(
-                "[receptionists/create] reclaiming soft-deleted DID e164=%s id=%s from=%s",
-                inbound_number,
-                telnyx_id,
-                reclaimed_from_id,
-            )
-            try:
-                telnyx_provision.configure_voice_url(
-                    telnyx_id, f"{webhook_base}/api/telnyx/voice"
-                )
-            except Exception as cfg_ex:
-                logger.warning(
-                    "[receptionists/create] configure reclaimed line failed id=%s: %s",
+        if want_keep:
+            reclaim = find_reclaimable_number_for_business(supabase, target_business_id)
+            if reclaim:
+                telnyx_id = reclaim["telnyx_id"]
+                telnyx_phone = reclaim["e164"]
+                inbound_number = reclaim["e164"]
+                reclaimed_from_id = reclaim.get("receptionist_id") or None
+                logger.info(
+                    "[receptionists/create] reclaiming leftover DID e164=%s id=%s from=%s",
+                    inbound_number,
                     telnyx_id,
-                    cfg_ex,
+                    reclaimed_from_id,
                 )
-            if reclaimed_from_id:
                 try:
-                    detach_phone_from_receptionist(supabase, reclaimed_from_id)
-                except Exception as det_ex:
-                    logger.warning(
-                        "[receptionists/create] detach after reclaim failed from=%s: %s",
-                        reclaimed_from_id,
-                        det_ex,
+                    telnyx_provision.configure_voice_url(
+                        telnyx_id, f"{webhook_base}/api/telnyx/voice"
                     )
+                except Exception as cfg_ex:
+                    logger.warning(
+                        "[receptionists/create] configure reclaimed line failed id=%s: %s",
+                        telnyx_id,
+                        cfg_ex,
+                    )
+                if reclaimed_from_id:
+                    try:
+                        detach_phone_from_receptionist(supabase, reclaimed_from_id)
+                    except Exception as det_ex:
+                        logger.warning(
+                            "[receptionists/create] detach after reclaim failed from=%s: %s",
+                            reclaimed_from_id,
+                            det_ex,
+                        )
 
     if not telnyx_id or not inbound_number:
         allow_orphan_reuse = True
@@ -1497,6 +1528,25 @@ async def delete_receptionist(request: Request, receptionist_id: str):
     }
     supabase.table("receptionists").update(updates).eq("id", receptionist_id).execute()
 
+    # One DID per account: park it on the business line, detach from this row
+    # so we can reclaim without buying, and ops can later return it to the pool.
+    if needs_manual_release and business_id_for_refresh and (telnyx_id or inbound_phone):
+        try:
+            upsert_canonical_business_phone(
+                supabase,
+                str(business_id_for_refresh),
+                phone_number_e164=inbound_phone,
+                telnyx_number_id=telnyx_id,
+            )
+        except Exception as ex:
+            logger.warning("[delete] keep canonical DID failed: %s", ex)
+        try:
+            from telnyx.phone_lifecycle import detach_phone_from_receptionist
+
+            detach_phone_from_receptionist(supabase, receptionist_id)
+        except Exception as ex:
+            logger.warning("[delete] detach DID from receptionist failed: %s", ex)
+
     try:
         if business_id_for_refresh:
             refresh_business_after_primary_receptionist_removed(supabase, str(business_id_for_refresh))
@@ -1554,10 +1604,18 @@ async def list_pending_release_numbers(request: Request):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
-    from telnyx.phone_lifecycle import list_pending_release_numbers_for_user
+    from telnyx.phone_lifecycle import (
+        can_purchase_extra_number,
+        collect_account_phone_inventory,
+        list_pending_release_numbers_for_user,
+    )
 
     numbers = list_pending_release_numbers_for_user(supabase, user["id"])
-    return {"numbers": numbers}
+    inventory = collect_account_phone_inventory(supabase, user["id"])
+    return {
+        "numbers": numbers,
+        "can_purchase_extra": can_purchase_extra_number(inventory),
+    }
 
 
 @router.post("/receptionists/{receptionist_id}/website")

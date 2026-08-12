@@ -3,26 +3,35 @@
 from voice.intent_router import resolve_calendar_fast_path
 
 
-def test_fast_path_check_availability_tomorrow():
+def test_availability_phrasing_goes_to_grok():
     d = resolve_calendar_fast_path(
         "what do you have tomorrow",
         {},
         slot_pre_attempted=False,
         last_slot_resolution=None,
     )
-    assert d.fast_tool_name == "check_availability"
-    assert "tomorrow" in (d.fast_tool_args.get("date_text") or "")
+    assert d.fast_tool_name is None
+    assert d.slot_fast is False
 
 
-def test_fast_path_check_availability_keeps_requested_time():
+def test_any_time_tomorrow_goes_to_grok():
+    d = resolve_calendar_fast_path(
+        "do you have any time tomorrow",
+        {},
+        slot_pre_attempted=False,
+        last_slot_resolution=None,
+    )
+    assert d.fast_tool_name is None
+
+
+def test_do_you_have_tomorrow_at_time_goes_to_grok_not_stale_slot():
     d = resolve_calendar_fast_path(
         "do you have tomorrow at 2pm",
         {"exact_slots": ["2026-04-11T15:00:00-04:00"], "suggested_slots": []},
         slot_pre_attempted=False,
         last_slot_resolution=None,
     )
-    assert d.fast_tool_name == "check_availability"
-    assert d.fast_tool_args.get("date_text") == "tomorrow at 2 pm"
+    assert d.fast_tool_name is None
 
 
 def test_fast_path_create_from_slot_resolution():

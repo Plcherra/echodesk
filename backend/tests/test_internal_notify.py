@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 from utils.internal_notify import (
+    notify_customer_number_released,
     notify_number_transfer_requested,
     notify_phone_number_release_needed,
 )
@@ -101,3 +102,68 @@ def test_notify_transfer_requested_includes_kind_and_carrier(monkeypatch):
     assert "T-Mobile" in text
     assert "mobile_carrier" in text
     assert "req-1" in text
+    assert "completed" in text
+    assert "rejected" in text
+
+
+def test_notify_customer_number_released_emails_owner(monkeypatch):
+    monkeypatch.setattr("utils.internal_notify.settings.resend_api_key", "re_test")
+    monkeypatch.setattr(
+        "utils.internal_notify.settings.support_email", "echodesk2@gmail.com"
+    )
+    monkeypatch.setattr(
+        "utils.internal_notify.settings.email_from",
+        "EchoDesk <noreply@echodesk.us>",
+    )
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.text = '{"id":"email_3"}'
+    mock_client = MagicMock()
+    mock_client.__enter__.return_value = mock_client
+    mock_client.__exit__.return_value = False
+    mock_client.post.return_value = mock_resp
+
+    with patch("utils.internal_notify.httpx.Client", return_value=mock_client):
+        ok = notify_customer_number_released(
+            owner_email="owner@example.com",
+            phone_number="+16174999456",
+        )
+
+    assert ok is True
+    payload = mock_client.post.call_args.kwargs["json"]
+    assert payload["to"] == ["owner@example.com"]
+    assert "+16174999456" in payload["text"]
+    assert "released" in payload["subject"].lower()
+
+
+def test_release_needed_email_includes_mark_released_api(monkeypatch):
+    monkeypatch.setattr("utils.internal_notify.settings.resend_api_key", "re_test")
+    monkeypatch.setattr(
+        "utils.internal_notify.settings.support_email", "echodesk2@gmail.com"
+    )
+    monkeypatch.setattr(
+        "utils.internal_notify.settings.email_from",
+        "EchoDesk <noreply@echodesk.us>",
+    )
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_client = MagicMock()
+    mock_client.__enter__.return_value = mock_client
+    mock_client.__exit__.return_value = False
+    mock_client.post.return_value = mock_resp
+
+    with patch("utils.internal_notify.httpx.Client", return_value=mock_client):
+        notify_phone_number_release_needed(
+            receptionist_id="rec-1",
+            receptionist_name="Eve",
+            phone_number="+15551234567",
+            telnyx_phone_number_id="PN123",
+            owner_user_id="user-1",
+            owner_email="owner@example.com",
+            business_id="biz-1",
+        )
+
+    text = mock_client.post.call_args.kwargs["json"]["text"]
+    assert "/api/internal/phone-numbers/release" in text
+    assert "PN123" in text

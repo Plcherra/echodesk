@@ -45,6 +45,7 @@ class WizardFormData {
   String calendarId;
   String mode; // 'personal' | 'business'
   String phoneStrategy; // 'new' | 'transfer' | 'reclaim' (reclaim = keep held DID)
+  String? heldPhoneNumber;
   String? areaCode;
   String? ownPhone;
   String? providerSid;
@@ -71,6 +72,7 @@ class WizardFormData {
     this.calendarId = 'primary',
     this.mode = 'personal',
     this.phoneStrategy = 'new',
+    this.heldPhoneNumber,
     this.areaCode = '212',
     this.ownPhone,
     this.providerSid,
@@ -108,6 +110,10 @@ class WizardFormData {
       'consent': consent,
       'staff': staff.where((s) => s.name.trim().isNotEmpty).map((s) => s.toJson()).toList(),
     };
+    if (phoneStrategy == 'reclaim' &&
+        (heldPhoneNumber ?? '').trim().isNotEmpty) {
+      body['held_phone_number'] = heldPhoneNumber!.trim();
+    }
     if (greeting != null && greeting!.trim().isNotEmpty) body['greeting'] = greeting!.trim();
     if (voicePresetKey != null && voicePresetKey!.trim().isNotEmpty) body['voice_preset_key'] = voicePresetKey!.trim();
     if (phoneStrategy == 'new') {

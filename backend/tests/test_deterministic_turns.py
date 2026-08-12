@@ -50,13 +50,11 @@ def test_bare_hour_gets_clarifying_reply():
     assert result.tool_name is None
 
 
-def test_calendar_availability_uses_tool_without_llm():
+def test_calendar_availability_is_left_for_grok():
     result = _resolve("what do you have tomorrow", use_calendar=True)
 
-    assert result.handled is True
-    assert result.tool_name == "check_availability"
-    assert result.tool_args["date_text"] == "tomorrow"
-    assert result.reason == "calendar_check_availability"
+    assert result.handled is False
+    assert result.tool_name is None
 
 
 def test_how_are_you_greeting_does_not_trigger_availability():
@@ -77,13 +75,11 @@ def test_short_greeting_opener_is_handled_without_llm():
     assert result.reason == "smalltalk_greeting"
 
 
-def test_greeting_with_real_booking_still_routes_to_calendar():
-    # A booking cue overrides smalltalk: this must still reach the calendar fast path.
+def test_greeting_with_real_booking_is_left_for_grok():
     result = _resolve("hi eve, what do you have tomorrow", use_calendar=True)
 
-    assert result.handled is True
-    assert result.tool_name == "check_availability"
-    assert result.tool_args["date_text"] == "tomorrow"
+    assert result.handled is False
+    assert result.tool_name is None
 
 
 def test_greeting_with_time_still_routes_to_calendar():

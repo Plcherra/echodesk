@@ -180,7 +180,10 @@ def contains_clear_intent(text: str) -> bool:
         )
     ):
         return True
-    if re.search(r"\b(do you have|any|anything)\b.*\b(today|tomorrow|morning|afternoon|evening)\b", norm):
+    if re.search(
+        r"\b(do you have|any|anything|anytime|any time)\b.*\b(today|tomorrow|morning|afternoon|evening|time|times)\b",
+        norm,
+    ):
         return True
     if re.search(r"\bcan you (do|make|book|schedule)\s+(?:me\s+)?(?:for\s+)?\d{1,2}\b", norm):
         return True
