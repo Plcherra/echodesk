@@ -40,7 +40,7 @@ class AppStrings {
       "Couldn't delete receptionist. Please try again.";
   static const pendingReleaseTitle = 'Number held';
   static const pendingReleaseSubtitle =
-      'Create a receptionist to keep this line. Unused numbers are released in 24–48 hours.';
+      'Create a receptionist to keep this line on your account. Unused numbers are released in 24–48 hours.';
   static const pendingReleaseCta = 'Create receptionist';
   static const couldNotSaveSettings = "Couldn't save. Please try again.";
   static const callInitiated = "Call initiated";

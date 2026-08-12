@@ -44,7 +44,7 @@ class WizardFormData {
   String country;
   String calendarId;
   String mode; // 'personal' | 'business'
-  String phoneStrategy; // 'new' | 'transfer' (create API only accepts new)
+  String phoneStrategy; // 'new' | 'transfer' | 'reclaim' (reclaim = keep held DID)
   String? areaCode;
   String? ownPhone;
   String? providerSid;
@@ -100,7 +100,9 @@ class WizardFormData {
       'country': country,
       'calendar_id': calendarId.trim(),
       'mode': mode,
-      'phone_strategy': phoneStrategy,
+      // Backend create only accepts new|transfer; reclaim maps to new + use_held_number.
+      'phone_strategy': phoneStrategy == 'reclaim' ? 'new' : phoneStrategy,
+      'use_held_number': phoneStrategy == 'reclaim',
       'system_prompt': systemPrompt.trim(),
       'consent': consent,
       'staff': staff.where((s) => s.name.trim().isNotEmpty).map((s) => s.toJson()).toList(),

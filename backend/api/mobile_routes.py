@@ -930,8 +930,15 @@ async def create_receptionist(request: Request):
             )
 
     # Same business: reclaim DID from soft-deleted assistant before orphan/buy.
+    # Clients can opt out with use_held_number=false (buy a different new number).
+    use_held_number = body.get("use_held_number")
+    if use_held_number is None:
+        want_reclaim = True
+    else:
+        want_reclaim = bool(use_held_number)
+
     reclaimed_from_id: str | None = None
-    if not telnyx_id or not inbound_number:
+    if want_reclaim and (not telnyx_id or not inbound_number):
         from telnyx.phone_lifecycle import (
             detach_phone_from_receptionist,
             find_reclaimable_number_for_business,

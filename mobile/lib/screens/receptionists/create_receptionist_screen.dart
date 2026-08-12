@@ -72,10 +72,14 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
   bool _reusesSharedLine = false;
   String? _sharedLinePhone;
 
+  /// Soft-deleted DID held for reclaim (from pending-release API).
+  Map<String, dynamic>? _heldNumber;
+
   bool get _canGoNext {
     if (_loading) return false;
     if (_step == 2) {
       if (_reusesSharedLine) return true;
+      if (_formData.phoneStrategy == 'reclaim' && _heldNumber != null) return true;
       // Only a new EchoDesk number can advance the wizard.
       return _formData.phoneStrategy == 'new' &&
           (_formData.areaCode != null && _formData.areaCode!.isNotEmpty);
@@ -186,6 +190,7 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
       preferredId: profileCalendarId,
       fallbackEmail: profileEmail,
     );
+    await _loadHeldNumber();
 
     try {
       final recs = await supabase
@@ -334,6 +339,30 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
     });
   }
 
+  Future<void> _loadHeldNumber() async {
+    try {
+      final res =
+          await ApiClient.get('/api/mobile/phone-numbers/pending-release');
+      if (res.statusCode < 200 || res.statusCode >= 300) return;
+      final data = jsonDecode(res.body) as Map<String, dynamic>?;
+      final nums = data?['numbers'] as List<dynamic>? ?? [];
+      if (nums.isEmpty) return;
+      final first = nums.first;
+      if (first is! Map) return;
+      final held = Map<String, dynamic>.from(first);
+      if (!mounted) return;
+      setState(() {
+        _heldNumber = held;
+        // Default: keep the held number instead of buying another DID.
+        if (!_reusesSharedLine) {
+          _formData.phoneStrategy = 'reclaim';
+        }
+      });
+    } catch (_) {
+      // Non-fatal — create still works with a new number.
+    }
+  }
+
   int _nextStepFrom(int step) {
     final n = step + 1;
     if (n == 2 && _reusesSharedLine) return 3;
@@ -368,6 +397,9 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
     }
     if (_step == 2) {
       if (_reusesSharedLine) return true;
+      if (_formData.phoneStrategy == 'reclaim' && _heldNumber != null) {
+        return true;
+      }
       if (_formData.phoneStrategy != 'new') {
         _showVisibleError(
           _activeTransfer != null
@@ -789,8 +821,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
           _activeTransfer = req;
           _transferStatusFetched = true;
           _transferLoading = false;
-          if (req != null) {
-            // Keep user on the only completable path.
+          if (req != null && _heldNumber == null) {
+            // Keep user on the only completable path when no held number.
             _formData.phoneStrategy = 'new';
           }
         });
@@ -948,19 +980,42 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
     }
     final underReview = _activeTransfer != null;
     final supportEmail = Env.supportEmail;
+    final heldDisplay = (_heldNumber?['phone_display'] as String?)?.trim().isNotEmpty == true
+        ? _heldNumber!['phone_display'] as String
+        : (_heldNumber?['phone_number'] as String? ?? '');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('How do you want to set up your business phone line?'),
-        const SizedBox(height: 16),
-        _selectableOption(
-          title: 'Get a new business number',
-          subtitle:
-              "We'll set up a US business number for you (~\$1–2/month). Ready quickly.",
-          selected: _formData.phoneStrategy == 'new',
-          onTap: () => setState(() => _formData.phoneStrategy = 'new'),
+        Text(
+          _heldNumber != null
+              ? 'How should we set up the phone line?'
+              : 'How do you want to set up your business phone line?',
         ),
+        const SizedBox(height: 16),
+        if (_heldNumber != null) ...[
+          _selectableOption(
+            title: 'Keep $heldDisplay',
+            subtitle:
+                'Attach this held number to your new receptionist. No new DID purchase.',
+            selected: _formData.phoneStrategy == 'reclaim',
+            onTap: () => setState(() => _formData.phoneStrategy = 'reclaim'),
+          ),
+          _selectableOption(
+            title: 'Get a different new number',
+            subtitle:
+                "We'll buy a new US number (~\$1–2/month). Your held number stays pending release.",
+            selected: _formData.phoneStrategy == 'new',
+            onTap: () => setState(() => _formData.phoneStrategy = 'new'),
+          ),
+        ] else
+          _selectableOption(
+            title: 'Get a new business number',
+            subtitle:
+                "We'll set up a US business number for you (~\$1–2/month). Ready quickly.",
+            selected: _formData.phoneStrategy == 'new',
+            onTap: () => setState(() => _formData.phoneStrategy = 'new'),
+          ),
         if (_formData.phoneStrategy == 'new')
           Padding(
             padding: const EdgeInsets.only(left: 16, top: 8),
@@ -1567,7 +1622,9 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                   'Phone',
                   _reusesSharedLine
                       ? 'Shared line (${_sharedLinePhone ?? 'existing'})'
-                      : 'New number (${_formData.areaCode ?? '—'})',
+                      : _formData.phoneStrategy == 'reclaim' && _heldNumber != null
+                          ? 'Keep held (${(_heldNumber!['phone_display'] as String?) ?? (_heldNumber!['phone_number'] as String?) ?? 'number'})'
+                          : 'New number (${_formData.areaCode ?? '—'})',
                 ),
                 _ReviewRow(
                   'Prompt',
