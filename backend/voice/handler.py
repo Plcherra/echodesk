@@ -23,7 +23,7 @@ from voice.constants import (
 from supabase_client import create_service_role_client
 from voice.send_media import send_clear, send_media
 from voice.pipeline import run_voice_pipeline
-from prompts.fetch import get_cached_prompt, fetch_prompt
+from prompts.fetch import ReceptionistPrompt, get_cached_prompt, fetch_prompt
 from voice_presets import resolve_tts_voice
 from voice.trace import mark_voice_event
 
@@ -134,17 +134,37 @@ async def handle_voice_stream_connection(ws: WebSocket) -> None:
             if call_sid and active_by_call_sid.get(call_sid) != ws:
                 return
 
-            if len(prompt_data) >= 6:
-                prompt, greeting, cached_voice_id, voice_preset_key, greeting_source, assistant_identity = prompt_data
+            if isinstance(prompt_data, ReceptionistPrompt):
+                prompt = prompt_data.prompt
+                greeting = prompt_data.greeting
+                cached_voice_id = prompt_data.voice_id
+                voice_preset_key = prompt_data.voice_preset_key
+                greeting_source = prompt_data.greeting_source
+                assistant_identity = prompt_data.assistant_identity
+                voice_clone_id = prompt_data.voice_clone_id
+                pocket_voice_path = prompt_data.pocket_voice_path
+            elif len(prompt_data) >= 6:
+                prompt, greeting, cached_voice_id, voice_preset_key, greeting_source, assistant_identity = prompt_data[:6]
+                voice_clone_id = None
+                pocket_voice_path = None
             else:
-                prompt, greeting, cached_voice_id, voice_preset_key, greeting_source = prompt_data
+                prompt, greeting, cached_voice_id, voice_preset_key, greeting_source = prompt_data[:5]
                 assistant_identity = "Receptionist"
-            resolved_tts_voice = resolve_tts_voice(voice_preset_key, cached_voice_id)
+                voice_clone_id = None
+                pocket_voice_path = None
+            resolved_tts_voice = resolve_tts_voice(
+                voice_preset_key,
+                cached_voice_id,
+                voice_clone_id=voice_clone_id,
+                pocket_voice_path=pocket_voice_path,
+            )
             logger.info(
-                "call_voice_setup receptionist_id=%s voice_preset_key=%s google_voice=%s greeting_source=%s assistant_identity=%s",
+                "call_voice_setup receptionist_id=%s voice_preset_key=%s google_voice=%s provider=%s clone_id=%s greeting_source=%s assistant_identity=%s",
                 receptionist_id,
                 voice_preset_key,
                 resolved_tts_voice.google_voice_name,
+                resolved_tts_voice.provider,
+                resolved_tts_voice.voice_clone_id,
                 greeting_source,
                 assistant_identity,
             )
@@ -154,8 +174,9 @@ async def handle_voice_stream_connection(ws: WebSocket) -> None:
                 "system_prompt": prompt,
                 "greeting": greeting,
                 "assistant_identity": assistant_identity,
-                "tts_provider": "google",
+                "tts_provider": resolved_tts_voice.provider,
                 "resolved_tts_voice": resolved_tts_voice,
+                "receptionist_id": receptionist_id,
             }
             if caller_phone:
                 config["caller_phone"] = caller_phone

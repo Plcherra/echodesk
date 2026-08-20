@@ -407,7 +407,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           kicker: 'Step 2 of 4',
           headline: 'Create your AI receptionist',
           body:
-              'Name your assistant, pick a voice, and get a US business number that answers and books for you.',
+              'Name your assistant, pick a voice (optional: use your own), and get a US business number that answers and books for you.',
           footnote: 'About 3 minutes. You can change details later.',
           primaryLabel: 'Create your AI receptionist',
           onPrimary: _openCreateAssistant,

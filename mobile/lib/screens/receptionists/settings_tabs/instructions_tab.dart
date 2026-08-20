@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../services/api_client.dart';
 import '../../../strings.dart';
 import '../../../theme/echodesk_theme.dart';
+import '../../../widgets/voice_clone_section.dart';
 
 class ReceptionistInstructionsTab extends StatefulWidget {
   final String receptionistId;
@@ -28,6 +29,8 @@ class _ReceptionistInstructionsTabState
   bool _loading = true;
   bool _saving = false;
   String? _voicePresetKey;
+  String? _voiceCloneId;
+  String? _voiceCloneLabel;
   List<Map<String, dynamic>> _voicePresets = [];
   bool _voicePresetsLoading = false;
   String? _previewPlayingKey;
@@ -172,7 +175,11 @@ class _ReceptionistInstructionsTabState
                                   ],
                                 ),
                                 onTap: () {
-                                  setState(() => _voicePresetKey = key);
+                                  setState(() {
+                                    _voicePresetKey = key;
+                                    _voiceCloneId = null;
+                                    _voiceCloneLabel = null;
+                                  });
                                   setModalState(() {});
                                 },
                               ),
@@ -210,13 +217,15 @@ class _ReceptionistInstructionsTabState
     final res = await Supabase.instance.client
         .from('receptionists')
         .select(
-            'system_prompt, greeting, voice_id, voice_preset_key, extra_instructions, generic_followup_message_template')
+            'system_prompt, greeting, voice_id, voice_preset_key, voice_clone_id, extra_instructions, generic_followup_message_template')
         .eq('id', widget.receptionistId)
         .maybeSingle();
     if (res != null) {
       _coreInstructionsController.text = res['system_prompt'] as String? ?? '';
       _greetingController.text = res['greeting'] as String? ?? '';
       _voicePresetKey = res['voice_preset_key'] as String?;
+      _voiceCloneId = res['voice_clone_id'] as String?;
+      _voiceCloneLabel = _voiceCloneId == null ? null : 'My voice';
       final voiceId = res['voice_id'] as String?;
       _extraNotesController.text =
           res['extra_instructions'] as String? ?? '';
@@ -269,6 +278,7 @@ class _ReceptionistInstructionsTabState
             : _genericFollowupController.text.trim(),
       };
       if (_voicePresetKey != null) body['voice_preset_key'] = _voicePresetKey;
+      body['voice_clone_id'] = _voiceCloneId;
       final res = await ApiClient.patch(
         '/api/mobile/receptionists/${widget.receptionistId}',
         body: body,
@@ -342,6 +352,9 @@ class _ReceptionistInstructionsTabState
             contentPadding: EdgeInsets.zero,
             title: Text(
               () {
+                if ((_voiceCloneId ?? '').isNotEmpty) {
+                  return _voiceCloneLabel ?? 'My voice';
+                }
                 final found =
                     _voicePresets.where((p) => p['key'] == _voicePresetKey);
                 return found.isEmpty
@@ -357,6 +370,25 @@ class _ReceptionistInstructionsTabState
               child: const Text('Change voice'),
             ),
           ),
+        ),
+        VoiceCloneSection(
+          compact: true,
+          selectedCloneId: _voiceCloneId,
+          selectedCloneLabel: _voiceCloneLabel,
+          onSelected: (id, label) {
+            setState(() {
+              _voiceCloneId = id;
+              _voiceCloneLabel = label;
+            });
+            _save();
+          },
+          onCleared: () {
+            setState(() {
+              _voiceCloneId = null;
+              _voiceCloneLabel = null;
+            });
+            _save();
+          },
         ),
         const SizedBox(height: EchoDeskSpacing.md),
         _SettingsSection(

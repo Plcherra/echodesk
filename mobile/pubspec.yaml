@@ -25,6 +25,8 @@ dependencies:
   web_socket_channel: ^3.0.0
   shared_preferences: ^2.2.2
   audioplayers: ^6.0.0
+  record: ^6.1.1
+  file_picker: ^8.3.7
 
 dev_dependencies:
   flutter_launcher_icons: ^0.14.3

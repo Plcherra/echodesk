@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from prompts.builder import CUSTOM_PROMPT_GUARDRAILS, build_receptionist_prompt
 from prompts.metrics import inspect_prompt
@@ -13,12 +13,22 @@ from voice.constants import DEFAULT_GREETING
 
 logger = logging.getLogger(__name__)
 
-# In-memory prompt cache:
-# call_control_id -> (prompt, greeting, voice_id | None, voice_preset_key | None, greeting_source, assistant_identity)
-_prompt_cache: dict[str, tuple[str, str, Optional[str], Optional[str], str, str]] = {}
+
+class ReceptionistPrompt(NamedTuple):
+    prompt: str
+    greeting: str
+    voice_id: Optional[str]
+    voice_preset_key: Optional[str]
+    greeting_source: str
+    assistant_identity: str
+    voice_clone_id: Optional[str] = None
+    pocket_voice_path: Optional[str] = None
+
+
+_prompt_cache: dict[str, ReceptionistPrompt] = {}
 _MAX_PROMPT_CACHE = 1000
 
-DEFAULT = (
+DEFAULT = ReceptionistPrompt(
     "You are an AI receptionist. Be helpful and concise.",
     DEFAULT_GREETING,
     None,
@@ -36,7 +46,25 @@ def set_prompt(
     voice_preset_key: Optional[str] = None,
     greeting_source: str = "custom",
     assistant_identity: str = "Receptionist",
+    voice_clone_id: Optional[str] = None,
+    pocket_voice_path: Optional[str] = None,
 ) -> None:
+    cache_prompt(
+        call_control_id,
+        ReceptionistPrompt(
+            prompt,
+            greeting,
+            voice_id,
+            voice_preset_key,
+            greeting_source,
+            assistant_identity or "Receptionist",
+            voice_clone_id,
+            pocket_voice_path,
+        ),
+    )
+
+
+def cache_prompt(call_control_id: str, data: ReceptionistPrompt) -> None:
     if call_control_id and len(_prompt_cache) >= _MAX_PROMPT_CACHE:
         try:
             oldest_key = next(iter(_prompt_cache.keys()))
@@ -49,17 +77,10 @@ def set_prompt(
         except Exception:
             _prompt_cache.clear()
             logger.warning("[CALL_DIAG] prompt_cache_cleared size_limit=%s", _MAX_PROMPT_CACHE)
-    _prompt_cache[call_control_id] = (
-        prompt,
-        greeting,
-        voice_id,
-        voice_preset_key,
-        greeting_source,
-        assistant_identity or "Receptionist",
-    )
+    _prompt_cache[call_control_id] = data
 
 
-def get_cached_prompt(call_control_id: str) -> tuple[str, str, Optional[str], Optional[str], str, str] | None:
+def get_cached_prompt(call_control_id: str) -> ReceptionistPrompt | None:
     return _prompt_cache.get(call_control_id)
 
 
@@ -70,14 +91,14 @@ def clear_cached_prompt(call_control_id: str) -> None:
     _prompt_cache.pop(call_control_id, None)
 
 
-async def fetch_prompt(receptionist_id: str, supabase) -> tuple[str, str, Optional[str], Optional[str], str, str]:
+async def fetch_prompt(receptionist_id: str, supabase) -> ReceptionistPrompt:
     """Fetch prompt for receptionist from Supabase."""
     if not receptionist_id or not receptionist_id.strip():
         return DEFAULT
     return await asyncio.to_thread(_build_from_supabase_sync, receptionist_id, supabase)
 
 
-def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str, Optional[str], Optional[str], str, str]:
+def _build_from_supabase_sync(receptionist_id: str, supabase) -> ReceptionistPrompt:
     default = DEFAULT
     if not receptionist_id or not receptionist_id.strip():
         return default
@@ -85,7 +106,7 @@ def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str,
     rec_res = supabase.table("receptionists").select(
         "id, name, user_id, phone_number, calendar_id, payment_settings, website_content, "
         "extra_instructions, system_prompt, greeting, voice_id, voice_preset_key, assistant_identity, mode, "
-        "bookable_hours"
+        "bookable_hours, voice_clone_id"
     ).eq("id", receptionist_id).execute()
 
     if not rec_res.data or len(rec_res.data) == 0:
@@ -175,4 +196,34 @@ def _build_from_supabase_sync(receptionist_id: str, supabase) -> tuple[str, str,
         metrics.booking_mentions,
         metrics.availability_mentions,
     )
-    return prompt, greeting, voice_id, voice_preset_key, greeting_source, identity
+    voice_clone_id = (rec.get("voice_clone_id") or "").strip() or None
+    pocket_voice_path = None
+    if voice_clone_id:
+        try:
+            clone_res = (
+                supabase.table("voice_clones")
+                .select("embedding_path")
+                .eq("id", voice_clone_id)
+                .limit(1)
+                .execute()
+            )
+            if clone_res.data:
+                pocket_voice_path = (clone_res.data[0].get("embedding_path") or "").strip() or None
+        except Exception as err:
+            logger.warning(
+                "[receptionist config] voice_clone lookup failed receptionist_id=%s clone_id=%s error=%s",
+                receptionist_id,
+                voice_clone_id,
+                err,
+            )
+
+    return ReceptionistPrompt(
+        prompt,
+        greeting,
+        voice_id,
+        voice_preset_key,
+        greeting_source,
+        identity,
+        voice_clone_id,
+        pocket_voice_path,
+    )

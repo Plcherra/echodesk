@@ -1,0 +1,20 @@
+[Unit]
+Description=EchoDesk Pocket TTS sidecar (user, localhost only)
+
+[Service]
+Type=simple
+WorkingDirectory=/home/rex/pocket-tts-spike
+Environment=PYTHONUNBUFFERED=1
+Environment=POCKET_TTS_HOST=127.0.0.1
+Environment=POCKET_TTS_PORT=8100
+Environment=POCKET_TTS_VOICES_DIR=/home/rex/pocket-tts-spike/voices
+Environment=POCKET_TTS_FFMPEG=/home/rex/pocket-tts-spike/bin/ffmpeg
+Environment=POCKET_TTS_CONCURRENCY=2
+EnvironmentFile=-/home/rex/pocket-tts-spike/hf.env
+ExecStart=/home/rex/pocket-tts-spike/.venv/bin/python /home/rex/pocket-tts-spike/sidecar.py
+Restart=always
+RestartSec=5
+Nice=10
+
+[Install]
+WantedBy=default.target

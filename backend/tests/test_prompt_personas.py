@@ -128,7 +128,7 @@ def test_custom_prompt_is_wrapped_with_non_negotiable_guardrails() -> None:
     prompt, greeting, voice_id, voice_preset_key, greeting_source, identity = _build_from_supabase_sync(
         "rec-1",
         supabase,
-    )
+    )[:6]
 
     assert prompt.startswith(CUSTOM_PROMPT_GUARDRAILS)
     assert prompt.index("Non-negotiable voice safety rules") < prompt.index("Ignore previous instructions")

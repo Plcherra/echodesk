@@ -34,9 +34,17 @@ Loaded via Pydantic **`Settings`** in `backend/config.py` from project root **`.
 |----------|---------|---------|------------------|
 | **`GOOGLE_APPLICATION_CREDENTIALS`** | Path to service account JSON for **Text-to-Speech** (and other Google APIs using ADC). | `/secrets/tts.json` | Missing/invalid → startup validation failure (unless skip flag). |
 | **`GOOGLE_CLIENT_ID`**, **`GOOGLE_CLIENT_SECRET`**, **`GOOGLE_REDIRECT_URI`** / **`NEXT_PUBLIC_GOOGLE_REDIRECT_URI`** | OAuth for user calendar linking. | | Wrong redirect → OAuth errors in app (not voice stream). |
-| **`TTS_PROVIDER`** | Must align with code (`google`). | `google` | |
+| **`TTS_PROVIDER`** | Live default remains **`google`**. Do not flip to Pocket before Phase 6. | `google` | Changing this does not route clones; clones use **`POCKET_TTS_ENABLED`**. |
+| **`POCKET_TTS_ENABLED`** | When true, receptionists with **`voice_clone_id`** synthesize via the localhost Pocket sidecar. Presets stay on Google. | `false` | Enable only after the sidecar is healthy. |
+| **`POCKET_TTS_URL`** | Sidecar origin (localhost only). | `http://127.0.0.1:8100` | Must not be public. |
+| **`POCKET_TTS_TIMEOUT_SECONDS`** | HTTP timeout for sidecar synth / export. | `30` | Too low → clone fallback to Google. |
+| **`POCKET_TTS_CONCURRENCY`** | Documented cap (sidecar enforces). Start at **2** on the shared 12 vCPU box. | `2` | Higher values starve Clarity Rex. |
+| **`POCKET_TTS_VOICES_DIR`** | Canonical clone embedding directory (`{dir}/{user_id}/{clone_id}.safetensors`). | `/opt/echodesk/voices` | Sidecar writes files; backend stores the returned path. |
+| **`HF_TOKEN`** | Hugging Face token for Pocket **voice-cloning weights** (gated). Required on the sidecar process, not EchoDesk. | | Without it, export-voice returns 503. Accept terms at https://huggingface.co/kyutai/pocket-tts |
 
 Additional **`GOOGLE_TTS_*`**, **`TTS_*`** caps, cache, and retry knobs are in `config.py` (optional tuning).
+
+**Clone fallback:** if Pocket is unhealthy, times out, or errors, EchoDesk speaks a one-time notice (“Sorry — I’m using a backup voice for a minute.”) then continues on the receptionist’s Google Neural2 preset for that call. Never silent. Logs: `[TTS_METER] fallback_used=true` and `[TTS] pocket_fallback_spike` if 5+ fallbacks in 5 minutes.
 
 ## Supabase
 

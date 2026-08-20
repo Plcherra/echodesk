@@ -129,6 +129,44 @@ class ApiClient {
     return response;
   }
 
+  static Future<http.Response> postMultipart(
+    String path, {
+    required Map<String, String> fields,
+    required List<http.MultipartFile> files,
+    bool withAuth = true,
+  }) async {
+    final uri = Uri.parse('$_baseUrl$path');
+    final request = http.MultipartRequest('POST', uri);
+    if (withAuth) {
+      final token = await _getAccessToken();
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+    }
+    request.headers['Accept'] = 'application/json';
+    request.fields.addAll(fields);
+    request.files.addAll(files);
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (await _handleUnauthorized(response, path, withAuth)) {
+      return response;
+    }
+    return response;
+  }
+
+  static Future<http.Response> delete(
+    String path, {
+    bool withAuth = true,
+  }) async {
+    final uri = Uri.parse('$_baseUrl$path');
+    final headers = await _headers(withAuth: withAuth);
+    final response = await http.delete(uri, headers: headers);
+    if (await _handleUnauthorized(response, path, withAuth)) {
+      return response;
+    }
+    return response;
+  }
+
   static Future<http.Response> patch(
     String path, {
     Object? body,

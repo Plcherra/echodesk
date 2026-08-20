@@ -17,6 +17,7 @@ from voice.google_tts import (
     assert_voice_allowed,
     synthesize_text_with_retry,
 )
+from voice.pocket_tts import PocketTtsError, pocket_enabled, pocket_health, synthesize as pocket_synthesize
 from voice.tts_cache import build_cache_key, create_tts_cache
 from voice.trace import mark_voice_event
 from voice_presets import ResolvedTtsVoice, google_voice_allowlist
@@ -24,6 +25,56 @@ from voice_presets import ResolvedTtsVoice, google_voice_allowlist
 logger = logging.getLogger(__name__)
 
 _cache = None
+
+POCKET_FALLBACK_NOTICE = "Sorry — I'm using a backup voice for a minute."
+_pocket_health_at = 0.0
+_pocket_health_ok = True
+_pocket_fallback_times: list[float] = []
+_last_google_meter: dict[str, Any] = {"cache_hit": False, "synth_ms": 0.0}
+
+
+def _meter_tts(
+    *,
+    provider: str,
+    receptionist_id: str | None,
+    clone_id: str | None,
+    chars: int,
+    synth_ms: float,
+    cache_hit: bool,
+    fallback_used: bool,
+) -> None:
+    logger.info(
+        "[TTS_METER] provider=%s receptionist_id=%s clone_id=%s chars=%s synth_ms=%.0f cache_hit=%s fallback_used=%s",
+        provider,
+        receptionist_id or "-",
+        clone_id or "-",
+        chars,
+        synth_ms,
+        cache_hit,
+        fallback_used,
+    )
+
+
+def _note_pocket_fallback_spike() -> None:
+    now = time.time()
+    _pocket_fallback_times.append(now)
+    cutoff = now - 300.0
+    alive = [t for t in _pocket_fallback_times if t >= cutoff]
+    _pocket_fallback_times[:] = alive
+    if len(alive) >= 5:
+        logger.error("[TTS] pocket_fallback_spike count=%s window_s=300", len(alive))
+
+
+async def _pocket_is_healthy() -> bool:
+    global _pocket_health_at, _pocket_health_ok
+    now = time.time()
+    if now - _pocket_health_at < 10:
+        return _pocket_health_ok
+    health = await pocket_health()
+    _pocket_health_ok = bool(health and health.get("status") == "ok")
+    _pocket_health_at = now
+    return _pocket_health_ok
+
 
 COMMON_TTS_CACHE_WARM_PHRASES: tuple[str, ...] = (
     "Checking now.",
@@ -256,6 +307,8 @@ async def _google_synthesize_to_mulaw(
             key[:16],
             len(text),
         )
+        _last_google_meter["cache_hit"] = True
+        _last_google_meter["synth_ms"] = 0.0
         return hit
     t_synth_start = time.perf_counter()
     logger.info("[BOOKING_LATENCY] tts_synthesis_start chars=%s t=%.3f", len(text), t_synth_start)
@@ -267,9 +320,88 @@ async def _google_synthesize_to_mulaw(
         max_seconds=settings.tts_google_retry_max_seconds,
     )
     t_synth_end = time.perf_counter()
-    logger.info("[BOOKING_LATENCY] tts_synthesis_end duration_ms=%.0f bytes=%s", (t_synth_end - t_synth_start) * 1000, len(audio))
+    synth_ms = (t_synth_end - t_synth_start) * 1000
+    logger.info("[BOOKING_LATENCY] tts_synthesis_end duration_ms=%.0f bytes=%s", synth_ms, len(audio))
     await cache.put(key, audio)
+    _last_google_meter["cache_hit"] = False
+    _last_google_meter["synth_ms"] = synth_ms
     return audio
+
+
+async def _pocket_synthesize_to_mulaw(text: str, voice: ResolvedTtsVoice) -> bytes:
+    if not voice.pocket_voice_path:
+        raise PocketTtsError("missing pocket_voice_path")
+    t_synth_start = time.perf_counter()
+    logger.info("[BOOKING_LATENCY] tts_synthesis_start provider=pocket chars=%s t=%.3f", len(text), t_synth_start)
+    audio = await pocket_synthesize(text, voice.pocket_voice_path, audio_format="mulaw")
+    t_synth_end = time.perf_counter()
+    logger.info(
+        "[BOOKING_LATENCY] tts_synthesis_end provider=pocket duration_ms=%.0f bytes=%s clone_id=%s",
+        (t_synth_end - t_synth_start) * 1000,
+        len(audio),
+        voice.voice_clone_id,
+    )
+    return audio
+
+
+async def _synthesize_to_mulaw(
+    text: str,
+    voice: ResolvedTtsVoice,
+    *,
+    receptionist_id: str | None = None,
+) -> tuple[bytes, str, bool]:
+    """Return (audio, provider_used, fell_back).
+
+    Clone voices use Pocket. If Pocket is unhealthy/fails, use the Google preset.
+    """
+    chars = len(text)
+    if voice.provider == "pocket" and voice.pocket_voice_path and pocket_enabled():
+        healthy = await _pocket_is_healthy()
+        if healthy:
+            try:
+                t0 = time.perf_counter()
+                audio = await _pocket_synthesize_to_mulaw(text, voice)
+                _meter_tts(
+                    provider="pocket",
+                    receptionist_id=receptionist_id,
+                    clone_id=voice.voice_clone_id,
+                    chars=chars,
+                    synth_ms=(time.perf_counter() - t0) * 1000,
+                    cache_hit=False,
+                    fallback_used=False,
+                )
+                return audio, "pocket", False
+            except Exception as err:
+                logger.exception(
+                    "[TTS] pocket_failed fallback=google clone_id=%s error=%s",
+                    voice.voice_clone_id,
+                    err,
+                )
+        else:
+            logger.warning("[TTS] pocket_unhealthy fallback=google clone_id=%s", voice.voice_clone_id)
+        audio = await _google_synthesize_to_mulaw(text, voice, use_backup_voice=False)
+        _meter_tts(
+            provider="google",
+            receptionist_id=receptionist_id,
+            clone_id=voice.voice_clone_id,
+            chars=chars,
+            synth_ms=float(_last_google_meter.get("synth_ms") or 0),
+            cache_hit=bool(_last_google_meter.get("cache_hit")),
+            fallback_used=True,
+        )
+        _note_pocket_fallback_spike()
+        return audio, "google", True
+    audio = await _google_synthesize_to_mulaw(text, voice, use_backup_voice=False)
+    _meter_tts(
+        provider="google",
+        receptionist_id=receptionist_id,
+        clone_id=None,
+        chars=chars,
+        synth_ms=float(_last_google_meter.get("synth_ms") or 0),
+        cache_hit=bool(_last_google_meter.get("cache_hit")),
+        fallback_used=False,
+    )
+    return audio, "google", False
 
 
 def _billable_chars_plain(text: str) -> int:
@@ -316,9 +448,13 @@ async def generate_and_send_tts(
     call_control_id = config.get("call_control_id")
     commit_id = config.get("active_turn_commit_id")
     label = trace_label or ("turn" if commit_id is not None else "system")
+    voice: ResolvedTtsVoice | None = config.get("resolved_tts_voice")
 
     logger.info(
-        "[TTS] utterance provider=google chars=%s chars_call_total=%s est_minutes=%.3f tts_request_index=%s",
+        "[TTS] utterance provider=%s clone_id=%s preset_voice=%s chars=%s chars_call_total=%s est_minutes=%.3f tts_request_index=%s",
+        getattr(voice, "provider", "unknown"),
+        getattr(voice, "voice_clone_id", None),
+        getattr(voice, "google_voice_name", None),
         billable,
         tts_state["chars"],
         est_min,
@@ -332,9 +468,10 @@ async def generate_and_send_tts(
         request_index=request_index,
         chars=billable,
         fallback=is_fallback,
+        tts_provider=getattr(voice, "provider", None),
+        clone_id=getattr(voice, "voice_clone_id", None),
     )
 
-    voice: ResolvedTtsVoice | None = config.get("resolved_tts_voice")
     if voice is None:
         logger.error("[TTS] resolved_tts_voice missing")
         mark_voice_event(
@@ -358,8 +495,39 @@ async def generate_and_send_tts(
             voice=voice.google_voice_name,
             backup=False,
             utterance_id=utterance_id,
+            tts_provider=voice.provider,
+            clone_id=voice.voice_clone_id,
         )
-        audio = await _google_synthesize_to_mulaw(use_text, voice, use_backup_voice=False)
+        audio, provider_used, pocket_fell_back = await _synthesize_to_mulaw(
+            use_text,
+            voice,
+            receptionist_id=config.get("receptionist_id"),
+        )
+        if pocket_fell_back:
+            logger.warning(
+                "[TTS] pocket_fallback_used clone_id=%s google_voice=%s",
+                voice.voice_clone_id,
+                voice.google_voice_name,
+            )
+            if not config.get("pocket_fallback_notice_played"):
+                try:
+                    notice = _prepare_text_for_tts(POCKET_FALLBACK_NOTICE)
+                    notice_audio = await _google_synthesize_to_mulaw(notice, voice, use_backup_voice=False)
+                    config["pocket_fallback_notice_played"] = True
+                    if mark_tts_sending(config, utterance_id):
+                        await _send_mulaw_chunks(
+                            notice_audio,
+                            on_audio,
+                            settings.tts_mulaw_chunk_bytes,
+                            config=config,
+                            utterance_id=utterance_id,
+                            call_control_id=call_control_id,
+                            commit_id=commit_id,
+                            label="pocket_fallback_notice",
+                            request_index=request_index,
+                        )
+                except Exception as notice_err:
+                    logger.warning("[TTS] pocket_fallback_notice_failed error=%s", notice_err)
         if not mark_tts_sending(config, utterance_id):
             logger.info("[TTS] utterance_interrupted_before_send utterance_id=%s", utterance_id)
             mark_voice_event(
@@ -380,6 +548,9 @@ async def generate_and_send_tts(
             audio_bytes=len(audio),
             backup=False,
             utterance_id=utterance_id,
+            tts_provider=provider_used,
+            clone_id=voice.voice_clone_id,
+            pocket_fallback=pocket_fell_back,
         )
         await _send_mulaw_chunks(
             audio,
@@ -395,7 +566,7 @@ async def generate_and_send_tts(
         if not is_tts_utterance_interrupted(config, utterance_id):
             finish_tts_utterance(config, utterance_id)
     except Exception as err:
-        logger.exception("[TTS] Google primary voice failed: %s", err)
+        logger.exception("[TTS] primary voice failed provider=%s: %s", getattr(voice, "provider", None), err)
         mark_voice_event(
             call_control_id,
             "tts_primary_failed",
@@ -474,6 +645,8 @@ async def warm_tts_phrase_cache(config: dict[str, Any], phrases: tuple[str, ...]
     voice: ResolvedTtsVoice | None = config.get("resolved_tts_voice")
     if voice is None:
         return 0
+    if voice.provider == "pocket":
+        return 0
     warmed = 0
     for phrase in phrases or COMMON_TTS_CACHE_WARM_PHRASES:
         prepared = _prepare_text_for_tts(phrase)
@@ -513,3 +686,11 @@ async def google_preview_mp3(text: str, voice: ResolvedTtsVoice) -> bytes:
         base_seconds=settings.tts_google_retry_base_seconds,
         max_seconds=settings.tts_google_retry_max_seconds,
     )
+
+
+async def pocket_preview_mp3(text: str, voice: ResolvedTtsVoice) -> bytes:
+    """MP3 preview bytes for a bound Pocket clone."""
+    if not voice.pocket_voice_path:
+        raise PocketTtsError("missing pocket_voice_path")
+    text = _prepare_text_for_tts(text)
+    return await pocket_synthesize(text, voice.pocket_voice_path, audio_format="mp3")

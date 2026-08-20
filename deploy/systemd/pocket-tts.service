@@ -1,0 +1,28 @@
+[Unit]
+Description=EchoDesk Pocket TTS sidecar (localhost only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=echodesk
+Group=echodesk
+WorkingDirectory=/opt/echodesk/pocket-tts
+Environment=PYTHONUNBUFFERED=1
+Environment=POCKET_TTS_HOST=127.0.0.1
+Environment=POCKET_TTS_PORT=8100
+Environment=POCKET_TTS_VOICES_DIR=/opt/echodesk/voices
+Environment=POCKET_TTS_FFMPEG=/opt/echodesk/pocket-tts/bin/ffmpeg
+Environment=POCKET_TTS_CONCURRENCY=2
+EnvironmentFile=-/opt/echodesk/pocket-tts/hf.env
+ExecStart=/opt/echodesk/pocket-tts/.venv/bin/python /opt/echodesk/pocket-tts/sidecar.py
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+# Never bind this on a public interface.
+
+[Install]
+WantedBy=multi-user.target

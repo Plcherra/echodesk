@@ -166,9 +166,18 @@ async def health() -> dict:
         logger.warning("[health] Supabase check failed: %s", e)
         supabase_status = "error"
     payload: dict = {"status": "ok" if supabase_status == "ok" else "degraded", "supabase": supabase_status}
-    payload["tts_provider"] = "google"
+    payload["tts_provider"] = (settings.tts_provider or "google").strip().lower() or "google"
     tts_status, _ = check_google_tts_credentials()
     payload["tts_google"] = tts_status
+    if settings.pocket_tts_enabled:
+        from voice.pocket_tts import pocket_health
+
+        pocket = await pocket_health()
+        payload["pocket_tts"] = (pocket or {}).get("status", "error")
+        if pocket and pocket.get("has_voice_cloning") is False:
+            payload["pocket_tts_cloning"] = "gated_hf_token_required"
+        if payload["pocket_tts"] == "error":
+            payload["status"] = "degraded"
     status = payload["status"]
     code = 503 if status == "degraded" else 200
     return JSONResponse(payload, status_code=code)

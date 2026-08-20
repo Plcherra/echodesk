@@ -25,6 +25,7 @@ VOICE_PRESETS: list[dict[str, Any]] = [
         "gender_or_style_label": "Warm, approachable",
         "google_voice_name": "en-US-Neural2-F",
         "google_language_code": "en-US",
+        "pocket_voice": None,  # unused until Phase 6 full cutover
         "sample_text": PREVIEW_SAMPLE_TEXT,
     },
     {
@@ -34,6 +35,7 @@ VOICE_PRESETS: list[dict[str, Any]] = [
         "gender_or_style_label": "Professional, calm",
         "google_voice_name": "en-US-Neural2-C",
         "google_language_code": "en-US",
+        "pocket_voice": None,  # unused until Phase 6 full cutover
         "sample_text": PREVIEW_SAMPLE_TEXT,
     },
     {
@@ -43,6 +45,7 @@ VOICE_PRESETS: list[dict[str, Any]] = [
         "gender_or_style_label": "Polished, attentive",
         "google_voice_name": "en-US-Neural2-J",
         "google_language_code": "en-US",
+        "pocket_voice": None,  # unused until Phase 6 full cutover
         "sample_text": PREVIEW_SAMPLE_TEXT,
     },
     {
@@ -52,6 +55,7 @@ VOICE_PRESETS: list[dict[str, Any]] = [
         "gender_or_style_label": "Energetic, upbeat",
         "google_voice_name": "en-US-Neural2-D",
         "google_language_code": "en-US",
+        "pocket_voice": None,  # unused until Phase 6 full cutover
         "sample_text": PREVIEW_SAMPLE_TEXT,
     },
     {
@@ -61,6 +65,7 @@ VOICE_PRESETS: list[dict[str, Any]] = [
         "gender_or_style_label": "Confident, clear",
         "google_voice_name": "en-US-Neural2-A",
         "google_language_code": "en-US",
+        "pocket_voice": None,  # unused until Phase 6 full cutover
         "sample_text": PREVIEW_SAMPLE_TEXT,
     },
 ]
@@ -94,11 +99,19 @@ ENV_DEFAULT_VOICE_ID: str | None = (_dp.get("google_voice_name") if _dp else Non
 
 @dataclass(frozen=True)
 class ResolvedTtsVoice:
-    """Resolved Google TTS voice from preset + legacy storage."""
+    """Resolved TTS voice from preset + optional Pocket clone.
+
+    Clone wins when voice_clone_id + pocket_voice_path are set.
+    Google fields always stay populated so clone failures can fall back.
+    """
 
     google_language_code: str
     google_voice_name: str
     model_id: str | None
+    provider: str = "google"  # google | pocket
+    voice_clone_id: str | None = None
+    pocket_voice_path: str | None = None
+    pocket_voice: str | None = None  # unused until Phase 6 preset cutover
 
 
 def resolve_voice_id(voice_preset_key: str | None, fallback_voice_id: str | None) -> str | None:
@@ -123,8 +136,17 @@ def resolve_voice_id(voice_preset_key: str | None, fallback_voice_id: str | None
     return fb or ENV_DEFAULT_VOICE_ID
 
 
-def resolve_tts_voice(voice_preset_key: str | None, fallback_voice_id: str | None) -> ResolvedTtsVoice:
-    """Resolve Google voice name/language from preset + legacy storage."""
+def resolve_tts_voice(
+    voice_preset_key: str | None,
+    fallback_voice_id: str | None,
+    *,
+    voice_clone_id: str | None = None,
+    pocket_voice_path: str | None = None,
+) -> ResolvedTtsVoice:
+    """Resolve Google voice (and optional Pocket clone) from preset + storage.
+
+    Rule: clone wins when voice_clone_id is set and an embedding path exists.
+    """
     key = (voice_preset_key or "").strip() or None
     fb = (fallback_voice_id or "").strip() or None
 
@@ -139,14 +161,23 @@ def resolve_tts_voice(voice_preset_key: str | None, fallback_voice_id: str | Non
     if preset:
         gname = (preset.get("google_voice_name") or "").strip() or (settings.google_tts_default_voice_name or "").strip()
         glang = (preset.get("google_language_code") or "").strip() or (settings.google_tts_default_language_code or "en-US").strip()
+        pocket_voice = (preset.get("pocket_voice") or "").strip() or None
     else:
         gname = (settings.google_tts_default_voice_name or "en-US-Neural2-C").strip()
         glang = (settings.google_tts_default_language_code or "en-US").strip()
+        pocket_voice = None
 
+    clone_id = (voice_clone_id or "").strip() or None
+    clone_path = (pocket_voice_path or "").strip() or None
+    use_pocket = bool(clone_id and clone_path)
     return ResolvedTtsVoice(
         google_language_code=glang,
         google_voice_name=gname,
-        model_id=None,  # Google TTS only; no model concept
+        model_id=None,
+        provider="pocket" if use_pocket else "google",
+        voice_clone_id=clone_id if use_pocket else None,
+        pocket_voice_path=clone_path if use_pocket else None,
+        pocket_voice=pocket_voice,
     )
 
 

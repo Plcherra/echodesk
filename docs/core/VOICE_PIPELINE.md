@@ -1,6 +1,8 @@
 # Voice pipeline
 
-Implementation: `backend/voice/pipeline.py` (Deepgram → Grok → Google TTS). WebSocket entry: `backend/voice/handler.py` → `run_voice_pipeline`.
+Implementation: `backend/voice/pipeline.py` (Deepgram → Grok → TTS). WebSocket entry: `backend/voice/handler.py` → `run_voice_pipeline`.
+
+Live TTS default is **Google Neural2**. If the receptionist has **`voice_clone_id`**, `resolve_tts_voice` sets `provider=pocket` and `tts_facade` calls the localhost Pocket sidecar (`backend/voice/pocket_tts.py`). Pocket failure falls back to the Google preset.
 
 ## Turn lifecycle
 

@@ -53,8 +53,13 @@ class Settings(BaseSettings):
     deepgram_utterance_end_ms: int = 1000  # Env: DEEPGRAM_UTTERANCE_END_MS
     grok_api_key: str = ""
 
-    # TTS provider: google (Google Cloud Text-to-Speech only)
+    # TTS provider: google remains the live default. Pocket is clone-only until Phase 6.
     tts_provider: str = "google"  # Env: TTS_PROVIDER
+    pocket_tts_enabled: bool = False  # Env: POCKET_TTS_ENABLED
+    pocket_tts_url: str = "http://127.0.0.1:8100"  # Env: POCKET_TTS_URL
+    pocket_tts_timeout_seconds: float = 30.0  # Env: POCKET_TTS_TIMEOUT_SECONDS
+    pocket_tts_concurrency: int = 2  # Env: POCKET_TTS_CONCURRENCY (sidecar cap; client logs only)
+    pocket_tts_voices_dir: str = "/opt/echodesk/voices"  # Env: POCKET_TTS_VOICES_DIR
     # Google Cloud TTS (ADC or GOOGLE_APPLICATION_CREDENTIALS)
     google_tts_voice_allowlist: str = ""  # Comma-separated voice names; empty = derive from presets + default
     google_tts_default_language_code: str = "en-US"  # Env: GOOGLE_TTS_DEFAULT_LANGUAGE_CODE

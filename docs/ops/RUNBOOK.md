@@ -98,6 +98,29 @@ Verification failures log **`client_ip`** (structured) — grep **`Telnyx webhoo
 - **Recording:** **`available`** must not regress to **`processing`** on hangup finalize (see tests around **`cdr_webhook`**); **`call.recording.saved`** should persist **`recording_url`** when Telnyx provides one.
 - **Post-booking:** Deterministic post-booking reply or LLM path must not exit without audio when a response is required; errors still hit the generic apology TTS path with a logged **`[turn] TTS started … (error_apology)`**.
 
+## Pocket TTS voice clones (hybrid)
+
+Pocket is a **localhost sidecar** on the shared Clarity + EchoDesk VPS (`127.0.0.1:8100`). Google Neural2 remains the default for presets.
+
+**Fallback:** clone synth failure or unhealthy sidecar → one spoken notice (“using a backup voice for a minute”) then Google preset for the rest of the call. Logs: **`[TTS_METER]`** (`provider`, `chars`, `synth_ms`, `cache_hit`, `fallback_used`), **`pocket_fallback_used`**, **`pocket_fallback_spike`**.
+
+**Health:** `GET /api/health` includes **`pocket_tts`** only when **`POCKET_TTS_ENABLED=true`**.
+
+**Sidecar (user `echodesk`, no public bind):**
+
+```bash
+sudo systemctl status pocket-tts --no-pager
+curl -fsS http://127.0.0.1:8100/health
+```
+
+Install / relocate from the Phase 0 spike: `sudo bash deploy/scripts/install-pocket-tts.sh`.
+Unit: `deploy/systemd/pocket-tts.service`. Files: `/opt/echodesk/pocket-tts`, clones: `/opt/echodesk/voices`.
+HF token: `/opt/echodesk/pocket-tts/hf.env` (mode 600). Do not put `HF_TOKEN` in the EchoDesk app `.env`.
+
+**Disk growth:** embeddings are ~6MB each under `POCKET_TTS_VOICES_DIR/{user_id}/`. Delete clones via the mobile API; the sidecar removes the file. Audit leftover `.safetensors` if users churn.
+
+**Cloning gated:** accept https://huggingface.co/kyutai/pocket-tts and set **`HF_TOKEN`** on the sidecar, then restart. Until then, catalog/safetensors playback works; `POST /export-voice` returns 503.
+
 ## No response from the assistant
 
 **Where to look**

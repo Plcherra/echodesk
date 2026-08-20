@@ -54,6 +54,9 @@ class WizardFormData {
   String? voiceId;
   /// Curated voice preset key (e.g. friendly_warm). Sent as voice_preset_key; backend resolves to voice_id.
   String? voicePresetKey;
+  /// Optional Pocket clone. When set, live TTS uses the cloned voice; preset stays as Google fallback.
+  String? voiceCloneId;
+  String? voiceCloneLabel;
   String? assistantIdentity;
   List<StaffItem> staff;
   List<ServiceItem> services;
@@ -80,6 +83,8 @@ class WizardFormData {
     this.greeting,
     this.voiceId,
     this.voicePresetKey = 'friendly_warm',
+    this.voiceCloneId,
+    this.voiceCloneLabel,
     this.assistantIdentity,
     List<StaffItem>? staff,
     List<ServiceItem>? services,
@@ -116,6 +121,9 @@ class WizardFormData {
     }
     if (greeting != null && greeting!.trim().isNotEmpty) body['greeting'] = greeting!.trim();
     if (voicePresetKey != null && voicePresetKey!.trim().isNotEmpty) body['voice_preset_key'] = voicePresetKey!.trim();
+    if (voiceCloneId != null && voiceCloneId!.trim().isNotEmpty) {
+      body['voice_clone_id'] = voiceCloneId!.trim();
+    }
     if (phoneStrategy == 'new') {
       body['area_code'] = areaCode ?? '212';
     }

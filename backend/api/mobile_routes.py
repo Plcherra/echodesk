@@ -63,6 +63,7 @@ from api.mobile.settings import router as settings_router
 from api.mobile.communication import router as communication_router
 from api.mobile.businesses import router as businesses_router
 from api.mobile.number_transfers import router as number_transfers_router
+from api.mobile.voice_clones import assert_owned_clone, router as voice_clones_router
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/mobile", tags=["mobile"])
@@ -151,6 +152,7 @@ router.include_router(communication_router)
 router.include_router(businesses_router)
 router.include_router(agenda_router)
 router.include_router(number_transfers_router)
+router.include_router(voice_clones_router)
 
 
 def _require_auth(request: Request) -> tuple[dict | None, Any]:
@@ -863,6 +865,11 @@ async def create_receptionist(request: Request):
     greeting = (body.get("greeting") or "").strip() or None
     raw_voice_id = (body.get("voice_id") or "").strip() or None  # legacy/admin only
     voice_preset_key = (body.get("voice_preset_key") or "").strip() or None
+    voice_clone_id = (body.get("voice_clone_id") or "").strip() or None
+    if voice_clone_id:
+        clone_err = assert_owned_clone(supabase, user["id"], voice_clone_id)
+        if clone_err:
+            return JSONResponse({"error": clone_err}, status_code=400)
 
     # Validate/coerce preset key:
     # - valid key -> use it
@@ -1099,6 +1106,7 @@ async def create_receptionist(request: Request):
         "greeting": greeting,
         "voice_id": voice_id,
         "voice_preset_key": voice_preset_key,
+        "voice_clone_id": voice_clone_id,
         "assistant_identity": assistant_identity,
         "bookable_hours": bookable_hours,
     }
@@ -1236,7 +1244,7 @@ async def get_receptionist(request: Request, receptionist_id: str):
     r = supabase.table("receptionists").select(
         "id, name, phone_number, inbound_phone_number, calendar_id, status, mode, "
         "website_url, extra_instructions, payment_settings, created_at, "
-        "system_prompt, greeting, voice_id, voice_preset_key, assistant_identity"
+        "system_prompt, greeting, voice_id, voice_preset_key, voice_clone_id, assistant_identity"
     ).eq("id", receptionist_id).single().execute()
     if not r.data:
         return JSONResponse({"error": "Receptionist not found"}, status_code=404)
@@ -1437,6 +1445,16 @@ async def update_receptionist(request: Request, receptionist_id: str):
             updates["voice_preset_key"] = None
     elif "voice_id" in body:
         updates["voice_id"] = (body["voice_id"] or "").strip() or None
+    if "voice_clone_id" in body:
+        raw_clone = body.get("voice_clone_id")
+        if raw_clone is None or (isinstance(raw_clone, str) and not raw_clone.strip()):
+            updates["voice_clone_id"] = None
+        else:
+            clone_id = str(raw_clone).strip()
+            clone_err = assert_owned_clone(supabase, user["id"], clone_id)
+            if clone_err:
+                return JSONResponse({"error": clone_err}, status_code=400)
+            updates["voice_clone_id"] = clone_id
     if "assistant_identity" in body:
         updates["assistant_identity"] = (body["assistant_identity"] or "").strip() or None
 

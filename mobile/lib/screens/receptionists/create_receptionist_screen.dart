@@ -14,6 +14,7 @@ import '../../config/env.dart';
 import '../../services/api_client.dart';
 import '../../strings.dart';
 import '../../widgets/bookable_hours_editor.dart';
+import '../../widgets/voice_clone_section.dart';
 
 const _steps = [
   'Basics',
@@ -1646,7 +1647,11 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                   ? Theme.of(context).colorScheme.primaryContainer
                   : null,
               child: InkWell(
-                onTap: () => setState(() => _formData.voicePresetKey = key),
+                onTap: () => setState(() {
+                  _formData.voicePresetKey = key;
+                  _formData.voiceCloneId = null;
+                  _formData.voiceCloneLabel = null;
+                }),
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -1695,6 +1700,18 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
               ),
             );
           }),
+        VoiceCloneSection(
+          selectedCloneId: _formData.voiceCloneId,
+          selectedCloneLabel: _formData.voiceCloneLabel,
+          onSelected: (id, label) => setState(() {
+            _formData.voiceCloneId = id;
+            _formData.voiceCloneLabel = label;
+          }),
+          onCleared: () => setState(() {
+            _formData.voiceCloneId = null;
+            _formData.voiceCloneLabel = null;
+          }),
+        ),
       ],
     );
   }
@@ -1729,6 +1746,9 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                 _ReviewRow(
                   'Voice',
                   () {
+                    if ((_formData.voiceCloneId ?? '').isNotEmpty) {
+                      return _formData.voiceCloneLabel ?? 'My voice';
+                    }
                     final found = _voicePresets
                         .where((p) => p['key'] == _formData.voicePresetKey);
                     return found.isEmpty

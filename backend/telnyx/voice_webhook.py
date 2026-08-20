@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 
 from config import settings
-from prompts.fetch import set_prompt, _build_from_supabase_sync
+from prompts.fetch import cache_prompt, _build_from_supabase_sync
 from quota import check_inbound_quota
 from supabase_client import create_service_role_client
 from telnyx.payload_utils import extract_call_control_id, extract_call_party_numbers
@@ -356,20 +356,17 @@ async def handle_voice_webhook(body: dict[str, Any], raw_body: bytes, headers: d
 
     # Pre-fetch and cache prompt, greeting, voice_id (precedence applied in fetch)
     try:
-        prompt, greeting, voice_id, voice_preset_key, greeting_source, assistant_identity = _build_from_supabase_sync(
+        prompt_data = _build_from_supabase_sync(
             receptionist_id,
             supabase,
         )
-        set_prompt(
+        cache_prompt(call_control_id, prompt_data)
+        logger.info(
+            "Prompt cached for call %s (voice_id=%s clone_id=%s)",
             call_control_id,
-            prompt,
-            greeting,
-            voice_id,
-            voice_preset_key,
-            greeting_source,
-            assistant_identity,
+            "custom" if prompt_data.voice_id else "env_default",
+            prompt_data.voice_clone_id,
         )
-        logger.info("Prompt cached for call %s (voice_id=%s)", call_control_id, "custom" if voice_id else "env_default")
     except Exception as e:
         logger.warning("Prompt pre-fetch failed: %s", e)
 
