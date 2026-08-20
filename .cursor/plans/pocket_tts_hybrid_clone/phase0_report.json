@@ -1,0 +1,73 @@
+{
+  "quantize": false,
+  "steps": [],
+  "load_model_ms": 6996.4,
+  "sample_rate": 24000,
+  "has_voice_cloning": false,
+  "alba_state_ms": 1074.9,
+  "warm_first_chunk_ms": {
+    "n": 5,
+    "min": 251.0,
+    "median": 293.5,
+    "mean": 329.3,
+    "max": 484.2
+  },
+  "warm_total_ms": {
+    "min": 2439.2,
+    "median": 2555.7,
+    "mean": 2579.1,
+    "max": 2732.7
+  },
+  "export_alba_ms": 29.2,
+  "reload_alba_safetensors_ms": 2.2,
+  "clone_source": "alba_safetensors",
+  "clone_wav": {
+    "path": "/home/rex/pocket-tts-spike/voices/announcer.wav",
+    "ok": false,
+    "error": "We could not download the weights for the model with voice cloning, but you're trying to use voice cloning. Without voice cloning, you can use our catalog of voices ['cosette', 'marius', 'javert', 'alba', 'jean', 'anna', 'vera', 'fantine', 'charles', 'paul', 'eponine', 'azelma', 'george', 'mary', 'jane', 'michael', 'eve', 'bill_boerst', 'peter_yearsley', 'stuart_bell', 'caro_davy', 'giovanni', 'lola', 'juergen', 'rafael', 'estelle']. If you want access to the model with voice cloning, go to https://huggingface.co/kyutai/pocket-tts and accept the terms, then make sure you're logged in locally with `uvx hf auth login`."
+  },
+  "mp3_bytes": 38180,
+  "synth_phone_text_ms": 4243.8,
+  "mulaw_convert_ms": 4.4,
+  "wav_24k_bytes": 226604,
+  "mulaw_8k_bytes": 37760,
+  "phone_wav_bytes": 75564,
+  "audio_duration_s": 4.72,
+  "rtf": 0.899,
+  "concurrency_locked_single_model": {
+    "1": {
+      "workers": 1,
+      "wall_ms": 3466.2,
+      "per_request_wait_ms": [
+        3464.8
+      ],
+      "max_wait_ms": 3464.8
+    },
+    "2": {
+      "workers": 2,
+      "wall_ms": 7987.3,
+      "per_request_wait_ms": [
+        3768.9,
+        7977.7
+      ],
+      "max_wait_ms": 7977.7
+    },
+    "4": {
+      "workers": 4,
+      "wall_ms": 15871.9,
+      "per_request_wait_ms": [
+        3865.9,
+        8752.0,
+        12354.6,
+        15845.8
+      ],
+      "max_wait_ms": 15845.8
+    }
+  },
+  "go_no_go": {
+    "warm_first_chunk_under_400ms": true,
+    "median_first_chunk_ms": 293.5,
+    "recommended_concurrency_cap": 2,
+    "reason": "Pocket generate_audio is not thread-safe; cap concurrent synths at 2 on the shared 12 vCPU box so Clarity Rex + EchoDesk keep headroom. First-chunk PASS vs 400ms budget."
+  }
+}
