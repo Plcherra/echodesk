@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     # TTS provider: google remains the live default. Pocket is clone-only until Phase 6.
     tts_provider: str = "google"  # Env: TTS_PROVIDER
     pocket_tts_enabled: bool = False  # Env: POCKET_TTS_ENABLED
+    # Product switch: hide/pause "Use my voice" even if the sidecar is still running.
+    voice_clone_enabled: bool = False  # Env: VOICE_CLONE_ENABLED
     pocket_tts_url: str = "http://127.0.0.1:8100"  # Env: POCKET_TTS_URL
     pocket_tts_timeout_seconds: float = 30.0  # Env: POCKET_TTS_TIMEOUT_SECONDS
     pocket_tts_concurrency: int = 2  # Env: POCKET_TTS_CONCURRENCY (sidecar cap; client logs only)

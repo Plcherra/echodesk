@@ -20,7 +20,20 @@ def test_resolve_preset_stays_google() -> None:
     assert voice.pocket_voice is None
 
 
-def test_resolve_clone_wins_when_path_set() -> None:
+def test_resolve_clone_paused_stays_google() -> None:
+    voice = resolve_tts_voice(
+        "professional_calm",
+        None,
+        voice_clone_id="clone-1",
+        pocket_voice_path="/opt/echodesk/voices/u1/clone-1.safetensors",
+    )
+    assert voice.provider == "google"
+    assert voice.voice_clone_id is None
+    assert voice.google_voice_name == "en-US-Neural2-C"
+
+
+def test_resolve_clone_wins_when_path_set(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "voice_clone_enabled", True)
     voice = resolve_tts_voice(
         "professional_calm",
         None,

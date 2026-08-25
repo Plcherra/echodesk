@@ -1,4 +1,5 @@
 /// Wizard form data for creating a receptionist (matches AddReceptionistWizardModal)
+import '../config/env.dart';
 import 'bookable_hours.dart';
 
 class StaffItem {
@@ -121,7 +122,9 @@ class WizardFormData {
     }
     if (greeting != null && greeting!.trim().isNotEmpty) body['greeting'] = greeting!.trim();
     if (voicePresetKey != null && voicePresetKey!.trim().isNotEmpty) body['voice_preset_key'] = voicePresetKey!.trim();
-    if (voiceCloneId != null && voiceCloneId!.trim().isNotEmpty) {
+    if (Env.voiceCloneEnabled &&
+        voiceCloneId != null &&
+        voiceCloneId!.trim().isNotEmpty) {
       body['voice_clone_id'] = voiceCloneId!.trim();
     }
     if (phoneStrategy == 'new') {

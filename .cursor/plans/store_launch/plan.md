@@ -9,7 +9,7 @@ Work one phase at a time. **Do not start the next phase until that phase’s tes
 | Distribution | **Play Store + App Store only**, when the app is fully ready. No TestFlight / beta program as a launch gate |
 | Customer surface at launch | **Mobile app**. Website is marketing + download + legal |
 | Web app | **After launch** — same product in the browser later. Not in this plan |
-| Voices | **Presets (Google) + optional clone (Pocket)** on the same Step 5 / settings screen |
+| Voices | **Google presets only at launch.** Pocket “Use my voice” is **paused** (code stays; UI hidden; live calls ignore `voice_clone_id`) |
 | TTS default | Google Neural2 presets stay default. Do not claim we replaced Google |
 | SMS / WhatsApp | Stay **Coming soon** |
 | Unify presets onto Pocket | Deferred until ~10 paying customers + metering (Pocket plan Phase 6) |
@@ -20,7 +20,7 @@ Work one phase at a time. **Do not start the next phase until that phase’s tes
 Stranger hits echodesk.us
   → Get the app (Store)
   → Create account in the app
-  → Calendar → receptionist (preset or optional clone) → number
+  → Calendar → receptionist (Google preset) → number
   → Real inbound call works
 Only then is EchoDesk launched.
 ```
@@ -36,7 +36,7 @@ Only then is EchoDesk launched.
 - Trial offer: 14 days / 60 minutes / first 100 — **2 claimed, 98 left**
 - Pocket sidecar `127.0.0.1:8100`, cloning weights loaded, concurrency 2
 - App checkout: auth, onboarding, billing, receptionist wizard, calendar, calls
-- Step 5 already has preset cards **and** `VoiceCloneSection` (“Use my voice”)
+- Step 5 has preset cards. **Use my voice is hidden** (`VOICE_CLONE_ENABLED=false`)
 - Launch Batch 1 (pricing, SMS/WhatsApp coming soon) shipped
 
 **Live test notes (2026-08-25, Carlo, production)**
@@ -48,16 +48,15 @@ Only then is EchoDesk launched.
   - **Appointments → Needs review** (generic bookings are under review, not Upcoming)
   - Wed Aug 26, **12:00–12:30 PM** EDT, summary “Appointment”
   - Earlier tonight (preset path) also booked **3:00–3:30 PM** EDT the same day — same Needs review tab
-- **Still untested for Phase 2:** Pocket-down fallback (stop sidecar → backup Google voice + one notice), settings clone ↔ preset switch, file-upload clone.
+- **2026-08-25 decision:** Pause Pocket for launch. Do not spend more time on clone quality, latency, or Pocket-down fallback. Resume after stores are live.
 
 **Gaps this plan closes**
 
 1. A stranger cannot install or sign up (get-started still says run `./run_prod.sh`)
 2. Live inbound call with a **preset** has been exercised; first-reply delay is deferred
-3. Live inbound **clone** speech works; Pocket-down fallback and spoken booking confirmation still open
-4. Landing does not mention optional clone
-5. Store packaging (version, signing, listings, screenshots) is not done
-6. Ops leftovers: leftover VPS tree; held-number cron exists but is never scheduled (deleted DIDs sit for weeks)
+3. Landing still has repo / run_prod get-started copy
+4. Store packaging (version, signing, listings, screenshots) is not done
+5. Ops leftovers: leftover VPS tree; held-number cron exists but is never scheduled (deleted DIDs sit for weeks)
 
 **Out of this plan**
 
@@ -65,6 +64,7 @@ Only then is EchoDesk launched.
 - Replacing Google presets with Pocket
 - Turning on SMS / WhatsApp
 - TestFlight-as-required-beta
+- **Pocket / Use my voice** — paused until after launch (`VOICE_CLONE_ENABLED`)
 
 ---
 
@@ -113,60 +113,39 @@ After code changes, stop and wait for the test gate.
 
 ---
 
-## Phase 2 — Prove clone beside presets
+## Phase 2 — Prove clone beside presets — **PAUSED (after launch)**
 
-**Goal:** Optional “Use my voice” works on the same Step 5 / settings screen as presets. Clone calls speak; if Pocket dies, the caller still hears a stock Google voice plus one short notice.
+**Goal (later):** Optional “Use my voice” on Step 5 / settings. Not a launch gate.
 
-Already built. This phase is **test + fix**, not a new wizard step.
+**Do not work this phase now.** Code stays. Flip `VOICE_CLONE_ENABLED` (app dart-define + backend env) when we resume. Keep the old clone test list in git history; do not treat it as a launch gate.
 
-### Tasks
-
-- [ ] On the same release build, create or edit a receptionist and use **Use my voice**
-- [ ] Record ~5–20s quiet speech **and** try file upload
-- [ ] Consent required (reject without it)
-- [ ] Preview plays before save
-- [ ] Selecting a preset clears the clone; selecting a clone keeps last preset as fallback metadata
-- [ ] Live inbound call uses Pocket (check `[TTS_METER]` / logs: `provider=pocket`)
-- [ ] Stop `pocket-tts`, call again: spoken notice once, then Google preset — never silence
-- [ ] Start `pocket-tts` again; health returns `pocket_tts: ok`
-
-### Test gate — all must pass
-
-- [ ] New user can finish onboarding **without** cloning (Phase 1 still holds)
-- [ ] Step 5 shows presets **and** Use my voice
-- [ ] Clone → preview → bind → inbound call sounds like the sample (phone quality OK)
-- [ ] Settings can switch clone ↔ preset without recreating the receptionist
-- [ ] Pocket down → backup voice + notice, call continues
-- [ ] Logs distinguish Google vs Pocket (chars, ms, `fallback_used`)
-
-**Exit:** Voices are launch-ready. Do not add a separate “clone onboarding” step.
+**Exit for launch:** Skip. Preset path is enough.
 
 ---
 
 ## Phase 3 — Website copy (app-only, no web signup)
 
-**Goal:** echodesk.us matches the product you are about to put on the stores. No repo commands. No web app. Mention optional clone.
+**Goal:** echodesk.us matches the product you are about to put on the stores. No repo commands. No web app. **Do not mention voice clone.**
 
 ### Tasks
 
-- [ ] Landing: keep five professional voices; add **optional: use your own voice**
+- [ ] Landing: keep five professional voices only
 - [ ] Do **not** say we replaced Google TTS or that there is one unified engine
 - [ ] Rewrite `/get-started`:
   - Remove `./run_prod.sh` / “no web signup yet” / Mac-from-repo steps
   - Copy: create the account **in the EchoDesk app**
   - Buttons: App Store + Play (placeholder URLs until Phase 7) + “Open app” deep link + support email
-- [ ] Short support note (Help screen and/or get-started): quiet room, 5–20s, no music; if clone drops to a stock voice, that is expected during a VPS issue
 - [ ] Deploy landing (`DEPLOY_LANDING=1` / `deploy-landing.sh`)
 
 ### Test gate
 
-- [ ] echodesk.us homepage mentions optional clone without overclaiming
+- [ ] echodesk.us homepage does **not** mention clone / “use your own voice”
 - [ ] `/get-started?plan=trial` (and starter/growth/business) has **no** git/run_prod instructions
 - [ ] Primary CTAs are store download (or “listing soon” + email) — not a web signup form
 - [ ] Privacy / Terms / Opt-in still reachable
 - [ ] Support email is `echodesk2@gmail.com`
 
-**Exit:** A stranger understands: download the app, optional clone exists, no browser product yet.
+**Exit:** A stranger understands: download the app, pick a professional voice, no browser product yet.
 
 ---
 
@@ -180,8 +159,8 @@ Already built. This phase is **test + fix**, not a new wizard step.
 
 - [ ] Bump `mobile/pubspec.yaml` version (not `1.0.0+1`)
 - [ ] Production dart-defines baked in
-- [ ] Screenshots + short description + full description (voices: presets + optional clone)
-- [ ] Privacy nutrition / data-safety forms match what the app actually does (account, calendar, mic for optional clone, call recordings, payments)
+- [ ] Screenshots + short description + full description (voices: **presets only**)
+- [ ] Privacy nutrition / data-safety forms match what the app actually does (account, calendar, call recordings, payments). Mic is not required while clone is paused.
 
 **Android (`com.echodesk.mobile`)**
 
@@ -198,9 +177,9 @@ Already built. This phase is **test + fix**, not a new wizard step.
 
 ### Test gate
 
-- [ ] Release IPA installs on a device and hits production (Phase 1 + 2 smoke, shortened: signup + one preset call)
+- [ ] Release IPA installs on a device and hits production (Phase 1 smoke: signup + one preset call)
 - [ ] Release AAB / signed APK same smoke on Android
-- [ ] Mic permission copy is honest (clone only)
+- [ ] No “Use my voice” / clone copy in the listing or in-app create flow
 - [ ] Checkout return (`echodesk://checkout`) and email confirm return to the app
 - [ ] No debug/dev plan names in Settings billing
 
@@ -215,15 +194,14 @@ Already built. This phase is **test + fix**, not a new wizard step.
 ### Tasks
 
 - [ ] On the VPS: `sudo rm -rf /opt/echodesk/app.pre-reset-` (root-owned leftover from the Aug 20 reset)
-- [ ] Confirm `echodesk-backend` and `pocket-tts` enabled + active
+- [ ] Confirm `echodesk-backend` enabled + active (`pocket-tts` can stay installed; it is not a launch dependency)
 - [ ] Watch `SUPPORT_EMAIL` (`echodesk2@gmail.com`) for number-transfer “Under review” requests
-- [ ] Know the one-liner: if clone calls go stock, check `systemctl status pocket-tts` and `/api/health` `pocket_tts`
 - [ ] Confirm trial counter on the landing updates from `/api/public/trial-offer`
 
 ### Test gate
 
 - [ ] Leftover `app.pre-reset-` is gone
-- [ ] `https://echodesk.us/api/health` still `pocket_tts: ok`
+- [ ] `https://echodesk.us/api/health` still shows Google configured
 - [ ] Transfer request still emails ops (if you offer transfer at launch)
 
 **Exit:** Day-to-day ops is boring. Held-number automation is the next phase, not email-watching.
@@ -266,13 +244,12 @@ Do this **before** store submit. A paying customer who deletes a receptionist mu
 
 - [ ] Paste real App Store + Play URLs into `/get-started` and landing CTAs; redeploy landing
 - [ ] Submit iOS + Android
-- [ ] Answer review questions (mic = optional voice clone; calendar = booking; recordings = call history)
+- [ ] Answer review questions (calendar = booking; recordings = call history; no clone/mic story while paused)
 - [ ] After **Approved / Published**, run the stranger path below on a phone that never had a sideload
 
 ### Test gate — launch is done only when these pass
 
 - [ ] Phone with no repo: store install → Create account → trial or paid → calendar → receptionist (preset) → inbound call
-- [ ] Same phone: optional clone in Step 5 → inbound call
 - [ ] `/get-started` store buttons open the real listings
 - [ ] Trial spots decrement after a new trial claim
 - [ ] Support email reaches you
@@ -283,23 +260,21 @@ Do this **before** store submit. A paying customer who deletes a receptionist mu
 
 ## Acceptance criteria (all phases)
 
-1. New user completes onboarding **without** cloning.
-2. Step 5: pick a Google preset (default) **or** optionally clone.
-3. Test call with preset = Google path.
-4. Test call with clone = Pocket path.
-5. Pocket down = Google stock + one spoken notice, never silent.
-6. Stranger installs from a store, not from git.
-7. Website does not promise a web app or a Google-TTS replacement.
-8. Unused held numbers auto-release after 48 hours (hourly cron). Manual `POST /api/internal/phone-numbers/release` is fallback only.
+1. New user completes onboarding and picks a **Google preset**.
+2. Step 5 shows presets only. No “Use my voice”.
+3. Test call = Google path.
+4. Stranger installs from a store, not from git.
+5. Website does not promise a web app, a clone, or a Google-TTS replacement.
+6. Unused held numbers auto-release after 48 hours (hourly cron). Manual `POST /api/internal/phone-numbers/release` is fallback only.
 
 ---
 
 ## Suggested build order
 
 ```text
-Phase 1 preset call  →  Phase 2 clone call  →  Phase 3 website copy
-     →  Phase 4 store packages  →  Phase 5 ops
-     →  Phase 6 held-number cron  →  Phase 7 submit
+Phase 1 preset call  →  Phase 3 website copy  →  Phase 4 store packages
+     →  Phase 5 ops  →  Phase 6 held-number cron  →  Phase 7 submit
+Phase 2 clone / Pocket: after launch
 Web app: after launch, separate plan
 ```
 
@@ -310,12 +285,12 @@ Web app: after launch, separate plan
 | Phase | Status |
 |-------|--------|
 | 1 Prove preset path | In progress (live call done; first-reply delay deferred) |
-| 2 Prove clone path | In progress (clone create + inbound speech passed; quality/latency later; Pocket-down + spoken booking confirmation still open) |
+| 2 Prove clone path | **Paused — after launch** |
 | 3 Website copy | Not started |
 | 4 Store packaging | Not started |
 | 5 Ops watch | Not started |
 | 6 Held-number cron | Not started (endpoint exists; no VPS schedule) |
-| 7 Submit stores | Blocked on 1–6 |
+| 7 Submit stores | Blocked on 1, 3–6 (not 2) |
 | Web app | After launch — out of scope |
 
 ### Related

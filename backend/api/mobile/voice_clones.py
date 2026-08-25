@@ -91,6 +91,8 @@ async def create_voice_clone(
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     if not _truthy_consent(consent):
         return JSONResponse({"error": "Consent is required to clone your voice."}, status_code=400)
+    if not settings.voice_clone_enabled:
+        return JSONResponse({"error": "Voice cloning is paused."}, status_code=503)
     if not pocket_enabled():
         return JSONResponse({"error": "Voice cloning is not enabled on this server."}, status_code=503)
 

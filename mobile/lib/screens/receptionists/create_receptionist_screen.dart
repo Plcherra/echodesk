@@ -1700,18 +1700,19 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
               ),
             );
           }),
-        VoiceCloneSection(
-          selectedCloneId: _formData.voiceCloneId,
-          selectedCloneLabel: _formData.voiceCloneLabel,
-          onSelected: (id, label) => setState(() {
-            _formData.voiceCloneId = id;
-            _formData.voiceCloneLabel = label;
-          }),
-          onCleared: () => setState(() {
-            _formData.voiceCloneId = null;
-            _formData.voiceCloneLabel = null;
-          }),
-        ),
+        if (Env.voiceCloneEnabled)
+          VoiceCloneSection(
+            selectedCloneId: _formData.voiceCloneId,
+            selectedCloneLabel: _formData.voiceCloneLabel,
+            onSelected: (id, label) => setState(() {
+              _formData.voiceCloneId = id;
+              _formData.voiceCloneLabel = label;
+            }),
+            onCleared: () => setState(() {
+              _formData.voiceCloneId = null;
+              _formData.voiceCloneLabel = null;
+            }),
+          ),
       ],
     );
   }
@@ -1746,7 +1747,8 @@ class _CreateReceptionistScreenState extends State<CreateReceptionistScreen> {
                 _ReviewRow(
                   'Voice',
                   () {
-                    if ((_formData.voiceCloneId ?? '').isNotEmpty) {
+                    if (Env.voiceCloneEnabled &&
+                        (_formData.voiceCloneId ?? '').isNotEmpty) {
                       return _formData.voiceCloneLabel ?? 'My voice';
                     }
                     final found = _voicePresets

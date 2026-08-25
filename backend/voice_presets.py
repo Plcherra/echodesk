@@ -169,7 +169,7 @@ def resolve_tts_voice(
 
     clone_id = (voice_clone_id or "").strip() or None
     clone_path = (pocket_voice_path or "").strip() or None
-    use_pocket = bool(clone_id and clone_path)
+    use_pocket = bool(clone_id and clone_path and settings.voice_clone_enabled)
     return ResolvedTtsVoice(
         google_language_code=glang,
         google_voice_name=gname,

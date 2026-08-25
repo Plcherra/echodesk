@@ -4,6 +4,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../config/env.dart';
 import '../../../services/api_client.dart';
 import '../../../strings.dart';
 import '../../../theme/echodesk_theme.dart';
@@ -278,7 +279,9 @@ class _ReceptionistInstructionsTabState
             : _genericFollowupController.text.trim(),
       };
       if (_voicePresetKey != null) body['voice_preset_key'] = _voicePresetKey;
-      body['voice_clone_id'] = _voiceCloneId;
+      if (Env.voiceCloneEnabled) {
+        body['voice_clone_id'] = _voiceCloneId;
+      }
       final res = await ApiClient.patch(
         '/api/mobile/receptionists/${widget.receptionistId}',
         body: body,
@@ -352,7 +355,7 @@ class _ReceptionistInstructionsTabState
             contentPadding: EdgeInsets.zero,
             title: Text(
               () {
-                if ((_voiceCloneId ?? '').isNotEmpty) {
+                if (Env.voiceCloneEnabled && (_voiceCloneId ?? '').isNotEmpty) {
                   return _voiceCloneLabel ?? 'My voice';
                 }
                 final found =
@@ -371,25 +374,26 @@ class _ReceptionistInstructionsTabState
             ),
           ),
         ),
-        VoiceCloneSection(
-          compact: true,
-          selectedCloneId: _voiceCloneId,
-          selectedCloneLabel: _voiceCloneLabel,
-          onSelected: (id, label) {
-            setState(() {
-              _voiceCloneId = id;
-              _voiceCloneLabel = label;
-            });
-            _save();
-          },
-          onCleared: () {
-            setState(() {
-              _voiceCloneId = null;
-              _voiceCloneLabel = null;
-            });
-            _save();
-          },
-        ),
+        if (Env.voiceCloneEnabled)
+          VoiceCloneSection(
+            compact: true,
+            selectedCloneId: _voiceCloneId,
+            selectedCloneLabel: _voiceCloneLabel,
+            onSelected: (id, label) {
+              setState(() {
+                _voiceCloneId = id;
+                _voiceCloneLabel = label;
+              });
+              _save();
+            },
+            onCleared: () {
+              setState(() {
+                _voiceCloneId = null;
+                _voiceCloneLabel = null;
+              });
+              _save();
+            },
+          ),
         const SizedBox(height: EchoDeskSpacing.md),
         _SettingsSection(
           title: 'Extra notes',

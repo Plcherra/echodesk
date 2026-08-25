@@ -54,6 +54,16 @@ class Env {
     return 'https://echodesk.us/auth/callback';
   }
 
+  /// Optional Pocket “Use my voice”. Off for store launch; flip later with
+  /// `--dart-define=VOICE_CLONE_ENABLED=true` plus backend `VOICE_CLONE_ENABLED`.
+  static bool get voiceCloneEnabled {
+    const env = String.fromEnvironment('VOICE_CLONE_ENABLED', defaultValue: '');
+    final value = env.isNotEmpty
+        ? env
+        : (_localOverrides['VOICE_CLONE_ENABLED'] ?? '');
+    return value.toLowerCase() == 'true' || value == '1';
+  }
+
   static bool get googleAuthEnabled {
     const env = String.fromEnvironment(
       'GOOGLE_AUTH_ENABLED',

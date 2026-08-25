@@ -35,7 +35,8 @@ Loaded via Pydantic **`Settings`** in `backend/config.py` from project root **`.
 | **`GOOGLE_APPLICATION_CREDENTIALS`** | Path to service account JSON for **Text-to-Speech** (and other Google APIs using ADC). | `/secrets/tts.json` | Missing/invalid → startup validation failure (unless skip flag). |
 | **`GOOGLE_CLIENT_ID`**, **`GOOGLE_CLIENT_SECRET`**, **`GOOGLE_REDIRECT_URI`** / **`NEXT_PUBLIC_GOOGLE_REDIRECT_URI`** | OAuth for user calendar linking. | | Wrong redirect → OAuth errors in app (not voice stream). |
 | **`TTS_PROVIDER`** | Live default remains **`google`**. Do not flip to Pocket before Phase 6. | `google` | Changing this does not route clones; clones use **`POCKET_TTS_ENABLED`**. |
-| **`POCKET_TTS_ENABLED`** | When true, receptionists with **`voice_clone_id`** synthesize via the localhost Pocket sidecar. Presets stay on Google. | `false` | Enable only after the sidecar is healthy. |
+| **`VOICE_CLONE_ENABLED`** | Product switch for “Use my voice”. **Off for store launch.** When false, clone UI stays hidden and live calls ignore `voice_clone_id` (Google preset only). | `false` | Turn on later with `POCKET_TTS_ENABLED` after clone quality is launch-ready. |
+| **`POCKET_TTS_ENABLED`** | When true, receptionists with **`voice_clone_id`** synthesize via the localhost Pocket sidecar. Presets stay on Google. | `false` | Enable only after the sidecar is healthy **and** `VOICE_CLONE_ENABLED` is true. |
 | **`POCKET_TTS_URL`** | Sidecar origin (localhost only). | `http://127.0.0.1:8100` | Must not be public. |
 | **`POCKET_TTS_TIMEOUT_SECONDS`** | HTTP timeout for sidecar synth / export. | `30` | Too low → clone fallback to Google. |
 | **`POCKET_TTS_CONCURRENCY`** | Documented cap (sidecar enforces). Start at **2** on the shared 12 vCPU box. | `2` | Higher values starve Clarity Rex. |
