@@ -85,6 +85,51 @@ async def test_facade_routes_clone_to_pocket(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_force_google_skips_pocket_for_recording_notice(monkeypatch) -> None:
+    pocket_called = {"value": False}
+
+    async def fake_pocket(*_args, **_kwargs) -> bytes:
+        pocket_called["value"] = True
+        raise AssertionError("Pocket must not synthesize the recording notice")
+
+    async def fake_google(text: str, voice: ResolvedTtsVoice, *, use_backup_voice: bool = False) -> bytes:
+        return b"g" * 1600
+
+    async def healthy() -> bool:
+        return True
+
+    monkeypatch.setattr(tts_facade, "_pocket_synthesize_to_mulaw", fake_pocket)
+    monkeypatch.setattr(tts_facade, "_google_synthesize_to_mulaw", fake_google)
+    monkeypatch.setattr(tts_facade, "pocket_enabled", lambda: True)
+    monkeypatch.setattr(tts_facade, "_pocket_is_healthy", healthy)
+
+    config = {
+        "resolved_tts_voice": ResolvedTtsVoice(
+            google_language_code="en-US",
+            google_voice_name="en-US-Neural2-C",
+            model_id=None,
+            provider="pocket",
+            voice_clone_id="clone-1",
+            pocket_voice_path="/voices/u/c.safetensors",
+        ),
+        "tts_state": {"requests": 0, "chars": 0},
+    }
+    sent: list[bytes] = []
+
+    async def on_audio(chunk: bytes) -> None:
+        sent.append(chunk)
+
+    await tts_facade.generate_and_send_tts(
+        "This call may be recorded.",
+        config,
+        on_audio,
+        force_google=True,
+    )
+    assert pocket_called["value"] is False
+    assert sent and sent[0].startswith(b"g")
+
+
+@pytest.mark.asyncio
 async def test_facade_falls_back_to_google_on_pocket_failure(monkeypatch) -> None:
     async def boom(*_args, **_kwargs) -> bytes:
         raise PocketTtsError("down")

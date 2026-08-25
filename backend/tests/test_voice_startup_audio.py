@@ -6,6 +6,7 @@ import pytest
 
 from config import settings
 from voice import pipeline
+from voice_presets import ResolvedTtsVoice
 
 
 @pytest.mark.asyncio
@@ -67,6 +68,55 @@ async def test_startup_audio_can_keep_consent_and_greeting_separate(monkeypatch)
 
     assert [c["label"] for c in calls] == ["consent", "greeting"]
     assert [c["text"] for c in calls] == ["This call may be recorded.", "Hello."]
+    assert consent_marked["value"] is True
+
+
+@pytest.mark.asyncio
+async def test_pocket_startup_plays_consent_on_google_then_clone_greeting(monkeypatch):
+    calls: list[dict[str, Any]] = []
+    consent_marked = {"value": False}
+
+    async def fake_tts(text: str, config: dict, on_audio, on_error=None, **kwargs):
+        calls.append(
+            {
+                "text": text,
+                "label": kwargs.get("trace_label"),
+                "force_google": bool(kwargs.get("force_google")),
+                "prepared": kwargs.get("prepared_audio"),
+            }
+        )
+
+    async def on_consent_played():
+        consent_marked["value"] = True
+
+    monkeypatch.setattr(settings, "voice_combine_consent_and_greeting", True)
+    monkeypatch.setattr(pipeline, "generate_and_send_tts", fake_tts)
+
+    await pipeline._send_startup_audio(
+        {
+            "call_control_id": "call-clone",
+            "consent_phrase": "This call may be recorded.",
+            "greeting": "Thanks for calling, this is Carlo.",
+            "on_consent_played": on_consent_played,
+            "resolved_tts_voice": ResolvedTtsVoice(
+                google_language_code="en-US",
+                google_voice_name="en-US-Neural2-A",
+                model_id=None,
+                provider="pocket",
+                voice_clone_id="clone-1",
+                pocket_voice_path="/voices/c.safetensors",
+            ),
+        },
+        on_audio=lambda _chunk: None,
+        on_error=None,
+        tts_failure_logged=[False],
+    )
+
+    assert [c["label"] for c in calls] == ["consent", "greeting"]
+    assert calls[0]["force_google"] is True
+    assert calls[0]["text"] == "This call may be recorded."
+    assert calls[1]["force_google"] is False
+    assert calls[1]["text"] == "Thanks for calling, this is Carlo."
     assert consent_marked["value"] is True
 
 

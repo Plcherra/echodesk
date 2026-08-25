@@ -349,13 +349,20 @@ async def _synthesize_to_mulaw(
     voice: ResolvedTtsVoice,
     *,
     receptionist_id: str | None = None,
+    force_google: bool = False,
 ) -> tuple[bytes, str, bool]:
     """Return (audio, provider_used, fell_back).
 
     Clone voices use Pocket. If Pocket is unhealthy/fails, use the Google preset.
+    force_google is for fixed legal/system lines (recording notice), not clone speech.
     """
     chars = len(text)
-    if voice.provider == "pocket" and voice.pocket_voice_path and pocket_enabled():
+    if (
+        not force_google
+        and voice.provider == "pocket"
+        and voice.pocket_voice_path
+        and pocket_enabled()
+    ):
         healthy = await _pocket_is_healthy()
         if healthy:
             try:
@@ -408,6 +415,28 @@ def _billable_chars_plain(text: str) -> int:
     return tts_chars.plain_text_billable_chars(text)
 
 
+async def synthesize_to_mulaw_bytes(
+    text: str,
+    config: dict[str, Any],
+    *,
+    force_google: bool = False,
+) -> bytes:
+    """Synthesize without sending. Used to overlap clone greeting with the consent clip."""
+    voice: ResolvedTtsVoice | None = config.get("resolved_tts_voice")
+    if voice is None:
+        raise PocketTtsError("missing resolved_tts_voice")
+    prepared = _prepare_text_for_tts(text)
+    if not prepared.strip():
+        return b""
+    audio, _provider, _fell_back = await _synthesize_to_mulaw(
+        prepared,
+        voice,
+        receptionist_id=config.get("receptionist_id"),
+        force_google=force_google,
+    )
+    return audio
+
+
 async def generate_and_send_tts(
     text: str,
     config: dict[str, Any],
@@ -416,6 +445,8 @@ async def generate_and_send_tts(
     is_fallback: bool = False,
     _tts_failure_logged: Optional[list[bool]] = None,
     trace_label: str | None = None,
+    force_google: bool = False,
+    prepared_audio: bytes | None = None,
 ) -> None:
     """Generate TTS and send via callback (Google Cloud TTS + chunking)."""
     if not text or not text.strip():
@@ -498,11 +529,17 @@ async def generate_and_send_tts(
             tts_provider=voice.provider,
             clone_id=voice.voice_clone_id,
         )
-        audio, provider_used, pocket_fell_back = await _synthesize_to_mulaw(
-            use_text,
-            voice,
-            receptionist_id=config.get("receptionist_id"),
-        )
+        if prepared_audio:
+            audio = prepared_audio
+            provider_used = "google" if force_google else (voice.provider or "unknown")
+            pocket_fell_back = False
+        else:
+            audio, provider_used, pocket_fell_back = await _synthesize_to_mulaw(
+                use_text,
+                voice,
+                receptionist_id=config.get("receptionist_id"),
+                force_google=force_google,
+            )
         if pocket_fell_back:
             logger.warning(
                 "[TTS] pocket_fallback_used clone_id=%s google_voice=%s",

@@ -57,7 +57,12 @@ from voice.tool_dispatch import (
     make_calendar_tool_exec,
     normalize_tool_args,
 )
-from voice.tts_facade import generate_and_send_tts, interrupt_tts_playback, warm_tts_phrase_cache
+from voice.tts_facade import (
+    generate_and_send_tts,
+    interrupt_tts_playback,
+    synthesize_to_mulaw_bytes,
+    warm_tts_phrase_cache,
+)
 from voice.trace import mark_voice_event
 
 logger = logging.getLogger(__name__)
@@ -111,16 +116,60 @@ async def _maybe_mark_consent_played(config: dict[str, Any]) -> None:
         logger.warning("[voice/stream] on_consent_played callback failed: %s", e)
 
 
+def _startup_uses_pocket(config: dict[str, Any]) -> bool:
+    voice = config.get("resolved_tts_voice")
+    return getattr(voice, "provider", None) == "pocket"
+
+
 async def _send_startup_audio(
     config: dict[str, Any],
     on_audio: Callable[[bytes], Awaitable[None]],
     on_error: Optional[Callable[[Exception], None]],
     tts_failure_logged: list[bool],
+    greeting_prewarm: asyncio.Task | None = None,
 ) -> None:
     """Play startup consent/greeting in the fastest legally-safe shape."""
     consent_phrase = (config.get("consent_phrase") or "").strip()
     greeting = (config.get("greeting") or "").strip()
     has_consent_callback = callable(config.get("on_consent_played"))
+
+    # Clone synth of the combined notice+greeting is too slow: the caller hears
+    # silence, speaks first, then finally gets the recording policy. Play the
+    # fixed legal notice on cached Google audio immediately; clone greeting follows.
+    if _startup_uses_pocket(config) and consent_phrase and has_consent_callback:
+        mark_voice_event(
+            config.get("call_control_id"),
+            "startup_audio_consent_google_greeting_pocket",
+            chars=len(consent_phrase) + len(greeting),
+        )
+        await generate_and_send_tts(
+            consent_phrase,
+            config,
+            on_audio,
+            on_error,
+            _tts_failure_logged=tts_failure_logged,
+            trace_label="consent",
+            force_google=True,
+        )
+        await _maybe_mark_consent_played(config)
+        logger.info("[voice/stream] recording consent sent immediately; clone greeting follows")
+        if greeting:
+            prepared = None
+            if greeting_prewarm is not None:
+                try:
+                    prepared = await greeting_prewarm
+                except Exception as err:
+                    logger.warning("[voice/stream] pocket greeting prewarm failed: %s", err)
+            await generate_and_send_tts(
+                greeting,
+                config,
+                on_audio,
+                on_error,
+                _tts_failure_logged=tts_failure_logged,
+                trace_label="greeting",
+                prepared_audio=prepared or None,
+            )
+        return
 
     if consent_phrase and greeting and has_consent_callback and settings.voice_combine_consent_and_greeting:
         startup_text = f"{consent_phrase.rstrip()} {greeting.lstrip()}"
@@ -199,6 +248,10 @@ async def run_voice_pipeline(
     tts_state: dict[str, int] = {"requests": 0, "chars": 0}
     config["tts_state"] = tts_state
     config.setdefault("tts_provider", (settings.tts_provider or "google").strip().lower())
+    greeting_prewarm: asyncio.Task | None = None
+    greeting_text = (config.get("greeting") or "").strip()
+    if _startup_uses_pocket(config) and greeting_text:
+        greeting_prewarm = asyncio.create_task(synthesize_to_mulaw_bytes(greeting_text, config))
 
     offered_slots_state = new_offered_slots_state()
     voice_session = new_voice_session()
@@ -828,7 +881,13 @@ async def run_voice_pipeline(
     )
     mark_voice_event(config.get("call_control_id"), "deepgram_connected")
 
-    await _send_startup_audio(config, on_audio, on_error, tts_failure_logged)
+    await _send_startup_audio(
+        config,
+        on_audio,
+        on_error,
+        tts_failure_logged,
+        greeting_prewarm=greeting_prewarm,
+    )
     if settings.tts_warm_common_phrases:
         asyncio.create_task(warm_tts_phrase_cache(config))
 
@@ -840,6 +899,8 @@ async def run_voice_pipeline(
                 pass
 
     def stop() -> None:
+        if greeting_prewarm and not greeting_prewarm.done():
+            greeting_prewarm.cancel()
         if debounce_task and not debounce_task.done():
             debounce_task.cancel()
         if grok_task and not grok_task.done():
