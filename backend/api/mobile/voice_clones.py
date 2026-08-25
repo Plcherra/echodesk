@@ -45,7 +45,7 @@ def _friendly_export_error(err: PocketTtsError) -> str:
     if "Could not read that recording" in raw:
         return "Could not read that recording. Try Record again, or upload a WAV/MP3."
     if "export_voice_failed" in raw or "export-voice 502" in raw:
-        return "Could not clone that recording. Try a 5–20 second take in a quiet room."
+        return "Could not clone that recording. Try again, or record a new 5–30 second take."
     if "unreachable" in raw.lower() or "503" in raw or "gated" in raw.lower():
         return "Voice cloning is temporarily unavailable. Try again in a few minutes."
     return "Could not create voice clone. Try recording again."
@@ -97,7 +97,7 @@ async def create_voice_clone(
     filename = (audio.filename or "sample.wav").strip()
     suffix = ("." + filename.rsplit(".", 1)[-1].lower()) if "." in filename else ".wav"
     if suffix not in _ALLOWED_SUFFIXES:
-        return JSONResponse({"error": "Upload a short WAV or MP3 sample (5–20 seconds)."}, status_code=400)
+        return JSONResponse({"error": "Upload a short WAV or MP3 sample (5–30 seconds)."}, status_code=400)
 
     payload = await audio.read()
     if not payload or len(payload) > _MAX_AUDIO_BYTES:

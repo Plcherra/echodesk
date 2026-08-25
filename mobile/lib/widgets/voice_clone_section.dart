@@ -254,7 +254,7 @@ class _VoiceCloneSectionState extends State<VoiceCloneSection> {
     }
     final path = _localPath;
     if (path == null) {
-      setState(() => _error = 'Record or upload a 5–20 second sample first.');
+      setState(() => _error = 'Record or upload a 5–30 second sample first.');
       return;
     }
     setState(() => _busy = true);
@@ -361,7 +361,7 @@ class _VoiceCloneSectionState extends State<VoiceCloneSection> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Recording $_elapsedLabel — tap Stop when you finish (5–20 seconds).',
+                'Recording $_elapsedLabel — tap Stop when you finish (5–30 seconds).',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: scheme.onErrorContainer,
                       fontWeight: FontWeight.w600,
@@ -410,7 +410,7 @@ class _VoiceCloneSectionState extends State<VoiceCloneSection> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Record or upload 5–20 seconds in a quiet room. Skip to keep a professional voice.',
+              'Record or upload 5–30 seconds in a quiet room. Skip to keep a professional voice.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
