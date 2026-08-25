@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/api_client.dart';
 import '../../strings.dart';
+import '../../theme/echodesk_theme.dart';
+import '../../widgets/confirm_delete_account.dart';
 import '../../widgets/confirm_sign_out.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 
@@ -179,6 +181,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 0),
               trailing: const Icon(Icons.logout, size: 20),
               onTap: () => confirmSignOut(context),
+            ),
+            ListTile(
+              title: const Text('Delete account'),
+              subtitle: const Text('Permanently remove your account and data'),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+              titleTextStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: EchoDeskColors.danger,
+                    fontWeight: FontWeight.w600,
+                  ),
+              trailing: const Icon(
+                Icons.delete_outline,
+                size: 20,
+                color: EchoDeskColors.danger,
+              ),
+              onTap: () => confirmDeleteAccount(context),
             ),
           ],
         ),

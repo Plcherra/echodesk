@@ -43,6 +43,8 @@ class AppStrings {
       'Create a receptionist to keep this line. You can keep it, or get one extra number while this one is held for 48 hours.';
   static const pendingReleaseCta = 'Create receptionist';
   static const couldNotSaveSettings = "Couldn't save. Please try again.";
+  static const couldNotDeleteAccount =
+      "Couldn't delete your account. Please try again or email support.";
   static const callInitiated = "Call initiated";
   static const couldNotStartCall = "Couldn't start call. Please try again.";
   static const couldNotFetchWebsite = "Couldn't fetch website. Please try again.";

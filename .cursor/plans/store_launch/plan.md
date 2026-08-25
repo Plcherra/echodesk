@@ -111,6 +111,8 @@ After code changes, stop and wait for the test gate.
 
 **Exit:** Preset path is demo-safe. Clone is not required to pass this phase.
 
+Plain-language checklist (tap through before submit): `.cursor/plans/store_launch/manual_prelaunch_tests.md`
+
 ---
 
 ## Phase 2 — Prove clone beside presets — **PAUSED (after launch)**

@@ -63,6 +63,7 @@ from api.mobile.settings import router as settings_router
 from api.mobile.communication import router as communication_router
 from api.mobile.businesses import router as businesses_router
 from api.mobile.number_transfers import router as number_transfers_router
+from api.mobile.account import router as account_router
 from api.mobile.voice_clones import assert_owned_clone, router as voice_clones_router
 
 logger = logging.getLogger(__name__)
@@ -153,6 +154,7 @@ router.include_router(businesses_router)
 router.include_router(agenda_router)
 router.include_router(number_transfers_router)
 router.include_router(voice_clones_router)
+router.include_router(account_router)
 
 
 def _require_auth(request: Request) -> tuple[dict | None, Any]:
