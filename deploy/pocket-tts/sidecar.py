@@ -99,6 +99,12 @@ def _decode_to_wav(src: Path, dest: Path, *, sample_rate: int) -> Path:
             status_code=400,
             detail="Could not read that recording. Try Record again, or upload a WAV/MP3.",
         )
+    try:
+        with wave.open(str(dest), "rb") as wf:
+            seconds = wf.getnframes() / float(wf.getframerate() or 1)
+        logger.info("export-voice decoded src=%s seconds=%.1f", src.name, seconds)
+    except Exception as err:
+        logger.warning("export-voice wav inspect failed: %s", err)
     return dest
 
 

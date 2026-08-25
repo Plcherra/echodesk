@@ -10,6 +10,7 @@ import 'package:record/record.dart';
 
 import '../services/api_client.dart';
 import 'voice_clone_io.dart' if (dart.library.html) 'voice_clone_io_stub.dart';
+import 'voice_clone_player.dart';
 
 /// Optional “Use my voice” control for receptionist Step 5 and settings.
 class VoiceCloneSection extends StatefulWidget {
@@ -36,10 +37,12 @@ class _VoiceCloneSectionState extends State<VoiceCloneSection> {
   final _recorder = AudioRecorder();
   final _player = AudioPlayer();
   StreamSubscription<void>? _playerDone;
+  StreamSubscription<Duration>? _playerPos;
+  StreamSubscription<Duration>? _playerDur;
   Timer? _tick;
   bool _recording = false;
   bool _busy = false;
-  bool _playingSample = false;
+  bool _playing = false;
   bool _previewingClone = false;
   bool _consent = false;
   String? _error;
@@ -48,6 +51,8 @@ class _VoiceCloneSectionState extends State<VoiceCloneSection> {
   String? _pendingLabel;
   DateTime? _recordStartedAt;
   Duration _elapsed = Duration.zero;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
 
   bool get _canRecord =>
       !kIsWeb &&
@@ -62,9 +67,22 @@ class _VoiceCloneSectionState extends State<VoiceCloneSection> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _playerPos = _player.onPositionChanged.listen((p) {
+      if (mounted) setState(() => _position = p);
+    });
+    _playerDur = _player.onDurationChanged.listen((d) {
+      if (mounted && d > Duration.zero) setState(() => _duration = d);
+    });
+  }
+
+  @override
   void dispose() {
     _tick?.cancel();
     _playerDone?.cancel();
+    _playerPos?.cancel();
+    _playerDur?.cancel();
     _recorder.dispose();
     _player.dispose();
     super.dispose();
@@ -117,7 +135,10 @@ class _VoiceCloneSectionState extends State<VoiceCloneSection> {
           _recording = false;
           _localPath = resolved;
           _pendingCloneId = null;
+          _duration = _elapsed;
+          _position = Duration.zero;
         });
+        await _prepareSample(resolved);
       } catch (e) {
         _stopTicker();
         if (mounted) {
@@ -136,8 +157,9 @@ class _VoiceCloneSectionState extends State<VoiceCloneSection> {
       }
       await _player.stop();
       setState(() {
-        _playingSample = false;
+        _playing = false;
         _previewingClone = false;
+        _position = Duration.zero;
       });
       final dest = voiceCloneTempAudioPath();
       final ios = defaultTargetPlatform == TargetPlatform.iOS;
@@ -168,32 +190,81 @@ class _VoiceCloneSectionState extends State<VoiceCloneSection> {
     }
   }
 
-  Future<void> _playLocalSample() async {
+  Future<void> _prepareSample(String path) async {
+    try {
+      await _player.stop();
+      await _player.setSource(DeviceFileSource(path));
+      final d = await _player.getDuration();
+      if (!mounted) return;
+      setState(() {
+        _playing = false;
+        _previewingClone = false;
+        _position = Duration.zero;
+        if (d != null && d > Duration.zero) _duration = d;
+      });
+    } catch (_) {
+      // Slider still uses the recording timer as a fallback duration.
+    }
+  }
+
+  Future<void> _togglePlaySample() async {
     final path = _localPath;
     if (path == null) return;
     setState(() => _error = null);
     try {
-      if (_playingSample) {
-        await _player.stop();
-        if (mounted) setState(() => _playingSample = false);
+      if (_playing) {
+        await _player.pause();
+        if (mounted) setState(() => _playing = false);
         return;
       }
-      await _player.stop();
-      await _player.play(DeviceFileSource(path));
+      if (_previewingClone) {
+        await _player.stop();
+        await _player.setSource(DeviceFileSource(path));
+      }
+      await _player.resume();
       if (!mounted) return;
       setState(() {
-        _playingSample = true;
+        _playing = true;
         _previewingClone = false;
       });
-      _listenPlayerDone(() => setState(() => _playingSample = false));
-    } catch (_) {
-      if (mounted) {
+      _listenPlayerDone(() {
         setState(() {
-          _playingSample = false;
-          _error = 'Could not play the sample.';
+          _playing = false;
+          _position = Duration.zero;
         });
+      });
+    } catch (_) {
+      try {
+        await _player.play(DeviceFileSource(path));
+        if (!mounted) return;
+        setState(() {
+          _playing = true;
+          _previewingClone = false;
+        });
+        _listenPlayerDone(() {
+          setState(() {
+            _playing = false;
+            _position = Duration.zero;
+          });
+        });
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _playing = false;
+            _error = 'Could not play the sample.';
+          });
+        }
       }
     }
+  }
+
+  Future<void> _seekSample(Duration to) async {
+    final max = _duration;
+    final clamped = to > max ? max : (to < Duration.zero ? Duration.zero : to);
+    setState(() => _position = clamped);
+    try {
+      await _player.seek(clamped);
+    } catch (_) {}
   }
 
   Future<void> _pickFile() async {
@@ -220,7 +291,10 @@ class _VoiceCloneSectionState extends State<VoiceCloneSection> {
       _pendingCloneId = null;
       _pendingLabel = file.name;
       _elapsed = Duration.zero;
+      _position = Duration.zero;
+      _duration = Duration.zero;
     });
+    await _prepareSample(file.path!);
   }
 
   Future<void> _uploadBytes(Uint8List bytes, String filename) async {
@@ -319,10 +393,16 @@ class _VoiceCloneSectionState extends State<VoiceCloneSection> {
         );
         if (!mounted) return;
         setState(() {
-          _playingSample = false;
+          _playing = true;
           _previewingClone = true;
         });
-        _listenPlayerDone(() => setState(() => _previewingClone = false));
+        _listenPlayerDone(() {
+          setState(() {
+            _previewingClone = false;
+            _playing = false;
+            _position = Duration.zero;
+          });
+        });
       } else {
         Map<String, dynamic>? data;
         try {
@@ -373,21 +453,14 @@ class _VoiceCloneSectionState extends State<VoiceCloneSection> {
       );
     }
     if (_hasSample) {
-      final timeNote = _elapsed.inSeconds > 0 ? ' ($_elapsedLabel)' : '';
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: scheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          'Sample ready$timeNote. Play it back, then create the clone.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSecondaryContainer,
-                fontWeight: FontWeight.w600,
-              ),
-        ),
+      return VoiceCloneSamplePlayer(
+        position: _position,
+        duration: _duration > Duration.zero ? _duration : _elapsed,
+        playing: _playing,
+        onPlayPause: _togglePlaySample,
+        onSeek: _seekSample,
+        label: _previewingClone ? 'Clone preview' : 'Your sample',
+        enabled: !_busy,
       );
     }
     return const SizedBox.shrink();
@@ -443,12 +516,6 @@ class _VoiceCloneSectionState extends State<VoiceCloneSection> {
                     onPressed: _busy ? null : _toggleRecord,
                     icon: Icon(_recording ? Icons.stop : Icons.mic),
                     label: Text(_recording ? 'Stop $_elapsedLabel' : 'Record'),
-                  ),
-                if (_hasSample)
-                  OutlinedButton.icon(
-                    onPressed: _busy ? null : _playLocalSample,
-                    icon: Icon(_playingSample ? Icons.stop : Icons.play_arrow),
-                    label: Text(_playingSample ? 'Stop sample' : 'Play sample'),
                   ),
                 OutlinedButton.icon(
                   onPressed: _busy || _recording ? null : _pickFile,
