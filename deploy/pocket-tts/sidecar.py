@@ -67,6 +67,41 @@ def _to_mulaw_8k(pcm16: np.ndarray, src_rate: int) -> bytes:
     return audioop.lin2ulaw(pcm16.tobytes(), 2)
 
 
+def _decode_to_wav(src: Path, dest: Path, *, sample_rate: int) -> Path:
+    """Normalize any phone upload (m4a/aac/mp3/wav) to mono PCM WAV for Pocket."""
+    if not Path(FFMPEG).exists():
+        raise HTTPException(status_code=500, detail="ffmpeg not available")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.run(
+        [
+            FFMPEG,
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(src),
+            "-ac",
+            "1",
+            "-ar",
+            str(max(8000, int(sample_rate))),
+            "-sample_fmt",
+            "s16",
+            str(dest),
+        ],
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0 or not dest.is_file() or dest.stat().st_size < 800:
+        err = (proc.stderr or b"").decode("utf-8", errors="replace")[:300]
+        logger.warning("export-voice decode failed src=%s err=%s", src.name, err)
+        raise HTTPException(
+            status_code=400,
+            detail="Could not read that recording. Try Record again, or upload a WAV/MP3.",
+        )
+    return dest
+
+
 def _to_mp3(wav_bytes: bytes) -> bytes:
     if not Path(FFMPEG).exists():
         raise HTTPException(status_code=500, detail="ffmpeg not available for MP3")
@@ -193,10 +228,11 @@ async def export_voice(
                 "and set HF_TOKEN on the sidecar, then restart."
             ),
         )
-    suffix = Path(audio.filename or "sample.wav").suffix or ".wav"
+    suffix = Path(audio.filename or "sample.wav").suffix.lower() or ".wav"
     dest_dir = VOICES_DIR / user_id
     dest_dir.mkdir(parents=True, exist_ok=True)
     raw_path = dest_dir / f"{clone_id}{suffix}"
+    wav_path = dest_dir / f"{clone_id}.prompt.wav"
     dest_path = dest_dir / f"{clone_id}.safetensors"
     payload = await audio.read()
     if not payload or len(payload) > 8 * 1024 * 1024:
@@ -206,14 +242,17 @@ async def export_voice(
     try:
         from pocket_tts import export_model_state
 
-        state = model.get_state_for_audio_prompt(str(raw_path), truncate=True)
+        prompt = _decode_to_wav(raw_path, wav_path, sample_rate=int(model.sample_rate))
+        state = model.get_state_for_audio_prompt(str(prompt), truncate=True)
         export_model_state(state, str(dest_path))
+    except HTTPException:
+        raise
     except Exception as err:
         logger.exception("export-voice failed: %s", err)
         raise HTTPException(status_code=502, detail="export_voice_failed") from err
     finally:
-        if raw_path.exists():
-            raw_path.unlink(missing_ok=True)
+        raw_path.unlink(missing_ok=True)
+        wav_path.unlink(missing_ok=True)
     logger.info("export-voice clone_id=%s ms=%.0f path=%s", clone_id, (time.perf_counter() - t0) * 1000, dest_path)
     return JSONResponse({"path": str(dest_path), "bytes": dest_path.stat().st_size})
 

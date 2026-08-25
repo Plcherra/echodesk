@@ -78,7 +78,9 @@ async def export_voice(*, user_id: str, clone_id: str, filename: str, audio: byt
     files = {"audio": (filename or "sample.wav", audio, "application/octet-stream")}
     data = {"user_id": user_id, "clone_id": clone_id}
     try:
-        async with httpx.AsyncClient(timeout=_timeout()) as client:
+        # Clone encode is slower than a short TTS turn; do not share the 30s synth budget.
+        export_timeout = httpx.Timeout(max(90.0, float(settings.pocket_tts_timeout_seconds)))
+        async with httpx.AsyncClient(timeout=export_timeout) as client:
             res = await client.post(f"{_base_url()}/export-voice", data=data, files=files)
     except httpx.RequestError as err:
         raise PocketTtsError(f"pocket sidecar unreachable: {err}") from err

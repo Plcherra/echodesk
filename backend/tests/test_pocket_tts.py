@@ -129,6 +129,16 @@ def test_voice_clone_consent_helper() -> None:
     assert not _truthy_consent(None)
 
 
+def test_friendly_export_error_hides_sidecar_json() -> None:
+    from api.mobile.voice_clones import _friendly_export_error
+
+    err = PocketTtsError('export-voice 502: {"detail":"export_voice_failed"}', status_code=502)
+    out = _friendly_export_error(err)
+    assert "502" not in out
+    assert "export_voice_failed" not in out
+    assert "clone" in out.lower()
+
+
 def test_pocket_disabled_by_default() -> None:
     assert settings.pocket_tts_enabled is False
     assert (settings.tts_provider or "google").lower() == "google"

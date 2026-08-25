@@ -40,6 +40,17 @@ def _serialize(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _friendly_export_error(err: PocketTtsError) -> str:
+    raw = str(err or "")
+    if "Could not read that recording" in raw:
+        return "Could not read that recording. Try Record again, or upload a WAV/MP3."
+    if "export_voice_failed" in raw or "export-voice 502" in raw:
+        return "Could not clone that recording. Try a 5–20 second take in a quiet room."
+    if "unreachable" in raw.lower() or "503" in raw or "gated" in raw.lower():
+        return "Voice cloning is temporarily unavailable. Try again in a few minutes."
+    return "Could not create voice clone. Try recording again."
+
+
 def _truthy_consent(value: Any) -> bool:
     if isinstance(value, bool):
         return value
@@ -103,7 +114,7 @@ async def create_voice_clone(
     except PocketTtsError as err:
         logger.warning("[voice-clones] export failed user=%s error=%s", user["id"], err)
         return JSONResponse(
-            {"error": str(err) or "Could not create voice clone."},
+            {"error": _friendly_export_error(err)},
             status_code=err.status_code or 502,
         )
 
