@@ -27,7 +27,7 @@ Only then is EchoDesk launched.
 
 ---
 
-## Current snapshot (2026-08-24)
+## Current snapshot (2026-08-25)
 
 **Live and working**
 
@@ -39,11 +39,22 @@ Only then is EchoDesk launched.
 - Step 5 already has preset cards **and** `VoiceCloneSection` (“Use my voice”)
 - Launch Batch 1 (pricing, SMS/WhatsApp coming soon) shipped
 
+**Live test notes (2026-08-25, Carlo, production)**
+
+- **Preset inbound call:** answered; booking hours bugs (10pm / lost “tomorrow”) were fixed in `d873fc28`. First-reply delay stays a later quality pass.
+- **Clone create:** works after Pocket sidecar deploy (`aa1f7cfa` + copy/restart `pocket-tts`). Record 5–30s, preview, consent, Create clone.
+- **Clone inbound call:** caller heard the cloned voice. Phone quality is low and there is extra latency — **fine-tune later**, do not block launch on it.
+- **Clone booking:** the 1:16 AM call (`791e85b3…`, 111s, `outcome=booked`) **did write** an appointment. Spoken confirmation / slot list did not come back clearly on the phone (clone TTS lag). Result is in the app, not on the call:
+  - **Appointments → Needs review** (generic bookings are under review, not Upcoming)
+  - Wed Aug 26, **12:00–12:30 PM** EDT, summary “Appointment”
+  - Earlier tonight (preset path) also booked **3:00–3:30 PM** EDT the same day — same Needs review tab
+- **Still untested for Phase 2:** Pocket-down fallback (stop sidecar → backup Google voice + one notice), settings clone ↔ preset switch, file-upload clone.
+
 **Gaps this plan closes**
 
 1. A stranger cannot install or sign up (get-started still says run `./run_prod.sh`)
-2. Live inbound call with a **preset** has not been signed off on a release build
-3. Live inbound call with a **clone**, plus Pocket-down fallback, has not been signed off
+2. Live inbound call with a **preset** has been exercised; first-reply delay is deferred
+3. Live inbound **clone** speech works; Pocket-down fallback and spoken booking confirmation still open
 4. Landing does not mention optional clone
 5. Store packaging (version, signing, listings, screenshots) is not done
 6. Ops leftovers: leftover VPS tree; held-number cron exists but is never scheduled (deleted DIDs sit for weeks)
@@ -298,8 +309,8 @@ Web app: after launch, separate plan
 
 | Phase | Status |
 |-------|--------|
-| 1 Prove preset path | Not started |
-| 2 Prove clone path | Not started (code exists; live tests missing) |
+| 1 Prove preset path | In progress (live call done; first-reply delay deferred) |
+| 2 Prove clone path | In progress (clone create + inbound speech passed; quality/latency later; Pocket-down + spoken booking confirmation still open) |
 | 3 Website copy | Not started |
 | 4 Store packaging | Not started |
 | 5 Ops watch | Not started |
