@@ -12,6 +12,8 @@
 set -euo pipefail
 
 SERVICE="echodesk-backend"
+POCKET_SERVICE="pocket-tts"
+POCKET_DEST="${POCKET_DEST_DIR:-/opt/echodesk/pocket-tts}"
 
 cd "$(dirname "$0")/../.."   # repo root, e.g. /opt/echodesk/app
 ROOT="$(pwd)"
@@ -36,6 +38,24 @@ if git diff --name-only 'HEAD@{1}' HEAD 2>/dev/null | grep -q '^backend/requirem
   ./venv/bin/pip install -q -r backend/requirements.txt
 else
   echo "--- backend deps unchanged (skipping pip install) ---"
+fi
+
+SIDECAR_SRC="$ROOT/deploy/pocket-tts/sidecar.py"
+SIDECAR_DST="$POCKET_DEST/sidecar.py"
+if [[ -f "$SIDECAR_SRC" && -d "$POCKET_DEST" ]]; then
+  echo "--- sync pocket sidecar ---"
+  cp -a "$SIDECAR_SRC" "$SIDECAR_DST"
+  echo "--- restart $POCKET_SERVICE ---"
+  sudo systemctl restart "$POCKET_SERVICE"
+  sleep 3
+  if systemctl is-active --quiet "$POCKET_SERVICE"; then
+    echo "OK: $POCKET_SERVICE is active."
+    curl -fsS http://127.0.0.1:8100/health || echo "WARN: pocket health not ready yet (model may still be loading)"
+  else
+    echo "ERROR: $POCKET_SERVICE is not active. Recent logs:"
+    journalctl -u "$POCKET_SERVICE" -n 30 --no-pager || true
+    exit 1
+  fi
 fi
 
 echo "--- restart $SERVICE ---"
