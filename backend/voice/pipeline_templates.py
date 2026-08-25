@@ -297,6 +297,16 @@ def _tool_failure_reply(
 
     if error == "slot_unavailable":
         slots = parsed.get("suggested_slots") or parsed.get("exact_slots") or []
+        if parsed.get("outside_hours") is True:
+            if isinstance(slots, list) and slots:
+                return (
+                    f"We're not open at {requested_time or 'that time'}. "
+                    f"I found {slots_sentence(slots)}. Which works best?"
+                )
+            return (
+                f"We're not open at {requested_time or 'that time'}. "
+                "Want me to check another time during business hours?"
+            )
         if isinstance(slots, list) and slots:
             return f"That time is no longer available. I found {slots_sentence(slots)}. Which works best?"
         if requested_time:
@@ -343,6 +353,11 @@ def template_from_tool_result(
             if requested_time and parsed.get("slot_available") is True:
                 return f"Yes, {requested_time} {day_text} is available. Would you like me to book it?"
             if requested_time and parsed.get("slot_available") is False:
+                if parsed.get("outside_hours") is True:
+                    return (
+                        f"We're not open at {requested_time}. "
+                        f"I found {slots_sentence(slots)} for {day_text}. Which works best?"
+                    )
                 return f"I don't see {requested_time} available. I found {slots_sentence(slots)}. Which works best?"
             if list_exact_times:
                 return f"I found {slots_sentence(slots)} for {day_text}. Which works best?"
@@ -351,6 +366,11 @@ def template_from_tool_result(
             if not periods_norm:
                 periods_norm = _infer_summary_periods_from_slots(slots)
             return _availability_reply_bucket_first(day_text, slots, periods_norm)
+        if requested_time and parsed.get("outside_hours") is True:
+            return (
+                f"We're not open at {requested_time}. "
+                "Want me to check another time during business hours?"
+            )
         return "I don't have open slots in that window. Want me to check another day?"
 
     if tool_name == "create_appointment":

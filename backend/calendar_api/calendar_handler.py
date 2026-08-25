@@ -237,7 +237,17 @@ async def handle_calendar_request(body: dict) -> dict:
                 closed_dates=closed,
             )
         if action == "create_appointment":
-            return _handle_create_appointment(service, calendar_id, params, receptionist_id, supabase, call_control_id=call_control_id)
+            closed = _load_closed_dates(supabase, receptionist_id)
+            return _handle_create_appointment(
+                service,
+                calendar_id,
+                params,
+                receptionist_id,
+                supabase,
+                call_control_id=call_control_id,
+                bookable_hours=rec.get("bookable_hours"),
+                closed_dates=closed,
+            )
         return _handle_reschedule(service, calendar_id, params, receptionist_id, supabase)
     except Exception as e:
         msg = str(e)
@@ -341,6 +351,8 @@ def _handle_create_appointment(
     supabase,
     *,
     call_control_id: str | None = None,
+    bookable_hours=None,
+    closed_dates=None,
 ) -> dict:
     return create_booking(
         service,
@@ -352,6 +364,8 @@ def _handle_create_appointment(
         default_slot_minutes=DEFAULT_SLOT_MINUTES,
         call_control_id=call_control_id,
         staff_id=params.get("staff_id"),
+        bookable_hours=bookable_hours,
+        closed_dates=closed_dates,
     )
 
 

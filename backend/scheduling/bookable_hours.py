@@ -232,7 +232,19 @@ def apply_bookable_window_to_range(
             end_dt = end_dt.replace(tzinfo=anchor.tzinfo)
         return {"timeMin": start_dt.isoformat(), "timeMax": end_dt.isoformat()}, None
 
-    # Exact / explicit time windows: keep requested start, but still reject closed days.
+    # Exact / explicit time windows: keep requested start if it is inside hours.
+    # Closed days already returned above. Outside hours → day window + error so
+    # the caller can offer in-hours alternatives instead of confirming 10pm.
+    if not slot_within_bookable_hours(
+        range_data["timeMin"],
+        bookable_hours,
+        closed_dates=closed_dates,
+    ):
+        start_dt, end_dt = day_start, day_end
+        if anchor.tzinfo is not None:
+            start_dt = start_dt.replace(tzinfo=anchor.tzinfo)
+            end_dt = end_dt.replace(tzinfo=anchor.tzinfo)
+        return {"timeMin": start_dt.isoformat(), "timeMax": end_dt.isoformat()}, "outside_hours"
     return range_data, None
 
 

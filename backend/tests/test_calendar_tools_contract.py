@@ -161,6 +161,31 @@ def test_check_availability_range_defaults_to_60_minutes():
     assert any("09:00:00" in s for s in out.get("exact_slots") or [])
 
 
+def test_check_availability_exact_time_outside_hours_is_not_available():
+    from scheduling.bookable_hours import default_bookable_hours
+
+    hours = default_bookable_hours()
+    hours["weekly"]["mon"] = {"open": True, "start": "07:00", "end": "19:00"}
+    freebusy = {"calendars": {"primary": {"busy": []}}}
+    service = _Service(freebusy_result=freebusy)
+    out = calendar_handler._handle_check_availability(
+        service,
+        "primary",
+        params={
+            "date_text": "2026-04-13T22:00:00-04:00",
+            "timezone": "America/New_York",
+        },
+        bookable_hours=hours,
+    )
+    assert out["success"] is True
+    assert out["slot_available"] is False
+    assert out.get("outside_hours") is True
+    slots = out.get("suggested_slots") or []
+    assert slots
+    assert all("22:" not in s for s in slots)
+    assert any("07:00:00" in s or "08:00:00" in s or "09:00:00" in s for s in slots)
+
+
 def test_check_availability_exact_time_unavailable_returns_alternatives():
     freebusy = {
         "calendars": {
@@ -185,6 +210,34 @@ def test_check_availability_exact_time_unavailable_returns_alternatives():
     assert any("15:00:00" in s for s in out.get("suggested_slots") or [])
     assert any("15:00:00" in s for s in out.get("exact_slots") or [])
     assert all(s.endswith("-04:00") for s in out.get("exact_slots") or [])
+
+
+def test_create_appointment_outside_hours_is_rejected():
+    from scheduling.bookable_hours import default_bookable_hours
+
+    hours = default_bookable_hours()
+    hours["weekly"]["mon"] = {"open": True, "start": "07:00", "end": "19:00"}
+    service = _Service(freebusy_result={"calendars": {"primary": {"busy": []}}})
+
+    class _SB:
+        def table(self, name: str):
+            raise AssertionError("should not persist outside bookable hours")
+
+    out = calendar_handler._handle_create_appointment(
+        service,
+        "primary",
+        params={
+            "summary": "Test",
+            "start_time": "2026-04-13T22:00:00-04:00",
+            "duration_minutes": 30,
+        },
+        receptionist_id="rec-1",
+        supabase=_SB(),
+        bookable_hours=hours,
+    )
+    assert out["success"] is False
+    assert out["error"] == "slot_unavailable"
+    assert out.get("outside_hours") is True
 
 
 def test_create_appointment_missing_date_returns_date_missing():

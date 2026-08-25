@@ -159,6 +159,38 @@ def test_daypart_preference_is_whitelisted_and_clear_intent():
     assert pipeline_transcript.contains_clear_intent("good morning") is False
 
 
+def test_template_check_availability_outside_hours_does_not_confirm():
+    payload = json.dumps(
+        {
+            "success": True,
+            "slot_available": False,
+            "outside_hours": True,
+            "exact_slots": [
+                "2026-04-11T07:00:00-04:00",
+                "2026-04-11T08:00:00-04:00",
+                "2026-04-11T09:00:00-04:00",
+            ],
+            "suggested_slots": [
+                "2026-04-11T07:00:00-04:00",
+                "2026-04-11T08:00:00-04:00",
+                "2026-04-11T09:00:00-04:00",
+            ],
+        }
+    )
+    out = pipeline_templates.template_from_tool_result(
+        "check_availability",
+        payload,
+        requested_date="tomorrow",
+        requested_time="10 pm",
+        voice_session=None,
+    )
+    assert out
+    assert "not open" in out.lower()
+    assert "10 pm" in out.lower()
+    assert "available" not in out.lower() or "not open" in out.lower()
+    assert "7:00 am" in out.lower()
+
+
 def test_template_check_availability_exact_time_available_answers_yes():
     payload = json.dumps(
         {

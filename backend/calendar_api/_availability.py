@@ -4,7 +4,7 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
 
-from scheduling.bookable_hours import apply_bookable_window_to_range
+from scheduling.bookable_hours import apply_bookable_window_to_range, slot_within_bookable_hours
 from ._parsing import get_free_slots, parse_datetime_range, parse_iso_datetime_or_natural
 
 logger = logging.getLogger(__name__)
@@ -87,6 +87,7 @@ def handle_check_availability(
             "summary_periods": [],
             "message": "I don't have openings in that part of the day. Want a different time or day?",
         }
+    outside_hours = hours_err == "outside_hours"
     if constrained:
         range_data = constrained
 
@@ -179,35 +180,48 @@ def handle_check_availability(
             len(suggested_slots),
         )
 
-    # For exact time requests (e.g. "tomorrow at 7pm"), check only that specific slot.
+    # For exact time requests (e.g. "tomorrow at 7pm"), check only that specific slot
+    # when it is inside bookable hours. Outside hours → not available + in-hours alts.
     if parse_mode == "exact_time_window":
         slot_start = parse_iso_datetime_or_natural(start_date, timezone=timezone)
         if slot_start:
             slot_end = slot_start + timedelta(minutes=duration_minutes)
-            logger.info(
-                "[CALENDAR_CTX] availability_slot_check calendar_id=%s slot_start=%s slot_end=%s",
-                calendar_id,
-                slot_start.isoformat(),
-                slot_end.isoformat(),
-            )
-            slot_fb = service.freebusy().query(
-                body={
-                    "timeMin": slot_start.isoformat(),
-                    "timeMax": slot_end.isoformat(),
-                    "items": [{"id": calendar_id}],
-                }
-            ).execute()
-            slot_cal = slot_fb.get("calendars", {}).get(calendar_id, {})
-            slot_busy = slot_cal.get("busy") or []
-            slot_available = len(slot_busy) == 0
             requested_slot_start = slot_start.isoformat()
             requested_slot_end = slot_end.isoformat()
-            logger.info(
-                "[CAL_DATE] check_availability_slot mode=exact_time_slot slot_start=%s slot_end=%s busy_count=%d",
+            if outside_hours or not slot_within_bookable_hours(
                 requested_slot_start,
-                requested_slot_end,
-                len(slot_busy),
-            )
+                bookable_hours,
+                closed_dates=closed_dates,
+            ):
+                slot_available = False
+                outside_hours = True
+                logger.info(
+                    "[CAL_DATE] exact_slot_outside_bookable_hours slot_start=%s",
+                    requested_slot_start,
+                )
+            else:
+                logger.info(
+                    "[CALENDAR_CTX] availability_slot_check calendar_id=%s slot_start=%s slot_end=%s",
+                    calendar_id,
+                    requested_slot_start,
+                    requested_slot_end,
+                )
+                slot_fb = service.freebusy().query(
+                    body={
+                        "timeMin": requested_slot_start,
+                        "timeMax": requested_slot_end,
+                        "items": [{"id": calendar_id}],
+                    }
+                ).execute()
+                slot_cal = slot_fb.get("calendars", {}).get(calendar_id, {})
+                slot_busy = slot_cal.get("busy") or []
+                slot_available = len(slot_busy) == 0
+                logger.info(
+                    "[CAL_DATE] check_availability_slot mode=exact_time_slot slot_start=%s slot_end=%s busy_count=%d",
+                    requested_slot_start,
+                    requested_slot_end,
+                    len(slot_busy),
+                )
             if slot_available and requested_slot_start:
                 exact_slots = [requested_slot_start]
                 suggested_slots = [requested_slot_start]
@@ -232,4 +246,5 @@ def handle_check_availability(
         "requested_slot_start": requested_slot_start,
         "requested_slot_end": requested_slot_end,
         "slot_available": slot_available,
+        "outside_hours": outside_hours,
     }

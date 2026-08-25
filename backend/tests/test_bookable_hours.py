@@ -87,6 +87,44 @@ def test_slot_within_bookable_hours():
     assert slot_within_bookable_hours("2026-04-12T11:00:00", hours) is False
 
 
+def test_apply_exact_time_outside_hours_returns_day_window():
+    hours = default_bookable_hours()
+    hours["weekly"]["mon"] = {"open": True, "start": "07:00", "end": "19:00"}
+    range_data = {
+        "timeMin": "2026-04-13T22:00:00-04:00",
+        "timeMax": "2026-04-13T22:30:00-04:00",
+    }
+    out, err = apply_bookable_window_to_range(
+        range_data=range_data,
+        parse_mode="exact_time_window",
+        bookable_hours=hours,
+        closed_dates=None,
+        timezone_name="America/New_York",
+    )
+    assert err == "outside_hours"
+    assert out is not None
+    assert "07:00" in out["timeMin"]
+    assert "19:00" in out["timeMax"]
+
+
+def test_apply_exact_time_inside_hours_keeps_requested_start():
+    hours = default_bookable_hours()
+    hours["weekly"]["mon"] = {"open": True, "start": "07:00", "end": "19:00"}
+    range_data = {
+        "timeMin": "2026-04-13T10:00:00-04:00",
+        "timeMax": "2026-04-13T10:30:00-04:00",
+    }
+    out, err = apply_bookable_window_to_range(
+        range_data=range_data,
+        parse_mode="exact_time_window",
+        bookable_hours=hours,
+        closed_dates=None,
+        timezone_name="America/New_York",
+    )
+    assert err is None
+    assert out == range_data
+
+
 def test_prompt_format_includes_days():
     text = format_bookable_hours_for_prompt(default_bookable_hours())
     assert "Monday: 09:00–17:00" in text

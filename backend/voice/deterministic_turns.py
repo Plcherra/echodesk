@@ -117,6 +117,16 @@ def resolve_deterministic_turn(
     date_hint = extract_date_text_hint(user_text)
     time_hint = extract_time_hint(user_text)
     if use_calendar and time_hint and not date_hint and is_availability_intent(user_text):
+        prior_date = str(offered_slots_state.get("last_date_text") or "").strip()
+        if prior_date:
+            return DeterministicTurnResult(
+                handled=True,
+                tool_name="check_availability",
+                tool_args={"date_text": f"{prior_date} at {time_hint}"},
+                reason="availability_time_with_prior_date",
+                requested_date=prior_date,
+                requested_time=time_hint,
+            )
         return DeterministicTurnResult(
             handled=True,
             reply=f"Sure — which day should I check for {time_hint}?",

@@ -50,6 +50,8 @@ def create_booking(
     default_slot_minutes: int,
     call_control_id: str | None = None,
     staff_id: str | None = None,
+    bookable_hours: Any = None,
+    closed_dates: Any = None,
 ) -> dict:
     _ = staff_id  # Reserved for multi-staff calendars (Phase 2).
     return handle_create_appointment(
@@ -61,6 +63,8 @@ def create_booking(
         default_timezone=default_timezone,
         default_slot_minutes=default_slot_minutes,
         call_control_id=call_control_id,
+        bookable_hours=bookable_hours,
+        closed_dates=closed_dates,
     )
 
 

@@ -5,6 +5,7 @@ import re
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from scheduling.bookable_hours import slot_within_bookable_hours
 from ._parsing import get_free_slots, parse_iso_datetime_or_natural
 from telnyx import sms as telnyx_sms
 from telnyx.sms_customer_identity import apply_sms_template_vars, fetch_customer_sms_display_name
@@ -392,6 +393,8 @@ def handle_create_appointment(
     default_timezone: str,
     default_slot_minutes: int,
     call_control_id: str | None = None,
+    bookable_hours=None,
+    closed_dates=None,
 ) -> dict:
     timezone = (params.get("timezone") or default_timezone).strip() or default_timezone
     start_time = params.get("start_time") or params.get("date_text")
@@ -495,6 +498,22 @@ def handle_create_appointment(
 
     start_iso = start_d.isoformat()
     end_iso = end_d.isoformat()
+    if bookable_hours is not None and not slot_within_bookable_hours(
+        start_iso,
+        bookable_hours,
+        closed_dates=closed_dates,
+    ):
+        logger.info(
+            "[CAL_BOOK] create_appointment error type=outside_hours start=%s",
+            start_iso,
+        )
+        return {
+            "success": False,
+            "error": "slot_unavailable",
+            "outside_hours": True,
+            "message": "That time is outside business hours.",
+            "suggested_slots": [],
+        }
     followup = _resolve_followup_for_booking(
         service_based=service_based,
         resolved_service=resolved_service if isinstance(resolved_service, dict) else None,

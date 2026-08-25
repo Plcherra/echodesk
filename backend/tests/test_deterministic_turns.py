@@ -42,6 +42,20 @@ def test_time_without_date_gets_clarifying_reply_not_bad_calendar_call():
     assert result.tool_name is None
 
 
+def test_time_without_date_reuses_prior_day_instead_of_reasking():
+    result = _resolve(
+        "do you have 10pm",
+        use_calendar=True,
+        offered_slots_state={"last_date_text": "tomorrow"},
+    )
+
+    assert result.handled is True
+    assert result.tool_name == "check_availability"
+    assert result.tool_args["date_text"] == "tomorrow at 10 pm"
+    assert result.requested_date == "tomorrow"
+    assert result.reason == "availability_time_with_prior_date"
+
+
 def test_bare_hour_gets_clarifying_reply():
     result = _resolve("can you do 9", use_calendar=True)
 
