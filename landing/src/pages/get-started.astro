@@ -15,22 +15,36 @@ const planLabel =
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Get started with EchoDesk</title>
+    <meta
+      name="description"
+      content="Create your EchoDesk account in the mobile app. App Store and Google Play listings are coming soon."
+    />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
       :root {
         color-scheme: light;
-        --ink: #14201c;
-        --muted: #5a6b64;
-        --bg: #f4f7f5;
-        --accent: #1f6b4f;
-        --line: rgba(20, 32, 28, 0.12);
+        --bg: #fbfaf8;
+        --surface: #ffffff;
+        --ink: #151821;
+        --muted: #626873;
+        --soft: #8b9099;
+        --line: #e6e0da;
+        --brand: #174061;
+        --brand-2: #2f9c9d;
+        --brand-soft: #e6f3f2;
       }
+      * { box-sizing: border-box; }
       body {
         margin: 0;
         min-height: 100vh;
-        font-family: Georgia, "Times New Roman", serif;
-        background:
-          radial-gradient(circle at top left, rgba(31, 107, 79, 0.12), transparent 40%),
-          linear-gradient(180deg, #eef5f1, var(--bg));
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
         color: var(--ink);
       }
       .shell {
@@ -41,8 +55,8 @@ const planLabel =
       a.back {
         color: var(--muted);
         text-decoration: none;
-        font-family: system-ui, sans-serif;
         font-size: 0.9rem;
+        font-weight: 600;
       }
       h1 {
         font-size: clamp(2rem, 5vw, 2.75rem);
@@ -73,41 +87,46 @@ const planLabel =
         color: var(--muted);
         line-height: 1.5;
       }
-      .code {
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 0.92rem;
-        background: rgba(20, 32, 28, 0.06);
-        padding: 2px 6px;
-        border-radius: 6px;
-      }
       .actions {
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
         margin-top: 28px;
       }
-      a.button {
-        display: inline-block;
+      a.button,
+      span.button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         text-decoration: none;
         padding: 12px 18px;
-        border-radius: 999px;
-        font-family: system-ui, sans-serif;
-        font-weight: 600;
+        min-height: 44px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 14px;
       }
       a.primary {
-        background: var(--accent);
+        background: var(--brand);
         color: white;
       }
-      a.quiet {
-        background: transparent;
+      a.quiet,
+      span.soon {
+        background: var(--surface);
         color: var(--ink);
         border: 1px solid var(--line);
+      }
+      span.soon {
+        color: var(--soft);
+        cursor: default;
       }
       .note {
         margin-top: 28px;
         color: var(--muted);
         font-size: 0.95rem;
         line-height: 1.5;
+      }
+      .note a {
+        color: var(--brand);
       }
     </style>
   </head>
@@ -116,40 +135,50 @@ const planLabel =
       <a class="back" href="/">← Back to EchoDesk</a>
       <h1>Create your {planLabel} account in the EchoDesk app</h1>
       <p class="lede">
-        There is no web signup form yet. Open the EchoDesk app on your phone or Mac,
-        then tap <strong>Create account</strong> on the first screen.
+        EchoDesk is a mobile app. There is no browser signup. Get the app, tap
+        <strong>Create account</strong>, and pick one of five professional voices for your receptionist.
       </p>
       <div class="steps">
         <div class="step">
-          <strong>On iPhone</strong>
+          <strong>1. Get the app</strong>
           <p>
-            Run the installed app build, or from the repo:
-            <span class="code">cd mobile && ./run_prod.sh &lt;device-id&gt; release</span>
+            App Store and Google Play listings are coming soon. If you already have EchoDesk installed,
+            open it from your phone. Need a build? Email
+            <a href="mailto:echodesk2@gmail.com">echodesk2@gmail.com</a>.
           </p>
         </div>
         <div class="step">
-          <strong>On Mac (desktop app)</strong>
+          <strong>2. Create your account</strong>
           <p>
-            From the repo:
-            <span class="code">cd mobile && ./run_prod.sh macos profile</span>
-            — then use Create account / Log in on the welcome screen.
+            On the first screen, tap <strong>Create account</strong>. Use the email you want for billing
+            and confirmations.
           </p>
         </div>
         <div class="step">
-          <strong>Confirm your email</strong>
+          <strong>3. Confirm your email</strong>
           <p>
-            After signup, confirm from the email link. You should return to the app
+            Open the confirmation link from your inbox. You should return to the app
             (or open the app and log in with the same email).
+          </p>
+        </div>
+        <div class="step">
+          <strong>4. Connect your calendar and pick a voice</strong>
+          <p>
+            Connect Google Calendar, create a receptionist, and choose one of five professional voices.
+            EchoDesk answers calls and books from your real availability.
           </p>
         </div>
       </div>
       <div class="actions">
+        <span class="button soon" aria-disabled="true">App Store — Listing soon</span>
+        <span class="button soon" aria-disabled="true">Google Play — Listing soon</span>
         <a class="button primary" href="echodesk://auth-callback">Open EchoDesk app</a>
         <a class="button quiet" href="mailto:echodesk2@gmail.com?subject=EchoDesk%20help">Email support</a>
       </div>
       <p class="note">
-        Need a build or help installing? Email
+        Questions? Email
         <a href="mailto:echodesk2@gmail.com">echodesk2@gmail.com</a>.
+        Privacy, terms, and SMS opt-in stay on this site.
       </p>
     </div>
   </body>

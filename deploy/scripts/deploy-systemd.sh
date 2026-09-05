@@ -66,6 +66,38 @@ else
 fi
 sudo systemctl restart echodesk-backend
 
+# Held-number detach timer. Install needs root; passwordless sudo is usually
+# restart-only, so this warns and leaves the units for a one-time sudo install.
+TIMER_SRC_DIR="$ROOT/deploy/systemd"
+TIMER_UNITS=(
+  echodesk-release-held-numbers.service
+  echodesk-release-held-numbers.timer
+)
+TIMER_CHANGED=0
+for unit in "${TIMER_UNITS[@]}"; do
+  src="$TIMER_SRC_DIR/$unit"
+  dst="/etc/systemd/system/$unit"
+  if [[ -f "$src" ]] && ! cmp -s "$src" "$dst" 2>/dev/null; then
+    TIMER_CHANGED=1
+    if sudo -n cp "$src" "$dst" 2>/dev/null; then
+      echo "Installed $unit"
+    else
+      echo "WARNING: could not install $unit (needs sudo). Manual:"
+      echo "  sudo cp \"$src\" \"$dst\""
+    fi
+  fi
+done
+if [[ "$TIMER_CHANGED" -eq 1 ]]; then
+  if sudo -n systemctl daemon-reload 2>/dev/null \
+    && sudo -n systemctl enable --now echodesk-release-held-numbers.timer 2>/dev/null; then
+    echo "Held-number timer enabled."
+  else
+    echo "WARNING: enable the held-number timer after copying units:"
+    echo "  sudo systemctl daemon-reload"
+    echo "  sudo systemctl enable --now echodesk-release-held-numbers.timer"
+  fi
+fi
+
 sleep 3
 curl -sS http://127.0.0.1:8000/api/health || true
 echo

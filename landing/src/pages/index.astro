@@ -60,10 +60,18 @@ const plans = [
   },
 ];
 
+const voices = [
+  "Friendly & Warm",
+  "Professional & Calm",
+  "Premium Concierge",
+  "Energetic & Upbeat",
+  "Confident & Clear",
+];
+
 const features = [
   {
-    title: "Answers professionally",
-    text: "A calm AI receptionist picks up when your team is busy, closed, or with a customer.",
+    title: "Five professional voices",
+    text: "Choose one of five calm, professional voices for your receptionist. Preview them in the app before you go live.",
   },
   {
     title: "Books from real availability",
@@ -322,6 +330,27 @@ const testimonials = [
         margin-top: 18px;
         color: var(--soft);
         font-size: 14px;
+      }
+
+      .voice-list {
+        list-style: none;
+        margin: 22px auto 0;
+        padding: 0;
+        max-width: 720px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .voice-list li {
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 600;
       }
 
       .hero-media {
@@ -1282,7 +1311,7 @@ const testimonials = [
           <a href="#testimonials">Stories</a>
         </nav>
         <div class="nav-actions">
-          <a class="button quiet" href="/get-started">Create account</a>
+          <a class="button quiet" href="/get-started">Get the app</a>
           <a class="button primary" href="#pricing">See pricing</a>
         </div>
       </div>
@@ -1295,9 +1324,12 @@ const testimonials = [
             <p class="eyebrow">AI receptionist for appointment-based businesses</p>
             <h1 id="hero-title">Turn missed calls into booked appointments.</h1>
             <p class="hero-subtitle">
-              EchoDesk answers calls with a calm, professional voice, checks real calendar availability,
+              EchoDesk answers calls with one of five professional voices, checks real calendar availability,
               and books customers while your team stays focused on service.
             </p>
+            <ul class="voice-list" aria-label="Professional voices">
+              {voices.map((voice) => <li>{voice}</li>)}
+            </ul>
             <div class="hero-actions">
               <a class="button primary" href="/get-started?plan=trial">Start free trial</a>
               <a class="button" href="#pricing">View plans</a>
@@ -1618,7 +1650,7 @@ const testimonials = [
             with calm consistency.
           </p>
           <div class="final-actions">
-            <a class="button primary" href="/get-started?plan=trial">Create account</a>
+            <a class="button primary" href="/get-started?plan=trial">Get the app</a>
             <a class="button" href="mailto:echodesk2@gmail.com?subject=EchoDesk%20help">Email support</a>
           </div>
         </div>
@@ -1654,7 +1686,7 @@ const testimonials = [
               cta.textContent = "Start free trial";
               cta.setAttribute("href", "/get-started?plan=trial");
             } else {
-              cta.textContent = "Create account";
+              cta.textContent = "Get the app";
               cta.setAttribute("href", "/get-started?plan=starter");
             }
           }

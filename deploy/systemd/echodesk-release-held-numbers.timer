@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly EchoDesk held-number detach
+
+[Timer]
+OnCalendar=hourly
+AccuracySec=5min
+Persistent=true
+Unit=echodesk-release-held-numbers.service
+
+[Install]
+WantedBy=timers.target

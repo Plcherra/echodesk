@@ -216,3 +216,39 @@ HF token: `/opt/echodesk/pocket-tts/hf.env` (mode 600). Do not put `HF_TOKEN` in
 
 - **`TELNYX_PUBLIC_KEY`** / **`TELNYX_WEBHOOK_SECRET`** doesn’t match Telnyx app.
 - Proxy strips Ed25519 headers — must use **`TELNYX_SKIP_VERIFY`** **and** non-empty **`TELNYX_ALLOWED_IPS`** (CIDR supported).
+
+## Held-number detach (48h)
+
+Unused held DIDs leave the **customer account** after 48 hours. They stay on **our Telnyx account** for the next receptionist. The job does **not** Telnyx-delete.
+
+- Endpoint: `GET /api/cron/release-held-numbers` with `Authorization: Bearer $CRON_SECRET`
+- Script: `deploy/scripts/run-release-held-numbers.sh` (reads `CRON_SECRET` from `/opt/echodesk/app/.env`)
+- Units: `deploy/systemd/echodesk-release-held-numbers.service` + `.timer` (hourly)
+
+**Install on the VPS (needs sudo once):**
+
+```bash
+sudo cp /opt/echodesk/app/deploy/systemd/echodesk-release-held-numbers.service /etc/systemd/system/
+sudo cp /opt/echodesk/app/deploy/systemd/echodesk-release-held-numbers.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now echodesk-release-held-numbers.timer
+systemctl status echodesk-release-held-numbers.timer --no-pager
+```
+
+**Fallback if sudo is unavailable** (as user `echodesk`):
+
+```bash
+chmod +x /opt/echodesk/app/deploy/scripts/run-release-held-numbers.sh
+(crontab -l 2>/dev/null | grep -v release-held-numbers; echo '7 * * * * /opt/echodesk/app/deploy/scripts/run-release-held-numbers.sh >> /var/log/echodesk/release-held.log 2>&1') | crontab -
+```
+
+Manual Telnyx delete (only if you must drop a DID from our account):
+
+```bash
+curl -fsS -X POST http://127.0.0.1:8000/api/internal/phone-numbers/release \
+  -H "Authorization: Bearer $INTERNAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"phone_number":"+1XXXXXXXXXX","telnyx_phone_number_id":"UUID"}'
+```
+
+Do **not** one-shot the cron against live receptionists (Eve `+16176137764`, Ash `+13105847719`). The job skips live inventory; still avoid a forced release of those E.164s.

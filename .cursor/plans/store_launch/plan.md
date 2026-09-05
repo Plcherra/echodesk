@@ -131,13 +131,13 @@ Plain-language checklist (tap through before submit): `.cursor/plans/store_launc
 
 ### Tasks
 
-- [ ] Landing: keep five professional voices only
-- [ ] Do **not** say we replaced Google TTS or that there is one unified engine
-- [ ] Rewrite `/get-started`:
+- [x] Landing: keep five professional voices only
+- [x] Do **not** say we replaced Google TTS or that there is one unified engine
+- [x] Rewrite `/get-started`:
   - Remove `./run_prod.sh` / “no web signup yet” / Mac-from-repo steps
   - Copy: create the account **in the EchoDesk app**
   - Buttons: App Store + Play (placeholder URLs until Phase 7) + “Open app” deep link + support email
-- [ ] Deploy landing (`DEPLOY_LANDING=1` / `deploy-landing.sh`)
+- [ ] Deploy landing (`DEPLOY_LANDING=1` / `deploy-landing.sh`) — files ready; live rsync needs owner sudo if passwordless landing wrapper is missing
 
 ### Test gate
 
@@ -218,10 +218,10 @@ Do this **before** store submit. A paying customer who deletes a receptionist mu
 
 ### Tasks
 
-- [ ] Add a systemd timer (preferred, matches `echodesk-backend`) **or** a root crontab that hits localhost hourly:
+- [x] Add a systemd timer (preferred, matches `echodesk-backend`) **or** a root crontab that hits localhost hourly:
   `curl -fsS -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:8000/api/cron/release-held-numbers`
-- [ ] Install, enable, and start the timer on the VPS (`deploy/systemd/` + a one-line note in `docs/ops/RUNBOOK.md`)
-- [ ] One-shot the same endpoint now so leftover holds detach from the customer (DID stays on Telnyx + customer email)
+- [ ] Install, enable, and start the timer on the VPS (`deploy/systemd/` + a one-line note in `docs/ops/RUNBOOK.md`) — user crontab installed (hourly, no sudo). systemd timer still needs owner sudo
+- [ ] One-shot the same endpoint now so leftover holds detach from the customer (DID stays on Telnyx + customer email) — skipped (do not touch Eve/Ash live DIDs)
 - [ ] Confirm the app no longer shows those two as held (pull-to-refresh Receptionists)
 - [ ] Keep `POST /api/internal/phone-numbers/release` as the manual fallback if Telnyx delete fails (cron already logs `[cron/release-held] Telnyx release failed` and skips the DB clear)
 - [ ] Optional same unit: other `/api/cron/*` jobs (usage, usage-alerts) if they are also unscheduled — only if cheap; do not block this phase on billing cron
@@ -288,10 +288,10 @@ Web app: after launch, separate plan
 |-------|--------|
 | 1 Prove preset path | In progress (live call done; first-reply delay deferred) |
 | 2 Prove clone path | **Paused — after launch** |
-| 3 Website copy | Not started |
-| 4 Store packaging | Not started |
-| 5 Ops watch | Not started |
-| 6 Held-number cron | Not started (endpoint exists; no VPS schedule) |
+| 3 Website copy | Copy rewritten in repo; live landing deploy may need owner sudo |
+| 4 Store packaging | Listing draft only (`store_listing_draft.md`). Version left at 1.0.0+1. No signing/submit |
+| 5 Ops watch | Partial: health + trial API ok (98 left). Leftover `app.pre-reset-` still needs sudo |
+| 6 Held-number cron | User crontab hourly on VPS (detach only). systemd timer files ready; enable needs sudo |
 | 7 Submit stores | Blocked on 1, 3–6 (not 2) |
 | Web app | After launch — out of scope |
 

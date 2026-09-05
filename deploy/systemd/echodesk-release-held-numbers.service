@@ -1,0 +1,13 @@
+[Unit]
+Description=EchoDesk detach held phone numbers after 48h
+After=network-online.target echodesk-backend.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=echodesk
+Group=echodesk
+WorkingDirectory=/opt/echodesk/app
+ExecStart=/opt/echodesk/app/deploy/scripts/run-release-held-numbers.sh
+PrivateTmp=true
+NoNewPrivileges=true
