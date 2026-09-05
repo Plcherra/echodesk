@@ -212,7 +212,7 @@ Plain-language checklist (tap through before submit): `.cursor/plans/store_launc
 
 ## Phase 6 — Automate held-number release
 
-**Goal:** Unused held DIDs actually leave Telnyx and the app after 48 hours, on a schedule, without anyone watching email. The release code already exists (`GET /api/cron/release-held-numbers`, Bearer `CRON_SECRET`). Nothing on the VPS calls it today — that is why +1 617-499-9456 and +1 310-584-7719 are still “release pending” from Aug 12.
+**Goal:** Unused held DIDs leave the **customer account** after 48 hours, on a schedule. The DID stays on **our Telnyx account** and the next receptionist create reuses it (do not buy a new one). The job already exists (`GET /api/cron/release-held-numbers`, Bearer `CRON_SECRET`) and now detaches only — it must not delete the number in Telnyx. Nothing on the VPS calls it today.
 
 Do this **before** store submit. A paying customer who deletes a receptionist must not keep a ghost number (or be blocked from a new one) for weeks.
 
@@ -221,7 +221,7 @@ Do this **before** store submit. A paying customer who deletes a receptionist mu
 - [ ] Add a systemd timer (preferred, matches `echodesk-backend`) **or** a root crontab that hits localhost hourly:
   `curl -fsS -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:8000/api/cron/release-held-numbers`
 - [ ] Install, enable, and start the timer on the VPS (`deploy/systemd/` + a one-line note in `docs/ops/RUNBOOK.md`)
-- [ ] One-shot the same endpoint now so the two Aug 12 leftovers release (Telnyx delete + DB detach + customer email)
+- [ ] One-shot the same endpoint now so leftover holds detach from the customer (DID stays on Telnyx + customer email)
 - [ ] Confirm the app no longer shows those two as held (pull-to-refresh Receptionists)
 - [ ] Keep `POST /api/internal/phone-numbers/release` as the manual fallback if Telnyx delete fails (cron already logs `[cron/release-held] Telnyx release failed` and skips the DB clear)
 - [ ] Optional same unit: other `/api/cron/*` jobs (usage, usage-alerts) if they are also unscheduled — only if cheap; do not block this phase on billing cron
@@ -267,7 +267,7 @@ Do this **before** store submit. A paying customer who deletes a receptionist mu
 3. Test call = Google path.
 4. Stranger installs from a store, not from git.
 5. Website does not promise a web app, a clone, or a Google-TTS replacement.
-6. Unused held numbers auto-release after 48 hours (hourly cron). Manual `POST /api/internal/phone-numbers/release` is fallback only.
+6. Unused held numbers detach from the customer after 48 hours (hourly cron) and stay in our Telnyx pool. Manual `POST /api/internal/phone-numbers/release` is the only way to delete a DID in Telnyx.
 
 ---
 

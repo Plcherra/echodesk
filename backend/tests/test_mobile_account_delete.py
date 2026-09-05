@@ -54,9 +54,9 @@ class _FakeSupabase:
         return _FakeQuery(self.store, name)
 
 
-def test_delete_account_releases_numbers_cancels_billing_and_removes_user(monkeypatch):
+def test_delete_account_detaches_numbers_cancels_billing_and_removes_user(monkeypatch):
     sb = _FakeSupabase()
-    released_ids: list[str] = []
+    detached: list[tuple[str | None, str | None]] = []
 
     monkeypatch.setattr(
         account,
@@ -64,11 +64,11 @@ def test_delete_account_releases_numbers_cancels_billing_and_removes_user(monkey
         lambda _sb, _uid: [{"e164": "+16175550100", "telnyx_id": "num_1", "live": True}],
     )
 
-    def fake_release(tid: str) -> None:
-        released_ids.append(tid)
+    def fake_detach(_sb, **kwargs):
+        detached.append((kwargs.get("phone_number"), kwargs.get("telnyx_phone_number_id")))
+        return {"matched": True}
 
-    monkeypatch.setattr(account.telnyx_provision, "release_number", fake_release)
-    monkeypatch.setattr(account, "mark_held_number_released", lambda **_kwargs: {"matched": True})
+    monkeypatch.setattr(account, "mark_held_number_released", fake_detach)
 
     canceled: list[str] = []
 
@@ -96,8 +96,9 @@ def test_delete_account_releases_numbers_cancels_billing_and_removes_user(monkey
 
     out = account.delete_account_for_user(sb, "user-1")
     assert out["deleted"] is True
+    assert out["detached_numbers"] == ["+16175550100"]
     assert out["released_numbers"] == ["+16175550100"]
-    assert released_ids == ["num_1"]
+    assert detached == [("+16175550100", "num_1")]
     assert "sub_1" in canceled
     assert "cus_1" in canceled
     assert "users" in sb.store["deletes"]

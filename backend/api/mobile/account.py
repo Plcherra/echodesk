@@ -11,7 +11,6 @@ from fastapi.responses import JSONResponse
 
 from api.auth import get_user_from_request
 from config import settings
-from telnyx import provision as telnyx_provision
 from telnyx.phone_lifecycle import (
     collect_account_phone_inventory,
     mark_held_number_released,
@@ -41,28 +40,19 @@ def _cancel_stripe_for_user(user_row: dict[str, Any]) -> None:
         logger.warning("[account/delete] stripe customer delete failed: %s", err)
 
 
-def _release_account_numbers(supabase: Any, user_id: str) -> list[str]:
-    released: list[str] = []
+def _detach_account_numbers(supabase: Any, user_id: str) -> list[str]:
+    """Unbind DIDs from this customer. Keep them on our Telnyx account for reuse."""
+    detached: list[str] = []
     try:
         inventory = collect_account_phone_inventory(supabase, user_id)
     except Exception as err:
         logger.warning("[account/delete] inventory failed user=%s: %s", user_id, err)
-        return released
+        return detached
     for item in inventory or []:
         e164 = str(item.get("e164") or "")
         tid = str(item.get("telnyx_id") or "").strip() or None
         if not e164 and not tid:
             continue
-        try:
-            if tid:
-                telnyx_provision.release_number(tid)
-        except Exception as err:
-            logger.warning(
-                "[account/delete] Telnyx release failed phone=%s id=%s: %s",
-                e164,
-                tid,
-                err,
-            )
         try:
             mark_held_number_released(
                 supabase,
@@ -70,14 +60,19 @@ def _release_account_numbers(supabase: Any, user_id: str) -> list[str]:
                 telnyx_phone_number_id=tid,
             )
         except Exception as err:
-            logger.warning("[account/delete] clear DID from DB failed phone=%s: %s", e164, err)
+            logger.warning("[account/delete] detach DID from DB failed phone=%s: %s", e164, err)
         if e164:
-            released.append(e164)
-    return released
+            detached.append(e164)
+            logger.warning(
+                "[account/delete] detached phone=%s telnyx_id=%s (kept on Telnyx)",
+                e164,
+                tid,
+            )
+    return detached
 
 
 def delete_account_for_user(supabase: Any, user_id: str) -> dict[str, Any]:
-    """Release numbers, cancel billing, delete profile + auth user."""
+    """Detach numbers (keep on Telnyx), cancel billing, delete profile + auth user."""
     uid = (user_id or "").strip()
     if not uid:
         raise ValueError("missing user_id")
@@ -96,7 +91,7 @@ def delete_account_for_user(supabase: Any, user_id: str) -> dict[str, Any]:
     except Exception as err:
         logger.warning("[account/delete] load profile failed user=%s: %s", uid, err)
 
-    released = _release_account_numbers(supabase, uid)
+    detached = _detach_account_numbers(supabase, uid)
     _cancel_stripe_for_user(profile)
 
     try:
@@ -106,8 +101,12 @@ def delete_account_for_user(supabase: Any, user_id: str) -> dict[str, Any]:
 
     supabase.table("users").delete().eq("id", uid).execute()
     supabase.auth.admin.delete_user(uid)
-    logger.warning("[account/delete] deleted user=%s phones=%s", uid, ",".join(released) or "-")
-    return {"deleted": True, "released_numbers": released}
+    logger.warning("[account/delete] deleted user=%s phones=%s", uid, ",".join(detached) or "-")
+    return {
+        "deleted": True,
+        "detached_numbers": detached,
+        "released_numbers": detached,
+    }
 
 
 @router.delete("/account")

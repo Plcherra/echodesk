@@ -167,3 +167,6 @@ def test_release_needed_email_includes_mark_released_api(monkeypatch):
     text = mock_client.post.call_args.kwargs["json"]["text"]
     assert "/api/internal/phone-numbers/release" in text
     assert "PN123" in text
+    assert "detaches it from the customer" in text
+    assert "stays on our Telnyx account" in text
+    assert "auto-releases it in Telnyx" not in text

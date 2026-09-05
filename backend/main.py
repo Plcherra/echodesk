@@ -595,7 +595,7 @@ async def cron_usage_alerts(
 async def cron_release_held_numbers(
     authorization: str = Header(None, alias="Authorization"),
 ):
-    """Release unused held DIDs after 48h. Run hourly. Safe to repeat."""
+    """Detach unused held DIDs after 48h. Keep them on Telnyx. Run hourly. Safe to repeat."""
     secret = (settings.cron_secret or "").strip()
     if not secret:
         raise HTTPException(status_code=503, detail="Cron not configured (CRON_SECRET required)")

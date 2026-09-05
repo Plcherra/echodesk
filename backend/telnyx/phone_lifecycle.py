@@ -95,7 +95,8 @@ def detach_phone_from_receptionist(supabase: Any, receptionist_id: str) -> None:
             "telnyx_phone_number_id": None,
             "telnyx_phone_number": None,
             "inbound_phone_number": None,
-            "phone_number": None,
+            # phone_number is NOT NULL on this table.
+            "phone_number": "",
         }
     ).eq("id", rid).execute()
 
@@ -218,8 +219,8 @@ def mark_held_number_released(
     telnyx_phone_number_id: str | None = None,
 ) -> dict[str, Any]:
     """
-    After ops removes a DID from Telnyx: detach it from soft-deleted rows and
-    clear the canonical business line if it still points at this number.
+    Detach a held DID from soft-deleted rows and clear the canonical business
+    line if it still points at this number. Does not delete the number in Telnyx.
 
     Returns {matched, phone_number, telnyx_phone_number_id, owner_user_id,
              owner_email, business_ids, detached_receptionist_ids}.
