@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/env.dart';
 import '../../services/pending_plan_service.dart';
 import '../../widgets/brand_lockup.dart';
+import '../../widgets/password_field.dart';
 
 class SignupScreen extends StatefulWidget {
   final String? planId;
@@ -153,15 +154,13 @@ class _SignupScreenState extends State<SignupScreen> {
                         (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
+                  PasswordField(
                     controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Required' : null,
+                    requireStrong: true,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) {
+                      if (_formKey.currentState!.validate()) _submit();
+                    },
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 16),
