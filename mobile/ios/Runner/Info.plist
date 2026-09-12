@@ -65,6 +65,8 @@
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
 		<key>NSMicrophoneUsageDescription</key>
-		<string>EchoDesk uses the microphone so you can optionally clone your voice for your AI receptionist.</string>
+		<string>EchoDesk may use the microphone for optional in-app audio features.</string>
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
 	</dict>
 </plist>
