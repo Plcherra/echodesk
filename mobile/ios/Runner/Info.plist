@@ -66,6 +66,12 @@
 		<true/>
 		<key>NSMicrophoneUsageDescription</key>
 		<string>EchoDesk may use the microphone for optional in-app audio features.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>EchoDesk may access your photo library so you can choose optional files in the app.</string>
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>EchoDesk may save optional files to your photo library.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>EchoDesk may use the camera so you can capture optional files in the app.</string>
 		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
 	</dict>
