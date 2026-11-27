@@ -73,7 +73,10 @@ class PushService {
 
   PushService._();
 
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  FirebaseMessaging? _messaging;
+
+  FirebaseMessaging get _firebaseMessaging =>
+      _messaging ??= FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
@@ -85,8 +88,24 @@ class PushService {
 
   void Function(String title, String body)? onForegroundNotification;
 
-  /// Navigate when an appointment (or other non-call) notification is opened.
-  void Function(String route)? onNavigate;
+  /// Navigate when a notification is opened.
+  ///
+  /// A tap that launches the app from a terminated state is handled inside
+  /// [initialize], which runs before this callback exists. That route is kept
+  /// and delivered when the callback is assigned.
+  void Function(String route)? _onNavigate;
+  String? _pendingRoute;
+
+  void Function(String route)? get onNavigate => _onNavigate;
+
+  set onNavigate(void Function(String route)? callback) {
+    _onNavigate = callback;
+    final pending = _pendingRoute;
+    if (callback != null && pending != null && pending.isNotEmpty) {
+      _pendingRoute = null;
+      callback(pending);
+    }
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -154,7 +173,7 @@ class PushService {
 
   /// Handle notification that launched app from terminated state.
   Future<void> _handleInitialMessage() async {
-    final message = await _messaging.getInitialMessage();
+    final message = await _firebaseMessaging.getInitialMessage();
     if (message?.data != null && message!.data.isNotEmpty) {
       _handleNotificationData(message.data);
     }
@@ -219,10 +238,18 @@ class PushService {
   }
 
   void _handleNotificationData(Map<String, dynamic> data) {
-    final route = routeForPushData(data);
-    if (route != null && route.isNotEmpty) {
-      onNavigate?.call(route);
+    deliverRoute(routeForPushData(data));
+  }
+
+  /// Send [route] to [onNavigate], or hold it until that callback is set.
+  void deliverRoute(String? route) {
+    if (route == null || route.isEmpty) return;
+    final callback = _onNavigate;
+    if (callback == null) {
+      _pendingRoute = route;
+      return;
     }
+    callback(route);
   }
 
   Future<void> _showLocalNotification(
@@ -257,7 +284,7 @@ class PushService {
   }
 
   Future<void> _requestPermission() async {
-    final settings = await _messaging.requestPermission(
+    final settings = await _firebaseMessaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
@@ -267,7 +294,7 @@ class PushService {
 
   Future<void> _getToken() async {
     try {
-      _fcmToken = await _messaging.getToken();
+      _fcmToken = await _firebaseMessaging.getToken();
       if (kDebugMode) print('[PushService] FCM token: ${_fcmToken?.substring(0, 20)}...');
       if (_fcmToken != null) {
         await _registerTokenWithBackend(_fcmToken!);
@@ -276,7 +303,7 @@ class PushService {
       if (kDebugMode) print('[PushService] FCM getToken: $e');
     }
 
-    _messaging.onTokenRefresh.listen((token) {
+    _firebaseMessaging.onTokenRefresh.listen((token) {
       _fcmToken = token;
       _registerTokenWithBackend(token);
     });

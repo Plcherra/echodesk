@@ -54,17 +54,23 @@ class _EchodeskAppState extends State<EchodeskApp> {
               data.event == AuthChangeEvent.tokenRefreshed ||
               data.event == AuthChangeEvent.initialSession)) {
         final path = _router.routerDelegate.currentConfiguration.uri.path;
-        if (path == '/' ||
-            path.startsWith('/learn-more') ||
-            path.startsWith('/login') ||
-            path.startsWith('/signup')) {
-          _router.go(await _homeAfterAuth());
+        if (_isAuthEntryPath(path)) {
+          final home = await _homeAfterAuth();
+          if (!mounted) return;
+          // A notification may have opened a call while this lookup ran.
+          final now = _router.routerDelegate.currentConfiguration.uri.path;
+          if (_isAuthEntryPath(now)) {
+            _router.go(home);
+          }
         }
       }
     });
     PushService().onNavigate = (route) {
       if (route.isEmpty) return;
-      _router.go(route);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _router.go(route);
+      });
     };
     _deepLinkHandler.init(
       (msg) {
@@ -73,6 +79,13 @@ class _EchodeskAppState extends State<EchodeskApp> {
       onGoogleCalendarConnected: _refreshAfterCalendarConnect,
       onAuthSuccess: _afterAuthDeepLink,
     );
+  }
+
+  bool _isAuthEntryPath(String path) {
+    return path == '/' ||
+        path.startsWith('/learn-more') ||
+        path.startsWith('/login') ||
+        path.startsWith('/signup');
   }
 
   Future<bool> _isOnboardingComplete() async {

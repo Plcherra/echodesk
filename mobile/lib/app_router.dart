@@ -222,11 +222,16 @@ GoRouter createAppRouter({Listenable? refreshListenable}) {
                         routes: [
                           GoRoute(
                             path: ':callId',
-                            builder: (context, state) => CallDetailScreen(
-                              receptionistId: state.pathParameters['id']!,
-                              callId: state.pathParameters['callId']!,
-                              callData: state.extra as Map<String, dynamic>?,
-                            ),
+                            builder: (context, state) {
+                              final receptionistId = state.pathParameters['id']!;
+                              final callId = state.pathParameters['callId']!;
+                              return CallDetailScreen(
+                                key: ValueKey('call-$receptionistId-$callId'),
+                                receptionistId: receptionistId,
+                                callId: callId,
+                                callData: state.extra as Map<String, dynamic>?,
+                              );
+                            },
                           ),
                         ],
                       ),

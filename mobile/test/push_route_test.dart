@@ -35,6 +35,31 @@ void main() {
     expect(route, isNot(startsWith('/call/')));
   });
 
+  test('a cold-start route is kept until navigation is attached', () {
+    final service = PushService();
+    service.onNavigate = null;
+    service.deliverRoute('/receptionists/rec-1/calls/log-9');
+
+    final opened = <String>[];
+    service.onNavigate = opened.add;
+
+    expect(opened, ['/receptionists/rec-1/calls/log-9']);
+    service.onNavigate = null;
+  });
+
+  test('a later notification replaces a route that is still waiting', () {
+    final service = PushService();
+    service.onNavigate = null;
+    service.deliverRoute('/receptionists/rec-1/calls/old');
+    service.deliverRoute('/receptionists/rec-1/calls/new');
+
+    final opened = <String>[];
+    service.onNavigate = opened.add;
+
+    expect(opened, ['/receptionists/rec-1/calls/new']);
+    service.onNavigate = null;
+  });
+
   test('deep link to call history is preferred', () {
     expect(
       routeForPushData({
