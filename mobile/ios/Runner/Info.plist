@@ -42,13 +42,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>EchoDesk may use the camera so you can capture optional files in the app.</string>
+	<string>EchoDesk uses the camera only to record or capture a voice sample for your AI receptionist.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>EchoDesk may use the microphone for optional in-app audio features.</string>
+	<string>EchoDesk uses the microphone only to record a voice sample for your AI receptionist.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>EchoDesk may save optional files to your photo library.</string>
+	<string>EchoDesk uses photo library access only to upload a voice sample for your AI receptionist.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>EchoDesk may access your photo library so you can choose optional files in the app.</string>
+	<string>EchoDesk uses your photo library only so you can choose a voice sample to upload for your AI receptionist.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
@@ -64,8 +64,6 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>

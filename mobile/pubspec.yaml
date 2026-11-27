@@ -1,7 +1,7 @@
 name: echodesk_mobile
 description: Echodesk AI receptionist mobile app.
 publish_to: "none"
-version: 1.0.0+1
+version: 1.0.0+3
 
 environment:
   sdk: ">=3.2.0 <4.0.0"
@@ -21,8 +21,6 @@ dependencies:
   firebase_crashlytics: ^5.0.8
   firebase_messaging: ^16.1.2
   flutter_local_notifications: ^21.0.0
-  flutter_callkit_incoming: ^3.0.0
-  web_socket_channel: ^3.0.0
   shared_preferences: ^2.2.2
   audioplayers: ^6.0.0
   record: ^6.1.1

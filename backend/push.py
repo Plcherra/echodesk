@@ -43,10 +43,12 @@ def send_incoming_call_push(
     caller: str,
     receptionist_id: str,
     receptionist_name: str = "Receptionist",
+    call_log_id: str = "",
 ) -> int:
     """
-    Send FCM push for incoming call. Fetches tokens from Supabase.
-    Returns number of messages sent successfully.
+    Send a normal FCM alert for a new call. The AI answers server-side;
+    the notification opens that call's detail screen and does not offer
+    Accept/Decline. Returns the number of messages sent successfully.
     """
     messaging = _get_messaging()
     if not messaging:
@@ -60,21 +62,35 @@ def send_incoming_call_push(
         logger.info("No push tokens for user %s", user_id)
         return 0
 
+    display_name = (receptionist_name or "").strip() or "your receptionist"
+    log_id = (call_log_id or "").strip()
+    receptionist = (receptionist_id or "").strip()
+    if receptionist and log_id:
+        deep_link = f"/receptionists/{receptionist}/calls/{log_id}"
+    elif receptionist:
+        deep_link = f"/receptionists/{receptionist}/calls"
+    else:
+        deep_link = ""
     data = {
         "type": "incoming_call",
         "call_sid": call_sid,
         "caller": caller or "",
-        "receptionist_id": receptionist_id or "",
-        "receptionist_name": receptionist_name or "Receptionist",
+        "receptionist_id": receptionist,
+        "receptionist_name": display_name,
+        "call_log_id": log_id,
+        "deep_link": deep_link,
     }
     # Ensure all values are strings for FCM data payload
     data = {k: str(v) for k, v in data.items()}
 
+    # Title is what iOS shows when the app is not in the foreground.
+    # There is no Accept action: the owner cannot join the call.
+    title = f"New call to {display_name}"
     message = messaging.MulticastMessage(
         tokens=tokens,
         notification=messaging.Notification(
-            title="Incoming call",
-            body=f"{receptionist_name} – Call from {caller or 'Unknown'}",
+            title=title,
+            body="Your AI receptionist is answering.",
         ),
         data=data,
         android=messaging.AndroidConfig(
@@ -102,7 +118,8 @@ def send_call_ended_push(
     receptionist_name: str = "Receptionist",
 ) -> int:
     """
-    Send FCM push when call ends (to clear CallKit UI).
+    Send an informational FCM push when a call ends.
+    Does not ask the device to hang up; the AI already owns the call.
     """
     messaging = _get_messaging()
     if not messaging:

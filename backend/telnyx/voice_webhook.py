@@ -60,6 +60,7 @@ async def _send_incoming_call_push(
     caller: str,
     receptionist_id: str,
     receptionist_name: str,
+    call_log_id: str = "",
 ) -> None:
     """Send FCM push for incoming call via backend firebase-admin."""
     try:
@@ -71,6 +72,7 @@ async def _send_incoming_call_push(
             caller=caller,
             receptionist_id=receptionist_id or "",
             receptionist_name=receptionist_name,
+            call_log_id=call_log_id or "",
         )
         if sent == 0 and not (settings.firebase_service_account_key or "").strip():
             logger.warning("Call push skipped: FIREBASE_SERVICE_ACCOUNT_KEY not set")
@@ -310,6 +312,7 @@ async def handle_voice_webhook(body: dict[str, Any], raw_body: bytes, headers: d
         return {"success": True}
 
     # call_logs: insert on call.initiated (every call counts, even short/rejected)
+    inserted_id = None
     if receptionist_id and user_id:
         inserted_id = _insert_call_log(
             supabase, call_control_id, receptionist_id, str(user_id),
@@ -351,6 +354,7 @@ async def handle_voice_webhook(body: dict[str, Any], raw_body: bytes, headers: d
                 caller=caller_number,
                 receptionist_id=receptionist_id,
                 receptionist_name=receptionist_name,
+                call_log_id=str(inserted_id) if inserted_id else "",
             )
         )
 

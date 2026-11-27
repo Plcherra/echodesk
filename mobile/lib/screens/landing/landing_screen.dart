@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../config/purchases.dart';
 import '../../config/trial_offer.dart';
 import '../../services/pending_plan_service.dart';
 import '../../theme/echodesk_theme.dart';
@@ -31,7 +32,11 @@ class _LandingScreenState extends State<LandingScreen> {
   @override
   void initState() {
     super.initState();
-    _refreshTrialSpots();
+    if (kPurchasesEnabled) {
+      if (!isIosPlatform) {
+        _refreshTrialSpots();
+      }
+    }
   }
 
   Future<void> _refreshTrialSpots() async {
@@ -41,6 +46,15 @@ class _LandingScreenState extends State<LandingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (kPurchasesEnabled) {
+      if (!isIosPlatform) {
+        return _buildCommercial();
+      }
+    }
+    return const _StoreSafeLanding();
+  }
+
+  Widget _buildCommercial() {
     return Scaffold(
       body: constrainedScaffoldBody(
         maxWidth: 1120,
@@ -871,4 +885,82 @@ class _MarketingPlan {
   final String? overage;
   final List<String>? features;
   final bool showTrialSpots;
+}
+
+/// Product page with sign-in and account creation, and no purchase copy.
+class _StoreSafeLanding extends StatelessWidget {
+  const _StoreSafeLanding();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: constrainedScaffoldBody(
+        maxWidth: 1120,
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              floating: true,
+              pinned: true,
+              toolbarHeight: 72,
+              backgroundColor: EchoDeskColors.background.withValues(alpha: 0.94),
+              surfaceTintColor: Colors.transparent,
+              titleSpacing: 16,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: 'Back',
+                onPressed: () => context.go('/'),
+              ),
+              title: const BrandLockup(centered: true),
+              actions: [
+                TextButton(
+                  onPressed: () => context.go('/login'),
+                  child: const Text('Log in'),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: FilledButton(
+                    onPressed: () => context.go('/signup'),
+                    child: const Text('Create account'),
+                  ),
+                ),
+              ],
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+                child: Column(
+                  children: [
+                    Text(
+                      'Turn missed calls into booked appointments.',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'EchoDesk answers calls, checks real calendar availability, and keeps every call organized.',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: () => context.go('/signup'),
+                      child: const Text('Create account'),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: () => context.go('/login'),
+                      child: const Text('Log in'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: _ProductPreview()),
+            const SliverToBoxAdapter(child: _FeatureSection()),
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          ],
+        ),
+      ),
+    );
+  }
 }
