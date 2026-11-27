@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../config/purchases.dart';
 import '../../config/trial_offer.dart';
 import '../../services/pending_plan_service.dart';
 import '../../theme/echodesk_theme.dart';
@@ -20,7 +21,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   void initState() {
     super.initState();
-    _refreshTrialSpots();
+    if (kPurchasesEnabled) {
+      if (!isIosPlatform) {
+        _refreshTrialSpots();
+      }
+    }
   }
 
   Future<void> _refreshTrialSpots() async {
@@ -29,15 +34,18 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   Future<void> _createAccount({String? planId}) async {
-    if (PendingPlanService.isValidPlanId(planId)) {
-      await PendingPlanService.save(planId!.trim());
-    } else {
-      await PendingPlanService.clear();
+    if (kPurchasesEnabled) {
+      if (!isIosPlatform && PendingPlanService.isValidPlanId(planId)) {
+        final id = planId!.trim();
+        await PendingPlanService.save(id);
+        if (!mounted) return;
+        context.go('/signup?plan=$id');
+        return;
+      }
     }
+    await PendingPlanService.clear();
     if (!mounted) return;
-    final query =
-        PendingPlanService.isValidPlanId(planId) ? '?plan=${planId!.trim()}' : '';
-    context.go('/signup$query');
+    context.go('/signup');
   }
 
   void _scrollToPlans() {
@@ -53,6 +61,87 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (kPurchasesEnabled) {
+      if (!isIosPlatform) {
+        return _buildCommercial(context);
+      }
+    }
+    return _buildCompanion(context);
+  }
+
+  Widget _buildCompanion(BuildContext context) {
+    return Scaffold(
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFE8F2F1),
+              EchoDeskColors.background,
+              Color(0xFFF7F5F2),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const BrandLockup(markSize: 44, centered: false),
+                    const SizedBox(height: EchoDeskSpacing.xl),
+                    Text(
+                      'Never miss another booking call.',
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.5,
+                            height: 1.15,
+                            color: EchoDeskColors.ink,
+                          ),
+                    ),
+                    const SizedBox(height: EchoDeskSpacing.sm),
+                    Text(
+                      'EchoDesk answers your business line, checks Google Calendar, and books appointments while you work.',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: EchoDeskColors.muted,
+                            height: 1.45,
+                          ),
+                    ),
+                    const SizedBox(height: EchoDeskSpacing.lg),
+                    const _ValueRows(),
+                    const SizedBox(height: EchoDeskSpacing.lg),
+                    const _ProductPreviewPanel(),
+                    const SizedBox(height: EchoDeskSpacing.xl),
+                    FilledButton(
+                      onPressed: () => _createAccount(),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                      ),
+                      child: const Text('Create account'),
+                    ),
+                    const SizedBox(height: EchoDeskSpacing.sm),
+                    OutlinedButton(
+                      onPressed: () => context.go('/login'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      child: const Text('Log in'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCommercial(BuildContext context) {
     final trialOpen = TrialOffer.hasSpotsRemaining;
 
     return Scaffold(

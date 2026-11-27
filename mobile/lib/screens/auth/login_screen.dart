@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/env.dart';
 import '../../widgets/brand_lockup.dart';
+import '../../widgets/legal_links.dart';
 import '../../widgets/password_field.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -174,6 +175,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       label: const Text('Continue with Google'),
                     ),
                   ],
+                  const SizedBox(height: 8),
+                  const LegalLinks(),
                 ],
               ),
             ),

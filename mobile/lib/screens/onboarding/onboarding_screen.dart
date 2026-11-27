@@ -6,10 +6,12 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../config/purchases.dart';
 import '../../config/trial_offer.dart';
 import '../../services/api_client.dart';
 import '../../strings.dart';
 import '../../theme/echodesk_theme.dart';
+import '../../widgets/account_inactive_notice.dart';
 import '../../widgets/brand_lockup.dart';
 import '../../widgets/confirm_sign_out.dart';
 import '../../widgets/constrained_scaffold_body.dart';
@@ -167,6 +169,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool get _isTrialing =>
       (_subscriptionStatus ?? '').toLowerCase() == 'trialing';
 
+  bool get _showTrialCopy {
+    if (kPurchasesEnabled) {
+      if (!isIosPlatform) return true;
+    }
+    return false;
+  }
+
+  Widget _subscriptionBadge() {
+    if (kPurchasesEnabled) {
+      if (!isIosPlatform) {
+        return _TrialChip(isTrialing: _isTrialing);
+      }
+    }
+    return const _ActiveChip();
+  }
+
   Future<void> _connectCalendar() async {
     try {
       final res = await ApiClient.get(
@@ -303,7 +321,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           if (_isSubscribed)
                             Padding(
                               padding: const EdgeInsets.only(right: 4),
-                              child: _TrialChip(isTrialing: _isTrialing),
+                              child: _subscriptionBadge(),
                             ),
                           PopupMenuButton<String>(
                             tooltip: 'Account',
@@ -371,7 +389,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     switch (phase) {
       case _OnboardingPhase.welcome:
         return _WelcomeBody(
-          isTrialing: _isTrialing || _isSubscribed,
+          isTrialing: _showTrialCopy && (_isTrialing || _isSubscribed),
           onStart: () => setState(() {
             _welcomeSeen = true;
             _phaseAnimKey++;
@@ -391,16 +409,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         );
       case _OnboardingPhase.assistant:
         if (!_isSubscribed) {
-          return _StepBody(
-            kicker: 'Step 2 of 4',
-            headline: 'Activate your plan to continue',
-            body:
-                'Create your AI receptionist after choosing a plan — or claim a launch trial spot if one is still open.',
-            footnote: 'Takes about a minute. No long-term contract.',
-            primaryLabel: 'Choose a plan',
-            onPrimary: () => context.push('/checkout'),
-            secondaryLabel: 'Refresh status',
-            onSecondary: _load,
+          if (kPurchasesEnabled) {
+            if (!isIosPlatform) {
+              return _StepBody(
+                kicker: 'Step 2 of 4',
+                headline: 'Activate your plan to continue',
+                body:
+                    'Create your AI receptionist after choosing a plan — or claim a launch trial spot if one is still open.',
+                footnote: 'Takes about a minute. No long-term contract.',
+                primaryLabel: 'Choose a plan',
+                onPrimary: () => context.push('/checkout'),
+                secondaryLabel: 'Refresh status',
+                onSecondary: _load,
+              );
+            }
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Spacer(),
+              const AccountInactiveNotice(textAlign: TextAlign.center),
+              const Spacer(),
+              TextButton(
+                onPressed: _load,
+                child: const Text('Refresh status'),
+              ),
+            ],
           );
         }
         return _StepBody(
@@ -437,6 +471,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           onCopy: _copyNumber,
         );
     }
+  }
+}
+
+String _welcomeHeadline(bool isTrialing) {
+  if (kPurchasesEnabled) {
+    if (!isIosPlatform && isTrialing) {
+      return 'Your ${TrialOffer.trialDays}-day trial is ready';
+    }
+  }
+  return 'Welcome to EchoDesk';
+}
+
+class _ActiveChip extends StatelessWidget {
+  const _ActiveChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: EchoDeskColors.brandSoft,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: EchoDeskColors.line),
+      ),
+      child: Text(
+        'Active',
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: EchoDeskColors.brand,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
   }
 }
 
@@ -533,9 +599,7 @@ class _WelcomeBody extends StatelessWidget {
         const BrandLockup(markSize: 56, centered: true),
         const SizedBox(height: EchoDeskSpacing.xl),
         Text(
-          isTrialing
-              ? 'Your ${TrialOffer.trialDays}-day trial is ready'
-              : 'Welcome to EchoDesk',
+          _welcomeHeadline(isTrialing),
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.4,

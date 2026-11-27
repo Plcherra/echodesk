@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../config/purchases.dart';
 import '../../services/api_client.dart';
 import '../../strings.dart';
+import '../../widgets/legal_links.dart';
 import '../../theme/echodesk_theme.dart';
 import '../../widgets/confirm_delete_account.dart';
 import '../../widgets/confirm_sign_out.dart';
@@ -109,31 +111,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       .push('/receptionists/$_firstReceptionistId/settings')
                   : context.push('/receptionists'),
             ),
+            if (kPurchasesEnabled)
+              if (!isIosPlatform) ...[
+                const SizedBox(height: 24),
+                _SectionHeader(title: 'Billing'),
+                const SizedBox(height: 4),
+                ListTile(
+                  title: const Text('Billing Portal'),
+                  subtitle: const Text('Manage subscription and payment'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                  trailing: _loadingBilling
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chevron_right, size: 20),
+                  onTap: _loadingBilling
+                      ? null
+                      : () => _openBillingPortal(context),
+                ),
+                ListTile(
+                  title: const Text('Subscribe / Upgrade'),
+                  subtitle: const Text('Starter, Growth, Business'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  onTap: () => context.push('/checkout'),
+                ),
+              ],
             const SizedBox(height: 24),
-            _SectionHeader(title: 'Billing'),
+            _SectionHeader(title: 'Legal'),
             const SizedBox(height: 4),
-            ListTile(
-              title: const Text('Billing Portal'),
-              subtitle: const Text('Manage subscription and payment'),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-              trailing: _loadingBilling
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.chevron_right, size: 20),
-              onTap: _loadingBilling
-                  ? null
-                  : () => _openBillingPortal(context),
-            ),
-            ListTile(
-              title: const Text('Subscribe / Upgrade'),
-              subtitle: const Text('Starter, Growth, Business'),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-              trailing: const Icon(Icons.chevron_right, size: 20),
-              onTap: () => context.push('/checkout'),
-            ),
+            const LegalLinks(alignStart: true),
             const SizedBox(height: 24),
             _SectionHeader(title: 'Integrations'),
             const SizedBox(height: 4),

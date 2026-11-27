@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/env.dart';
+import '../../config/purchases.dart';
 import '../../services/pending_plan_service.dart';
+import '../../widgets/legal_links.dart';
 import '../../widgets/brand_lockup.dart';
 import '../../widgets/password_field.dart';
 
@@ -24,8 +26,13 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _error;
 
   String? get _validPlanId {
-    final planId = widget.planId?.trim();
-    return PendingPlanService.isValidPlanId(planId) ? planId : null;
+    if (kPurchasesEnabled) {
+      if (!isIosPlatform) {
+        final planId = widget.planId?.trim();
+        return PendingPlanService.isValidPlanId(planId) ? planId : null;
+      }
+    }
+    return null;
   }
 
   @override
@@ -64,11 +71,13 @@ class _SignupScreenState extends State<SignupScreen> {
       );
       if (mounted) {
         if (authRes.session != null) {
-          if (planId != null) {
-            context.go('/checkout?plan=${Uri.encodeComponent(planId)}');
-          } else {
-            context.go('/dashboard');
+          var destination = '/dashboard';
+          if (kPurchasesEnabled) {
+            if (!isIosPlatform && planId != null) {
+              destination = '/checkout?plan=${Uri.encodeComponent(planId)}';
+            }
           }
+          context.go(destination);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Check your email to confirm signup')),
@@ -198,6 +207,8 @@ class _SignupScreenState extends State<SignupScreen> {
                       label: const Text('Continue with Google'),
                     ),
                   ],
+                  const SizedBox(height: 8),
+                  const LegalLinks(),
                 ],
               ),
             ),

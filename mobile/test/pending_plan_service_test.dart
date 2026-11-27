@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:echodesk_mobile/models/plan.dart';
 import 'package:echodesk_mobile/services/pending_plan_service.dart';
 
 void main() {
@@ -14,10 +16,15 @@ void main() {
     expect(await PendingPlanService.peekValid(), 'starter');
   });
 
-  test('allows hidden internal dev_test via deep link', () async {
+  test('allows hidden internal dev_test via deep link in debug only', () async {
     await PendingPlanService.save('dev_test');
 
-    expect(await PendingPlanService.peekValid(), 'dev_test');
+    if (kDebugMode) {
+      expect(await PendingPlanService.peekValid(), 'dev_test');
+    } else {
+      expect(await PendingPlanService.peekValid(), isNull);
+    }
+    expect(Plan.publicPlans.map((plan) => plan.id), isNot(contains('dev_test')));
   });
 
   test('rejects retired pro plan', () async {

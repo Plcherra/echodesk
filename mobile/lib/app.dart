@@ -5,9 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_router.dart';
+import 'config/purchases.dart';
 import 'services/account_bootstrap_service.dart';
 import 'services/api_client.dart';
-import 'services/call_service.dart';
 import 'services/deep_link_handler.dart';
 import 'services/pending_plan_service.dart';
 import 'services/push_service.dart';
@@ -54,26 +54,23 @@ class _EchodeskAppState extends State<EchodeskApp> {
               data.event == AuthChangeEvent.tokenRefreshed ||
               data.event == AuthChangeEvent.initialSession)) {
         final path = _router.routerDelegate.currentConfiguration.uri.path;
-        if (path == '/' ||
-            path.startsWith('/learn-more') ||
-            path.startsWith('/login') ||
-            path.startsWith('/signup')) {
-          _router.go(await _homeAfterAuth());
+        if (_isAuthEntryPath(path)) {
+          final home = await _homeAfterAuth();
+          if (!mounted) return;
+          // A notification may have opened a call while this lookup ran.
+          final now = _router.routerDelegate.currentConfiguration.uri.path;
+          if (_isAuthEntryPath(now)) {
+            _router.go(home);
+          }
         }
       }
     });
-    CallService().onCallAccepted = (callSid, receptionistId, caller) {
-      final q = <String, String>{};
-      if (receptionistId.isNotEmpty) q['receptionist_id'] = receptionistId;
-      if (caller.isNotEmpty) q['caller'] = caller;
-      final path = q.isEmpty
-          ? '/call/$callSid'
-          : '/call/$callSid?${Uri(queryParameters: q).query}';
-      _router.go(path);
-    };
     PushService().onNavigate = (route) {
       if (route.isEmpty) return;
-      _router.go(route);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _router.go(route);
+      });
     };
     _deepLinkHandler.init(
       (msg) {
@@ -82,6 +79,13 @@ class _EchodeskAppState extends State<EchodeskApp> {
       onGoogleCalendarConnected: _refreshAfterCalendarConnect,
       onAuthSuccess: _afterAuthDeepLink,
     );
+  }
+
+  bool _isAuthEntryPath(String path) {
+    return path == '/' ||
+        path.startsWith('/learn-more') ||
+        path.startsWith('/login') ||
+        path.startsWith('/signup');
   }
 
   Future<bool> _isOnboardingComplete() async {
@@ -113,13 +117,20 @@ class _EchodeskAppState extends State<EchodeskApp> {
   }
 
   Future<void> _routePendingPlanIfNeeded() async {
-    final pendingPlanId = await PendingPlanService.peekValid();
-    if (!mounted || pendingPlanId == null) return;
+    if (kPurchasesEnabled) {
+      if (!isIosPlatform) {
+        final pendingPlanId = await PendingPlanService.peekValid();
+        if (!mounted || pendingPlanId == null) return;
 
-    final currentPath = _router.routerDelegate.currentConfiguration.uri.path;
-    if (currentPath.startsWith('/checkout')) return;
+        final currentPath =
+            _router.routerDelegate.currentConfiguration.uri.path;
+        if (currentPath.startsWith('/checkout')) return;
 
-    _router.go('/checkout?plan=${Uri.encodeComponent(pendingPlanId)}');
+        _router.go('/checkout?plan=${Uri.encodeComponent(pendingPlanId)}');
+        return;
+      }
+    }
+    await PendingPlanService.clear();
   }
 
   Future<void> _refreshAfterCalendarConnect(String? returnTo) async {

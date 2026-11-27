@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../config/purchases.dart';
 import '../../models/receptionist.dart';
-import '../../strings.dart';
 import '../../services/api_client.dart';
+import '../../strings.dart';
 import '../../theme/echodesk_theme.dart';
+import '../../widgets/account_inactive_notice.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 import '../../widgets/loading_skeleton.dart';
 import '../../widgets/state_views.dart';
@@ -521,12 +523,17 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('Subscribe to continue'),
-            const SizedBox(height: 8),
-            const Text(
-              'You need an active subscription to add receptionists.',
-              textAlign: TextAlign.center,
-            ),
+            if (kPurchasesEnabled)
+              if (!isIosPlatform) ...[
+                const Text('Subscribe to continue'),
+                const SizedBox(height: 8),
+                const Text(
+                  'You need an active subscription to add receptionists.',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            if (!kPurchasesEnabled || isIosPlatform)
+              const AccountInactiveNotice(textAlign: TextAlign.center),
             const SizedBox(height: 24),
             FilledButton(
               onPressed: () => context.go('/dashboard'),

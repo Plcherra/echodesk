@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/env.dart';
+import '../../config/purchases.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 
 class HelpScreen extends StatelessWidget {
@@ -12,6 +13,14 @@ class HelpScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final supportEmail = Env.supportEmail;
+    var gettingStarted =
+        'Complete onboarding: connect Google Calendar, then create your first receptionist. Your assistant answers calls on your business line.';
+    if (kPurchasesEnabled) {
+      if (!isIosPlatform) {
+        gettingStarted =
+            'Complete onboarding: connect Google Calendar, choose a plan, then create your first receptionist. Your assistant answers calls on your business line.';
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -38,7 +47,7 @@ class HelpScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Complete onboarding: connect Google Calendar, choose a plan, then create your first receptionist. Your assistant answers calls on your business line.',
+                    gettingStarted,
                     style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 8),
@@ -75,23 +84,25 @@ class HelpScreen extends StatelessWidget {
                 ],
               ),
             ),
-            _HelpCard(
-              title: 'Billing and plans',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Subscription plans include a fixed monthly price and included minutes. Usage is tracked per receptionist; you can see "Minutes this period" on the dashboard. Overage may be billed if you exceed your included minutes.',
-                    style: theme.textTheme.bodyMedium,
+            if (kPurchasesEnabled)
+              if (!isIosPlatform)
+                _HelpCard(
+                  title: 'Billing and plans',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Subscription plans include a fixed monthly price and included minutes. Usage is tracked per receptionist; you can see "Minutes this period" on the dashboard. Overage may be billed if you exceed your included minutes.',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => context.push('/settings'),
+                        child: const Text('Manage subscription'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () => context.push('/settings'),
-                    child: const Text('Manage subscription'),
-                  ),
-                ],
-              ),
-            ),
+                ),
             _HelpCard(
               title: 'Contact support',
               child: Column(

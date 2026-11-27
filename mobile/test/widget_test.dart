@@ -15,7 +15,7 @@ void main() {
       );
 
       expect(find.text('Log in'), findsOneWidget);
-      expect(find.text('AI Receptionist'), findsOneWidget);
+      expect(find.text('EchoDesk'), findsOneWidget);
       expect(find.byType(TextFormField), findsNWidgets(2));
       expect(find.text('Sign In'), findsOneWidget);
       expect(find.text("Don't have an account? Sign up"), findsOneWidget);
@@ -47,7 +47,7 @@ void main() {
       );
 
       expect(find.text('Create account'), findsOneWidget);
-      expect(find.text('AI Receptionist'), findsOneWidget);
+      expect(find.text('EchoDesk'), findsOneWidget);
       expect(find.byType(TextFormField), findsNWidgets(2));
       expect(find.text('Sign Up'), findsOneWidget);
       expect(find.text('Already have an account? Log in'), findsOneWidget);

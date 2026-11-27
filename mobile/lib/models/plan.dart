@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
+
 /// Subscription plan definitions (matches backend stripe_plans / Stripe prices).
 class Plan {
   final String id;
@@ -51,9 +53,14 @@ class Plan {
   /// Plans shown in customer-facing plan pickers.
   static List<Plan> get subscriptionPlans => publicPlans;
 
-  /// Plans that may be purchased via API or deep link (includes hidden internal).
-  static List<Plan> get checkoutablePlans => [
-        ...publicPlans,
-        internalDevPlan,
-      ];
+  /// Plans that may be purchased via API or deep link.
+  ///
+  /// The hidden $1 `dev_test` plan is included in debug builds only.
+  /// Release and profile builds cannot reach it, including by deep link.
+  static List<Plan> get checkoutablePlans {
+    if (kDebugMode) {
+      return const [...publicPlans, internalDevPlan];
+    }
+    return publicPlans;
+  }
 }

@@ -17,7 +17,6 @@ import 'config/env.dart';
 import 'app.dart';
 import 'firebase_options.dart';
 import 'services/push_service.dart';
-import 'services/call_service.dart';
 
 void main() async {
   var firebaseReady = false;
@@ -74,7 +73,6 @@ void main() async {
     if (defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.android) {
       await PushService().initialize();
-      await CallService().initialize();
     }
     runApp(const EchodeskApp());
   }, (error, stack) {

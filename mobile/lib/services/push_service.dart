@@ -11,30 +11,60 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'api_client.dart';
-import 'call_service.dart';
 import '../firebase_options.dart';
 
-// Background message handler - must be top-level
+/// Lock-screen text for a new call. The AI answers server-side.
+String incomingCallNotificationText(String? receptionistName) {
+  final name = (receptionistName ?? '').trim();
+  final who = name.isEmpty ? 'your receptionist' : name;
+  return 'New call to $who';
+}
+
+/// Route opened when a call notification is tapped.
+///
+/// Prefers the call detail screen. Falls back to that receptionist's call
+/// list. Never opens an in-app "active call" screen.
+String? routeForPushData(Map<String, dynamic> data) {
+  final type = data['type']?.toString() ?? data['notification_type']?.toString();
+  if (type == 'incoming_call' || type == 'call_ended') {
+    final deepLink = data['deep_link']?.toString() ?? '';
+    if (deepLink.startsWith('/receptionists/') && deepLink.contains('/calls')) {
+      return deepLink;
+    }
+    final receptionistId =
+        (data['receptionist_id'] ?? data['receptionistId'] ?? '').toString();
+    final callLogId = (data['call_log_id'] ?? data['callLogId'] ?? '').toString();
+    if (receptionistId.isNotEmpty && callLogId.isNotEmpty) {
+      return '/receptionists/$receptionistId/calls/$callLogId';
+    }
+    if (receptionistId.isNotEmpty) {
+      return '/receptionists/$receptionistId/calls';
+    }
+    return null;
+  }
+
+  if (type == 'appointment_created' || type == 'new_appointment') {
+    final deepLink = data['deep_link']?.toString();
+    final appointmentId = data['appointment_id']?.toString();
+    final status = data['status']?.toString();
+    if (deepLink != null && deepLink.isNotEmpty) return deepLink;
+    if (status == 'needs_review' || status == null) {
+      return '/appointments?status=needs_review';
+    }
+    if (appointmentId != null && appointmentId.isNotEmpty) {
+      return '/appointments/$appointmentId';
+    }
+    return '/appointments';
+  }
+  return null;
+}
+
+// Background message handler - must be top-level.
+// The OS displays the notification payload. Do not present CallKit here:
+// the owner cannot join the call, and Accept/Decline was misleading.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  final data = message.data;
-  if (data.isEmpty) return;
-  final type = data['type'] ?? data['notification_type'];
-  if (type != 'incoming_call' && type != 'call_ended') return;
-  final callSid = data['call_sid'] ?? data['callSid'];
-  final receptionistName = data['receptionist_name'] ?? data['receptionistName'];
-  final receptionistId = data['receptionist_id'] ?? data['receptionistId'] ?? '';
-  final caller = data['caller'] ?? data['callerNumber'] ?? '';
-  if (callSid != null && callSid.isNotEmpty) {
-    await CallService().handlePushCallEvent(
-      type!,
-      callSid,
-      receptionistName,
-      receptionistId: receptionistId?.toString() ?? '',
-      caller: caller?.toString() ?? '',
-    );
-  }
 }
 
 class PushService {
@@ -43,7 +73,10 @@ class PushService {
 
   PushService._();
 
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  FirebaseMessaging? _messaging;
+
+  FirebaseMessaging get _firebaseMessaging =>
+      _messaging ??= FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
@@ -55,8 +88,24 @@ class PushService {
 
   void Function(String title, String body)? onForegroundNotification;
 
-  /// Navigate when an appointment (or other non-call) notification is opened.
-  void Function(String route)? onNavigate;
+  /// Navigate when a notification is opened.
+  ///
+  /// A tap that launches the app from a terminated state is handled inside
+  /// [initialize], which runs before this callback exists. That route is kept
+  /// and delivered when the callback is assigned.
+  void Function(String route)? _onNavigate;
+  String? _pendingRoute;
+
+  void Function(String route)? get onNavigate => _onNavigate;
+
+  set onNavigate(void Function(String route)? callback) {
+    _onNavigate = callback;
+    final pending = _pendingRoute;
+    if (callback != null && pending != null && pending.isNotEmpty) {
+      _pendingRoute = null;
+      callback(pending);
+    }
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -124,7 +173,7 @@ class PushService {
 
   /// Handle notification that launched app from terminated state.
   Future<void> _handleInitialMessage() async {
-    final message = await _messaging.getInitialMessage();
+    final message = await _firebaseMessaging.getInitialMessage();
     if (message?.data != null && message!.data.isNotEmpty) {
       _handleNotificationData(message.data);
     }
@@ -132,6 +181,21 @@ class PushService {
 
   void _setupListeners() {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final data = message.data;
+      final type =
+          data['type']?.toString() ?? data['notification_type']?.toString();
+      if (type == 'incoming_call') {
+        final text = incomingCallNotificationText(
+          data['receptionist_name']?.toString() ??
+              data['receptionistName']?.toString(),
+        );
+        _showLocalNotification(
+          text,
+          'Your AI receptionist is answering.',
+          data,
+        );
+        return;
+      }
       final notification = message.notification;
       if (notification != null) {
         if (onForegroundNotification != null) {
@@ -143,7 +207,7 @@ class PushService {
           _showLocalNotification(
             notification.title ?? 'EchoDesk',
             notification.body ?? '',
-            message.data,
+            data,
           );
         }
       }
@@ -174,36 +238,18 @@ class PushService {
   }
 
   void _handleNotificationData(Map<String, dynamic> data) {
-    final type = data['type'] as String? ?? data['notification_type'] as String?;
-    if (type != null && (type == 'incoming_call' || type == 'call_ended')) {
-      final callSid = data['call_sid'] as String? ?? data['callSid'] as String?;
-      final receptionistName =
-          data['receptionist_name'] as String? ?? data['receptionistName'] as String?;
-      final receptionistId = (data['receptionist_id'] ?? data['receptionistId'] ?? '') as String;
-      final caller = (data['caller'] ?? data['callerNumber'] ?? '') as String;
-      CallService().handlePushCallEvent(
-        type,
-        callSid,
-        receptionistName,
-        receptionistId: receptionistId,
-        caller: caller,
-      );
+    deliverRoute(routeForPushData(data));
+  }
+
+  /// Send [route] to [onNavigate], or hold it until that callback is set.
+  void deliverRoute(String? route) {
+    if (route == null || route.isEmpty) return;
+    final callback = _onNavigate;
+    if (callback == null) {
+      _pendingRoute = route;
       return;
     }
-
-    if (type == 'appointment_created' || type == 'new_appointment') {
-      final deepLink = data['deep_link'] as String?;
-      final appointmentId = data['appointment_id'] as String?;
-      final status = data['status'] as String?;
-      final route = (deepLink != null && deepLink.isNotEmpty)
-          ? deepLink
-          : (status == 'needs_review' || status == null)
-              ? '/appointments?status=needs_review'
-              : (appointmentId != null && appointmentId.isNotEmpty)
-                  ? '/appointments/$appointmentId'
-                  : '/appointments';
-      onNavigate?.call(route);
-    }
+    callback(route);
   }
 
   Future<void> _showLocalNotification(
@@ -238,7 +284,7 @@ class PushService {
   }
 
   Future<void> _requestPermission() async {
-    final settings = await _messaging.requestPermission(
+    final settings = await _firebaseMessaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
@@ -248,7 +294,7 @@ class PushService {
 
   Future<void> _getToken() async {
     try {
-      _fcmToken = await _messaging.getToken();
+      _fcmToken = await _firebaseMessaging.getToken();
       if (kDebugMode) print('[PushService] FCM token: ${_fcmToken?.substring(0, 20)}...');
       if (_fcmToken != null) {
         await _registerTokenWithBackend(_fcmToken!);
@@ -257,7 +303,7 @@ class PushService {
       if (kDebugMode) print('[PushService] FCM getToken: $e');
     }
 
-    _messaging.onTokenRefresh.listen((token) {
+    _firebaseMessaging.onTokenRefresh.listen((token) {
       _fcmToken = token;
       _registerTokenWithBackend(token);
     });

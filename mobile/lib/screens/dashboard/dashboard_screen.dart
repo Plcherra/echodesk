@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../config/purchases.dart';
 import '../../models/receptionist.dart';
 import '../../models/user_profile.dart';
 import '../../services/appointment_service.dart';
@@ -10,6 +11,7 @@ import '../../services/dashboard_service.dart';
 import '../../theme/echodesk_theme.dart';
 import '../../utils/appointment_formatters.dart';
 import '../../utils/call_formatters.dart';
+import '../../widgets/account_inactive_notice.dart';
 import '../../widgets/confirm_sign_out.dart';
 import '../../widgets/constrained_scaffold_body.dart';
 import '../../widgets/loading_skeleton.dart';
@@ -332,7 +334,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  String _overageWarningCopy() {
+    if (kPurchasesEnabled) {
+      if (!isIosPlatform) {
+        return 'Over cap; overage may be billed at \$0.20/min.';
+      }
+    }
+    return 'Over cap. Extra minutes may apply.';
+  }
+
   Widget _buildUpgradeCard(BuildContext context, UserProfile profile) {
+    if (kPurchasesEnabled) {
+      if (!isIosPlatform) {
+        return _buildPurchaseUpgradeCard(context, profile);
+      }
+    }
+    return const Card(
+      child: Padding(
+        padding: EdgeInsets.all(24),
+        child: AccountInactiveNotice(),
+      ),
+    );
+  }
+
+  Widget _buildPurchaseUpgradeCard(BuildContext context, UserProfile profile) {
     final needsSetup = !profile.onboardingComplete;
     return Card(
       child: Padding(
@@ -385,9 +410,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _remainingMinutes! > 0 &&
         _remainingMinutes! <= 30;
     final subtext = overageText ??
-        (overageWarning
-            ? 'Over cap; overage may be billed at \$0.25/min.'
-            : remainingText);
+        (overageWarning ? _overageWarningCopy() : remainingText);
     final subtextColor = overageText != null || overageWarning
         ? EchoDeskColors.warning
         : (lowMinutes ? EchoDeskColors.warning : EchoDeskColors.success);

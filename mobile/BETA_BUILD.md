@@ -51,14 +51,18 @@ open ios/Runner.xcworkspace
 - Choose your Team and provisioning profile
 - Ensure Bundle ID matches your App Store Connect app
 
-2. **Build and archive**:
+2. **Build and archive** (App Store / TestFlight). iOS is a sign-in companion:
+   purchases stay off so plan, price, trial, and checkout UI is stripped.
 
 ```bash
-flutter build ipa --release \
+flutter build ipa --release --build-number=3 \
+  --dart-define=PURCHASES_ENABLED=false \
   --dart-define=API_BASE_URL=https://echodesk.us \
   --dart-define=SUPABASE_URL=$SUPABASE_URL \
   --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
 ```
+
+Current store build: version `1.0.0`, build number `3` (`pubspec.yaml` `1.0.0+3`).
 
 Output: `build/ios/ipa/*.ipa`
 
@@ -78,13 +82,13 @@ Before sharing with testers, run through the full flow:
 |------|--------|----------|
 | 1 | Open app → Get Started | Sign up screen |
 | 2 | Sign up with email | Account created, redirect to dashboard |
-| 3 | Dashboard shows "Upgrade" (if not subscribed) | Upgrade CTA visible |
-| 4 | Tap Subscribe → Complete Stripe Checkout | Redirect back to app, subscription synced |
+| 3 | Android/web: dashboard shows "Upgrade" if not subscribed. iOS store build (`PURCHASES_ENABLED=false`): inactive account shows "Your account isn't active yet. Contact echodesk2@gmail.com." with no purchase button | No prices, plans, trials, or buy buttons on iOS |
+| 4 | Android/web: tap Subscribe → complete Stripe Checkout. Skip on the iOS store build | Redirect back to the app on Android/web; iOS never opens checkout |
 | 5 | Finish onboarding: Connect Calendar, create receptionist, confirm business line | Onboarding complete |
 | 6 | Create receptionist (wizard) | Receptionist created and attached to the business line |
 | 7 | Receptionist detail → Start outbound call | Call initiated, "Call initiated" snackbar |
 | 8 | Dashboard → Minutes this period | Shows usage (e.g. 0 / 300) |
-| 9 | Settings → Billing | Opens Stripe portal in browser |
+| 9 | Android/web: Settings → Billing opens the Stripe portal. iOS store build has no Billing section | Privacy Policy and Terms are in Settings on every platform |
 | 10 | Help (from dashboard) | Help screen with guides |
 
 ## Run Script

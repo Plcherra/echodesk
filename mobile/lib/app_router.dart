@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'config/purchases.dart';
 import 'screens/landing/landing_screen.dart';
 import 'screens/landing/welcome_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -18,12 +19,22 @@ import 'screens/settings/edit_business_screen.dart';
 import 'screens/settings/communication_setup_screen.dart';
 import 'screens/checkout/checkout_screen.dart';
 import 'screens/help/help_screen.dart';
-import 'screens/call/active_call_screen.dart';
 import 'screens/calls/call_history_screen.dart';
 import 'screens/calls/call_detail_screen.dart';
 import 'screens/appointments/appointments_screen.dart';
 import 'screens/appointments/appointment_detail_screen.dart';
 import 'widgets/main_shell.dart';
+
+/// Checkout is only built when purchases are enabled and this is not iOS.
+/// Store builds pass PURCHASES_ENABLED=false so this widget is tree-shaken.
+Widget _checkoutPage(String? planId) {
+  if (kPurchasesEnabled) {
+    if (!isIosPlatform) {
+      return CheckoutScreen(planId: planId);
+    }
+  }
+  return const SizedBox.shrink();
+}
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _dashboardNavigatorKey = GlobalKey<NavigatorState>();
@@ -39,6 +50,10 @@ GoRouter createAppRouter({Listenable? refreshListenable}) {
     redirect: (context, state) async {
       final session = Supabase.instance.client.auth.currentSession;
       final isLoggedIn = session != null;
+      final blockCheckout = !kPurchasesEnabled || isIosPlatform;
+      if (state.matchedLocation.startsWith('/checkout') && blockCheckout) {
+        return isLoggedIn ? '/dashboard' : '/';
+      }
       final isLanding = state.matchedLocation == '/' ||
           state.matchedLocation.startsWith('/learn-more') ||
           state.matchedLocation.startsWith('/login') ||
@@ -75,13 +90,16 @@ GoRouter createAppRouter({Listenable? refreshListenable}) {
       // Redirect to onboarding if not yet complete.
       if (isLoggedIn) {
         final loc = state.matchedLocation;
+        final isCallHistory =
+            RegExp(r'^/receptionists/[^/]+/calls').hasMatch(loc);
         final allowlist = loc == '/onboarding' ||
             loc == '/reset-password' ||
             loc == '/receptionists/create' ||
             loc.startsWith('/settings') ||
             loc.startsWith('/checkout') ||
             loc == '/help' ||
-            loc.startsWith('/call/');
+            loc.startsWith('/call/') ||
+            isCallHistory;
         if (!allowlist) {
           try {
             final user = Supabase.instance.client.auth.currentUser;
@@ -133,8 +151,8 @@ GoRouter createAppRouter({Listenable? refreshListenable}) {
       ),
       GoRoute(
         path: '/checkout',
-        builder: (context, state) => CheckoutScreen(
-          planId: state.uri.queryParameters['plan'],
+        builder: (context, state) => _checkoutPage(
+          state.uri.queryParameters['plan'],
         ),
       ),
       GoRoute(
@@ -143,16 +161,17 @@ GoRouter createAppRouter({Listenable? refreshListenable}) {
       ),
       GoRoute(
         path: '/call/:callSid',
-        builder: (context, state) {
-          final callSid = state.pathParameters['callSid'] ?? '';
+        redirect: (context, state) {
           final receptionistId =
               state.uri.queryParameters['receptionist_id'] ?? '';
-          final caller = state.uri.queryParameters['caller'] ?? '';
-          return ActiveCallScreen(
-            callSid: callSid,
-            receptionistId: receptionistId,
-            caller: caller,
-          );
+          final callLogId = state.uri.queryParameters['call_log_id'] ?? '';
+          if (receptionistId.isNotEmpty && callLogId.isNotEmpty) {
+            return '/receptionists/$receptionistId/calls/$callLogId';
+          }
+          if (receptionistId.isNotEmpty) {
+            return '/receptionists/$receptionistId/calls';
+          }
+          return '/dashboard';
         },
       ),
       StatefulShellRoute.indexedStack(
@@ -203,11 +222,16 @@ GoRouter createAppRouter({Listenable? refreshListenable}) {
                         routes: [
                           GoRoute(
                             path: ':callId',
-                            builder: (context, state) => CallDetailScreen(
-                              receptionistId: state.pathParameters['id']!,
-                              callId: state.pathParameters['callId']!,
-                              callData: state.extra as Map<String, dynamic>?,
-                            ),
+                            builder: (context, state) {
+                              final receptionistId = state.pathParameters['id']!;
+                              final callId = state.pathParameters['callId']!;
+                              return CallDetailScreen(
+                                key: ValueKey('call-$receptionistId-$callId'),
+                                receptionistId: receptionistId,
+                                callId: callId,
+                                callData: state.extra as Map<String, dynamic>?,
+                              );
+                            },
                           ),
                         ],
                       ),

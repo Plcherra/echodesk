@@ -56,6 +56,7 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
   Map<String, dynamic>? _call;
   bool _loading = false;
   String? _error;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -66,7 +67,29 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
     }
   }
 
+  @override
+  void didUpdateWidget(CallDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final changed = oldWidget.receptionistId != widget.receptionistId ||
+        oldWidget.callId != widget.callId;
+    if (!changed) return;
+    // A notification can replace this page in place. Drop the previous call
+    // so a stale load cannot paint the last caller, transcript, or recording.
+    _loadGeneration++;
+    _audioPlayer.stop().then((_) {}, onError: (_) {});
+    _isPlaying = false;
+    _recordingExpired = false;
+    _recordingActionBusy = false;
+    _error = null;
+    _call = widget.callData;
+    _loading = false;
+    if (_call == null) {
+      _load();
+    }
+  }
+
   Future<void> _load() async {
+    final generation = ++_loadGeneration;
     setState(() {
       _loading = true;
       _error = null;
@@ -76,19 +99,19 @@ class _CallDetailScreenState extends State<CallDetailScreen> {
         receptionistId: widget.receptionistId,
         callId: widget.callId,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _call = call;
         _loading = false;
       });
     } on CallHistoryApiException catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _error = e.message;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _error = e.toString();
         _loading = false;
