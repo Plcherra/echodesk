@@ -17,6 +17,8 @@ import 'screens/receptionists/create_receptionist_screen.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/settings/edit_business_screen.dart';
 import 'screens/settings/communication_setup_screen.dart';
+import 'screens/billing/apple_plans_screen.dart';
+import 'screens/billing/stripe_plans_screen.dart';
 import 'screens/checkout/checkout_screen.dart';
 import 'screens/help/help_screen.dart';
 import 'screens/calls/call_history_screen.dart';
@@ -25,13 +27,21 @@ import 'screens/appointments/appointments_screen.dart';
 import 'screens/appointments/appointment_detail_screen.dart';
 import 'widgets/main_shell.dart';
 
-/// Checkout is only built when purchases are enabled and this is not iOS.
-/// Store builds pass PURCHASES_ENABLED=false so this widget is tree-shaken.
-Widget _checkoutPage(String? planId) {
-  if (kPurchasesEnabled) {
-    if (!isIosPlatform) {
-      return CheckoutScreen(planId: planId);
-    }
+/// Stripe checkout on Android and web. Apple plans on iOS.
+/// PURCHASES_ENABLED=false tree-shakes both.
+Widget _checkoutPage() {
+  if (stripePurchasesEnabled) {
+    return const StripePlansScreen();
+  }
+  if (applePurchasesEnabled) {
+    return const ApplePlansScreen();
+  }
+  return const SizedBox.shrink();
+}
+
+Widget _stripePayPage(String? planId) {
+  if (stripePurchasesEnabled) {
+    return CheckoutScreen(planId: planId);
   }
   return const SizedBox.shrink();
 }
@@ -50,7 +60,7 @@ GoRouter createAppRouter({Listenable? refreshListenable}) {
     redirect: (context, state) async {
       final session = Supabase.instance.client.auth.currentSession;
       final isLoggedIn = session != null;
-      final blockCheckout = !kPurchasesEnabled || isIosPlatform;
+      final blockCheckout = !stripePurchasesEnabled && !applePurchasesEnabled;
       if (state.matchedLocation.startsWith('/checkout') && blockCheckout) {
         return isLoggedIn ? '/dashboard' : '/';
       }
@@ -151,9 +161,15 @@ GoRouter createAppRouter({Listenable? refreshListenable}) {
       ),
       GoRoute(
         path: '/checkout',
-        builder: (context, state) => _checkoutPage(
-          state.uri.queryParameters['plan'],
-        ),
+        builder: (context, state) => _checkoutPage(),
+        routes: [
+          GoRoute(
+            path: 'pay',
+            builder: (context, state) => _stripePayPage(
+              state.uri.queryParameters['plan'],
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: '/help',

@@ -15,11 +15,12 @@ class HelpScreen extends StatelessWidget {
     final supportEmail = Env.supportEmail;
     var gettingStarted =
         'Complete onboarding: connect Google Calendar, then create your first receptionist. Your assistant answers calls on your business line.';
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform) {
-        gettingStarted =
-            'Complete onboarding: connect Google Calendar, choose a plan, then create your first receptionist. Your assistant answers calls on your business line.';
-      }
+    if (stripePurchasesEnabled) {
+      gettingStarted =
+          'Complete onboarding: connect Google Calendar, choose a plan, then create your first receptionist. Your assistant answers calls on your business line.';
+    } else if (applePurchasesEnabled) {
+      gettingStarted =
+          'Create an account, choose a monthly plan in the app, connect Google Calendar, then create your first receptionist.';
     }
 
     return Scaffold(
@@ -84,25 +85,42 @@ class HelpScreen extends StatelessWidget {
                 ],
               ),
             ),
-            if (kPurchasesEnabled)
-              if (!isIosPlatform)
-                _HelpCard(
-                  title: 'Billing and plans',
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Subscription plans include a fixed monthly price and included minutes. Usage is tracked per receptionist; you can see "Minutes this period" on the dashboard. Overage may be billed if you exceed your included minutes.',
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: () => context.push('/settings'),
-                        child: const Text('Manage subscription'),
-                      ),
-                    ],
-                  ),
+            if (stripePurchasesEnabled)
+              _HelpCard(
+                title: 'Billing and plans',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Subscription plans include a fixed monthly price and included minutes. Usage is tracked per receptionist; you can see "Minutes this period" on the dashboard. Overage may be billed if you exceed your included minutes.',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => context.push('/settings'),
+                      child: const Text('Manage subscription'),
+                    ),
+                  ],
                 ),
+              ),
+            if (applePurchasesEnabled)
+              _HelpCard(
+                title: 'Subscription',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Monthly plans are billed by Apple and renew until you cancel. Included minutes are a hard cap. Manage the subscription from Settings.',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => context.push('/settings'),
+                      child: const Text('Manage subscription'),
+                    ),
+                  ],
+                ),
+              ),
             _HelpCard(
               title: 'Contact support',
               child: Column(

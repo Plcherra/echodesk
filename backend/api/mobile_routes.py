@@ -36,7 +36,12 @@ from billing.stripe_sync import (
     upsert_subscription_from_stripe,
 )
 from billing.subscriptions import get_billing_access_state
-from stripe_plans import get_price_id_for_plan_id, plan_from_subscription
+from stripe_plans import (
+    TRIAL_DAYS,
+    get_price_id_for_plan_id,
+    minutes_for_subscription,
+    plan_from_subscription,
+)
 from billing.launch_trial import maybe_activate_launch_trial
 from supabase_client import create_service_role_client
 from telnyx import provision as telnyx_provision
@@ -165,7 +170,11 @@ def _require_auth(request: Request) -> tuple[dict | None, Any]:
     return (user, supabase)
 
 
-def _ensure_user_profile(supabase, user: dict) -> dict:
+def _ios_client(request: Request) -> bool:
+    return (request.headers.get("x-echodesk-platform") or "").strip().lower() == "ios"
+
+
+def _ensure_user_profile(supabase, user: dict, *, allow_trial: bool = True) -> dict:
     """Create or repair the public.users row for the authenticated Supabase user."""
     user_id = str(user.get("id") or "").strip()
     if not user_id:
@@ -199,6 +208,7 @@ def _ensure_user_profile(supabase, user: dict) -> dict:
             user_id,
             row,
             sync_user_plan=_sync_user_plan_from_billing_plan,
+            allow_trial=allow_trial,
         )
         return {"created": False, "profile": row}
 
@@ -218,6 +228,7 @@ def _ensure_user_profile(supabase, user: dict) -> dict:
         user_id,
         profile,
         sync_user_plan=_sync_user_plan_from_billing_plan,
+        allow_trial=allow_trial,
     )
     return {"created": True, "profile": profile}
 
@@ -229,7 +240,7 @@ async def ensure_profile(request: Request):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
     try:
-        result = _ensure_user_profile(supabase, user)
+        result = _ensure_user_profile(supabase, user, allow_trial=not _ios_client(request))
         profile = result["profile"] or {}
         return {
             "ok": True,
@@ -254,7 +265,9 @@ async def onboarding_status(request: Request):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
     try:
-        profile_result = _ensure_user_profile(supabase, user)
+        profile_result = _ensure_user_profile(
+            supabase, user, allow_trial=not _ios_client(request)
+        )
         profile = profile_result["profile"] or {}
         profile_row = (
             supabase.table("users")
@@ -372,9 +385,11 @@ async def onboarding_status(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-def _compute_onboarding_completion_state(supabase, user: dict) -> dict[str, Any]:
+def _compute_onboarding_completion_state(
+    supabase, user: dict, *, allow_trial: bool = True
+) -> dict[str, Any]:
     """Authoritative completion check before marking onboarding complete."""
-    profile_result = _ensure_user_profile(supabase, user)
+    profile_result = _ensure_user_profile(supabase, user, allow_trial=allow_trial)
     profile = profile_result["profile"] or {}
     profile_row = (
         supabase.table("users")
@@ -456,7 +471,9 @@ async def complete_onboarding(request: Request):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
     try:
-        state = _compute_onboarding_completion_state(supabase, user)
+        state = _compute_onboarding_completion_state(
+            supabase, user, allow_trial=not _ios_client(request)
+        )
         if not state["ready"]:
             return JSONResponse(
                 {
@@ -587,6 +604,7 @@ async def _sync_subscription_from_session(session_id: str, user_id: str) -> dict
             )
             plan = plan_from_subscription(sub_obj)
             if plan:
+                plan = minutes_for_subscription(plan, updates["subscription_status"])
                 updates["billing_plan"] = plan["billing_plan"]
                 updates["billing_plan_metadata"] = plan.get("billing_plan_metadata")
         supabase = create_service_role_client()
@@ -661,7 +679,7 @@ async def google_auth_url(request: Request):
 # --- Checkout ---
 @router.post("/checkout")
 async def checkout(request: Request):
-    user, _ = _require_auth(request)
+    user, supabase = _require_auth(request)
     if not user:
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     if not user.get("email"):
@@ -697,6 +715,24 @@ async def checkout(request: Request):
     success_url = f"{return_scheme}://checkout?session_id={{CHECKOUT_SESSION_ID}}" if return_scheme == "echodesk" else f"{app_url}/dashboard?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{return_scheme}://checkout?cancelled=1" if return_scheme == "echodesk" else f"{app_url}/dashboard"
 
+    subscription_data = {"metadata": {"userId": user["id"], "email": user["email"]}}
+    if plan_id in {"starter", "growth", "business"}:
+        already = ""
+        if supabase is not None:
+            try:
+                existing = (
+                    supabase.table("users")
+                    .select("subscription_status")
+                    .eq("id", user["id"])
+                    .limit(1)
+                    .execute()
+                )
+                if existing.data:
+                    already = str(existing.data[0].get("subscription_status") or "")
+            except Exception:
+                already = ""
+        if already.lower() not in {"active", "trialing", "grace_period"}:
+            subscription_data["trial_period_days"] = TRIAL_DAYS
     try:
         session = stripe.checkout.Session.create(
             mode="subscription",
@@ -706,7 +742,7 @@ async def checkout(request: Request):
             cancel_url=cancel_url,
             customer_email=user["email"],
             metadata={"userId": user["id"], "email": user["email"]},
-            subscription_data={"metadata": {"userId": user["id"], "email": user["email"]}},
+            subscription_data=subscription_data,
         )
         if not session.url:
             return JSONResponse({"error": "Could not create checkout session."}, status_code=500)

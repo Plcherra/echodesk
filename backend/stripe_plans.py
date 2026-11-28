@@ -1,8 +1,11 @@
 """Stripe plan mapping: price ID -> billing_plan.
 
 Option A: flat monthly Stripe price + included minutes; overage billed by backend
-at overage_rate_cents (default $0.20/min). Optional STRIPE_PRICE_OVERAGE can label
+at the plan's overage_rate_cents. Optional STRIPE_PRICE_OVERAGE can label
 invoice line items; see usage_billing.
+
+Public tiers match the iOS plans. Price IDs stay in STRIPE_PRICE_STARTER,
+STRIPE_PRICE_GROWTH, and STRIPE_PRICE_BUSINESS.
 """
 
 from __future__ import annotations
@@ -10,22 +13,25 @@ from __future__ import annotations
 import os
 from typing import Any
 
-# Launch public tiers: Starter / Growth / Business. Legacy ids kept for old subs.
+# Public tiers match iOS. Legacy ids kept so older subscriptions still resolve.
+TRIAL_DAYS = 14
+TRIAL_INCLUDED_MINUTES = 50
+
 PLAN_DEFS = [
     {
         "id": "starter",
         "env_key": "STRIPE_PRICE_STARTER",
-        "included_minutes": 400,
+        "included_minutes": 250,
         "monthly_fee_cents": 6900,
-        "overage_rate_cents": 20,
-        "per_minute_cents": 20,
+        "overage_rate_cents": 25,
+        "per_minute_cents": 25,
         "billing_plan_id": "subscription_starter",
     },
     {
         "id": "growth",
         "env_key": "STRIPE_PRICE_GROWTH",
-        "included_minutes": 850,
-        "monthly_fee_cents": 12900,
+        "included_minutes": 750,
+        "monthly_fee_cents": 14900,
         "overage_rate_cents": 20,
         "per_minute_cents": 20,
         "billing_plan_id": "subscription_growth",
@@ -33,10 +39,10 @@ PLAN_DEFS = [
     {
         "id": "business",
         "env_key": "STRIPE_PRICE_BUSINESS",
-        "included_minutes": 1350,
-        "monthly_fee_cents": 17900,
-        "overage_rate_cents": 20,
-        "per_minute_cents": 20,
+        "included_minutes": 1500,
+        "monthly_fee_cents": 24900,
+        "overage_rate_cents": 18,
+        "per_minute_cents": 18,
         "billing_plan_id": "subscription_business",
     },
     # Legacy — keep env mapping so existing subscribers still resolve.
@@ -185,6 +191,22 @@ def get_price_id_for_plan_id(plan_id: str) -> str | None:
                 if fallback:
                     return fallback
     return None
+
+
+def minutes_for_subscription(plan: dict[str, Any], status: str) -> dict[str, Any]:
+    """Cap included minutes at the trial allowance while status is trialing.
+
+    Paid renewals keep the plan's full minutes. The returned dict is a copy.
+    """
+    if str(status or "").strip().lower() != "trialing":
+        return plan
+    meta = dict(plan.get("billing_plan_metadata") or {})
+    paid = meta.get("included_minutes")
+    meta["paid_included_minutes"] = paid
+    meta["included_minutes"] = TRIAL_INCLUDED_MINUTES
+    meta["trial_days"] = TRIAL_DAYS
+    meta["trial_cap"] = True
+    return {**plan, "billing_plan_metadata": meta}
 
 
 def get_overage_price_id() -> str | None:

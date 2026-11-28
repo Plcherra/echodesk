@@ -21,10 +21,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   void initState() {
     super.initState();
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform) {
-        _refreshTrialSpots();
-      }
+    if (stripePurchasesEnabled) {
+      _refreshTrialSpots();
     }
   }
 
@@ -34,14 +32,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   Future<void> _createAccount({String? planId}) async {
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform && PendingPlanService.isValidPlanId(planId)) {
-        final id = planId!.trim();
-        await PendingPlanService.save(id);
-        if (!mounted) return;
-        context.go('/signup?plan=$id');
-        return;
-      }
+    if (stripePurchasesEnabled && PendingPlanService.isValidPlanId(planId)) {
+      final id = planId!.trim();
+      await PendingPlanService.save(id);
+      if (!mounted) return;
+      context.go('/signup?plan=$id');
+      return;
     }
     await PendingPlanService.clear();
     if (!mounted) return;
@@ -61,10 +57,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform) {
-        return _buildCommercial(context);
-      }
+    if (stripePurchasesEnabled) {
+      return _buildCommercial(context);
     }
     return _buildCompanion(context);
   }
@@ -278,7 +272,7 @@ class _HeroColumn extends StatelessWidget {
               ),
         ),
         const SizedBox(height: EchoDeskSpacing.lg),
-        _TrialOfferBanner(trialOpen: trialOpen),
+        const _TrialOfferBanner(),
         const SizedBox(height: EchoDeskSpacing.lg),
         const _ValueRows(),
         const SizedBox(height: EchoDeskSpacing.xl),
@@ -292,7 +286,7 @@ class _HeroColumn extends StatelessWidget {
             ),
           ),
           child: Text(
-            trialOpen ? 'Start 14-day free trial' : 'Create account',
+            'Start 14-day free trial',
           ),
         ),
         const SizedBox(height: EchoDeskSpacing.sm),
@@ -314,9 +308,7 @@ class _HeroColumn extends StatelessWidget {
 }
 
 class _TrialOfferBanner extends StatelessWidget {
-  const _TrialOfferBanner({required this.trialOpen});
-
-  final bool trialOpen;
+  const _TrialOfferBanner();
 
   @override
   Widget build(BuildContext context) {
@@ -331,9 +323,7 @@ class _TrialOfferBanner extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            trialOpen
-                ? 'Launch offer · ${TrialOffer.trialDays}-day free trial'
-                : 'Launch trial is full',
+            '${TrialOffer.trialDays}-day free trial',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: EchoDeskColors.brand,
@@ -341,9 +331,7 @@ class _TrialOfferBanner extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            trialOpen
-                ? '${TrialOffer.spotsLabel}. Includes ${TrialOffer.includedMinutes} call minutes, one business number, and calendar booking. No credit card.'
-                : 'Choose Starter, Growth, or Business below to continue.',
+            'Includes ${TrialOffer.includedMinutes} call minutes. A card is required. You are not charged until the 14 days end.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: EchoDeskColors.ink.withValues(alpha: 0.78),
                   height: 1.4,
@@ -542,27 +530,27 @@ class _PlansStrip extends StatelessWidget {
         _PlanChip(
           name: '14-day trial',
           price: 'Free',
-          detail: '${TrialOffer.includedMinutes} min · ${TrialOffer.spotsLabel}',
+          detail: '${TrialOffer.includedMinutes} minutes, then a paid plan',
           onTap: onSelectTrial,
           emphasize: true,
         ),
       _PlanChip(
         name: 'Starter',
         price: '\$69/mo',
-        detail: '400 minutes',
+        detail: '250 minutes',
         onTap: () => onSelectPlan('starter'),
         emphasize: !trialOpen,
       ),
       _PlanChip(
         name: 'Growth',
-        price: '\$129/mo',
-        detail: '850 minutes',
+        price: '\$149/mo',
+        detail: '750 minutes',
         onTap: () => onSelectPlan('growth'),
       ),
       _PlanChip(
         name: 'Business',
-        price: '\$179/mo',
-        detail: '1,350 minutes',
+        price: '\$249/mo',
+        detail: '1,500 minutes',
         onTap: () => onSelectPlan('business'),
       ),
     ];

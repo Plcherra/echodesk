@@ -23,9 +23,9 @@ final _banned = RegExp(
 
 void main() {
   testWidgets('store build UI has no purchase calls to action', (tester) async {
-    if (kPurchasesEnabled && !isIosPlatform) {
-      // Android and web keep the purchase flow. Re-run this test with
-      // --dart-define=PURCHASES_ENABLED=false to check the App Store UI.
+    if (kPurchasesEnabled) {
+      // Purchases stay on: Stripe on Android/web, Apple IAP on iOS.
+      // Re-run with --dart-define=PURCHASES_ENABLED=false to check the kill switch.
       return;
     }
 
@@ -56,7 +56,7 @@ void main() {
 
   testWidgets('captures store-safe welcome, inactive dashboard, and settings',
       (tester) async {
-    if (kPurchasesEnabled && !isIosPlatform) return;
+    if (kPurchasesEnabled) return;
 
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));

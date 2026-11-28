@@ -35,6 +35,7 @@ from api.admin_number_transfers import router as admin_number_transfers_router
 from api.admin_phone_release import router as admin_phone_release_router
 from api.mobile_routes import router as mobile_router
 from api.public_routes import router as public_router
+from api.apple_routes import router as apple_router
 from api.stripe_routes import stripe_webhook_post
 from config import settings
 from quota import check_outbound_quota
@@ -149,6 +150,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Echodesk Voice Backend", lifespan=lifespan)
 app.include_router(mobile_router)
+app.include_router(apple_router)
 app.include_router(admin_billing_router)
 app.include_router(admin_number_transfers_router)
 app.include_router(admin_phone_release_router)

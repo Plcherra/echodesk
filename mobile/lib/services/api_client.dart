@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/env.dart';
+import '../config/purchases.dart';
 
 /// HTTP client for Echodesk backend API. Attaches Bearer token from Supabase session.
 /// Refreshes token if expired. On 401, signs out and invokes onUnauthorized.
@@ -48,6 +49,9 @@ class ApiClient {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
+    if (isIosPlatform) {
+      headers['X-EchoDesk-Platform'] = 'ios';
+    }
     if (withAuth) {
       final token = await _getAccessToken();
       if (token != null) {
@@ -137,6 +141,9 @@ class ApiClient {
   }) async {
     final uri = Uri.parse('$_baseUrl$path');
     final request = http.MultipartRequest('POST', uri);
+    if (isIosPlatform) {
+      request.headers['X-EchoDesk-Platform'] = 'ios';
+    }
     if (withAuth) {
       final token = await _getAccessToken();
       if (token != null) {

@@ -40,29 +40,26 @@ class DeepLinkHandler {
     Future<void> Function()? onAuthSuccess,
   ) async {
     if (uri.host == 'checkout') {
-      if (kPurchasesEnabled) {
-        if (!isIosPlatform) {
-          final sessionId = uri.queryParameters['session_id'];
-          if (sessionId != null && sessionId.isNotEmpty) {
-            if (uri.queryParameters['cancelled'] == '1') {
-              onMessage('Checkout cancelled');
-              return;
-            }
-            try {
-              final res = await ApiClient.post(
-                '/api/mobile/sync-session',
-                body: {'session_id': sessionId},
-              );
-              if (res.statusCode >= 200 && res.statusCode < 300) {
-                onMessage('Subscription activated!');
-              } else {
-                onMessage('Could not sync subscription. Please try again.');
-              }
-            } catch (_) {
+      if (stripePurchasesEnabled) {
+        final sessionId = uri.queryParameters['session_id'];
+        if (sessionId != null && sessionId.isNotEmpty) {
+          if (uri.queryParameters['cancelled'] == '1') {
+            onMessage('Checkout cancelled');
+            return;
+          }
+          try {
+            final res = await ApiClient.post(
+              '/api/mobile/sync-session',
+              body: {'session_id': sessionId},
+            );
+            if (res.statusCode >= 200 && res.statusCode < 300) {
+              onMessage('Subscription activated!');
+            } else {
               onMessage('Could not sync subscription. Please try again.');
             }
+          } catch (_) {
+            onMessage('Could not sync subscription. Please try again.');
           }
-          return;
         }
       }
       return;
@@ -108,10 +105,8 @@ class DeepLinkHandler {
         onMessage('Open EchoDesk and sign in with the same email');
       }
     } else if (uri.host == 'settings') {
-      if (kPurchasesEnabled) {
-        if (!isIosPlatform) {
-          onMessage('Billing updated');
-        }
+      if (stripePurchasesEnabled) {
+        onMessage('Billing updated');
       }
     }
   }

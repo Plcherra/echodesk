@@ -60,6 +60,28 @@ Additional **`GOOGLE_TTS_*`**, **`TTS_*`** caps, cache, and retry knobs are in `
 
 Used by billing, push, and redirects — see `config.py` for full list: **`STRIPE_SECRET_KEY`**, **`STRIPE_WEBHOOK_SECRET`**, **`FIREBASE_SERVICE_ACCOUNT_KEY`**, **`CRON_SECRET`**, **`APP_API_BASE_URL`** / **`NEXT_PUBLIC_APP_URL`**, **`INTERNAL_API_KEY`**, **`SENTRY_DSN`**, **`PORT`**, etc.
 
+## Apple In-App Purchase
+
+Required before iPhone purchases can activate an account. Apply migration `supabase/migrations/047_apple_billing_source.sql` before deploying the backend that writes these columns. Never commit the `.p8` key.
+
+| Variable | Purpose |
+|----------|---------|
+| **`APPLE_ISSUER_ID`** | Issuer ID from App Store Connect → Users and Access → Integrations. |
+| **`APPLE_KEY_ID`** | Key ID of the In-App Purchase API key. |
+| **`APPLE_PRIVATE_KEY`** | Contents of the downloaded `.p8`. Newlines may be written as `\n`. |
+| **`APPLE_PRIVATE_KEY_PATH`** | Alternative to `APPLE_PRIVATE_KEY`: absolute path to the `.p8` on the server. |
+| **`APPLE_BUNDLE_ID`** | App bundle id. Default `com.echodesk.echodeskMobile`. |
+| **`APPLE_IAP_ENVIRONMENT`** | `sandbox` or `production`. The server still accepts the other environment when the JWS signature verifies, so one URL can receive both notification streams. |
+| **`APPLE_APP_APPLE_ID`** | Numeric App Store app id. Required to verify Production transactions. Sandbox verification works without it. |
+| **`APPLE_ROOT_CA_PATH`** | Optional directory of Apple root `.cer` files. Default is `backend/certs/apple/`. |
+| **`APPLE_IAP_ONLINE_CHECKS`** | `true` to also run OCSP checks. Signature verification against Apple's roots always runs. Default `false`. |
+| **`APPLE_IAP_ALLOW_XCODE`** | `true` only for local StoreKit testing. Leave unset in production. Xcode payloads are not signed by Apple. |
+| **`APPLE_IAP_PRODUCT_STARTER`** | Default `com.echodesk.sub.starter.monthly` (250 minutes). |
+| **`APPLE_IAP_PRODUCT_GROWTH`** | Default `com.echodesk.sub.growth.monthly` (750 minutes). |
+| **`APPLE_IAP_PRODUCT_BUSINESS`** | Default `com.echodesk.sub.business.monthly` (1,500 minutes). |
+
+The iOS build can override the same product ids with `--dart-define=APPLE_IAP_PRODUCT_STARTER=...` (and `GROWTH` / `BUSINESS`). Notification URL: `https://echodesk.us/api/apple/notifications`. Client verification: `POST /api/mobile/apple/verify`. Setup steps for App Store Connect are in `mobile/APP_STORE_IAP_SETUP.md`.
+
 ## Quick reference — URLs Telnyx and clients call
 
 | Endpoint | Use |

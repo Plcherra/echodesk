@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_router.dart';
 import 'config/purchases.dart';
+import 'services/apple_iap_service.dart';
 import 'services/account_bootstrap_service.dart';
 import 'services/api_client.dart';
 import 'services/deep_link_handler.dart';
@@ -72,6 +73,9 @@ class _EchodeskAppState extends State<EchodeskApp> {
         _router.go(route);
       });
     };
+    if (applePurchasesEnabled) {
+      AppleIapService.instance.ensureListening();
+    }
     _deepLinkHandler.init(
       (msg) {
         _scaffoldKey.currentState?.showSnackBar(SnackBar(content: Text(msg)));
@@ -117,18 +121,15 @@ class _EchodeskAppState extends State<EchodeskApp> {
   }
 
   Future<void> _routePendingPlanIfNeeded() async {
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform) {
-        final pendingPlanId = await PendingPlanService.peekValid();
-        if (!mounted || pendingPlanId == null) return;
+    if (stripePurchasesEnabled) {
+      final pendingPlanId = await PendingPlanService.peekValid();
+      if (!mounted || pendingPlanId == null) return;
 
-        final currentPath =
-            _router.routerDelegate.currentConfiguration.uri.path;
-        if (currentPath.startsWith('/checkout')) return;
+      final currentPath = _router.routerDelegate.currentConfiguration.uri.path;
+      if (currentPath.startsWith('/checkout')) return;
 
-        _router.go('/checkout?plan=${Uri.encodeComponent(pendingPlanId)}');
-        return;
-      }
+      _router.go('/checkout?plan=${Uri.encodeComponent(pendingPlanId)}');
+      return;
     }
     await PendingPlanService.clear();
   }

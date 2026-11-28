@@ -334,20 +334,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  String _overageWarningCopy() {
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform) {
-        return 'Over cap; overage may be billed at \$0.20/min.';
+  String _overageWarningCopy(UserProfile profile) {
+    if (profile.billingSource == 'apple') {
+      return 'Included minutes used. Upgrade to keep answering.';
+    }
+    if (stripePurchasesEnabled) {
+      final cents = profile.overageRateCents;
+      if (cents != null && cents > 0) {
+        final dollars = (cents / 100).toStringAsFixed(2);
+        return 'Over cap; overage may be billed at \$$dollars/min.';
       }
+      return 'Over cap; extra minutes may be billed.';
     }
     return 'Over cap. Extra minutes may apply.';
   }
 
   Widget _buildUpgradeCard(BuildContext context, UserProfile profile) {
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform) {
-        return _buildPurchaseUpgradeCard(context, profile);
-      }
+    if (stripePurchasesEnabled) {
+      return _buildPurchaseUpgradeCard(context, profile);
+    }
+    if (applePurchasesEnabled) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Choose a plan',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Subscribe in the app to turn on your AI receptionist. Plans renew monthly through Apple.',
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: () => _pushAndRefresh('/checkout'),
+                child: const Text('View plans'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
     return const Card(
       child: Padding(
@@ -402,7 +431,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final remainingText = _remainingMinutes != null && _remainingMinutes! > 0
         ? '$_remainingMinutes min remaining'
         : null;
-    final overageText = _overageMinutes > 0 ? '$_overageMinutes overage' : null;
+    final appleHardCap = profile.billingSource == 'apple';
+    final overageText =
+        !appleHardCap && _overageMinutes > 0 ? '$_overageMinutes overage' : null;
     final overageWarning = _includedMinutes != null &&
         _totalUsageMinutes >= _includedMinutes! &&
         _totalUsageMinutes > 0;
@@ -410,7 +441,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _remainingMinutes! > 0 &&
         _remainingMinutes! <= 30;
     final subtext = overageText ??
-        (overageWarning ? _overageWarningCopy() : remainingText);
+        (overageWarning ? _overageWarningCopy(profile) : remainingText);
     final subtextColor = overageText != null || overageWarning
         ? EchoDeskColors.warning
         : (lowMinutes ? EchoDeskColors.warning : EchoDeskColors.success);
@@ -489,6 +520,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                   ),
                 ],
+                if (appleHardCap && overageWarning)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () => _pushAndRefresh('/checkout'),
+                      child: const Text('Upgrade plan'),
+                    ),
+                  ),
                 if (progress != null) ...[
                   const SizedBox(height: EchoDeskSpacing.sm + 2),
                   ClipRRect(

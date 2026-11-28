@@ -51,18 +51,33 @@ open ios/Runner.xcworkspace
 - Choose your Team and provisioning profile
 - Ensure Bundle ID matches your App Store Connect app
 
-2. **Build and archive** (App Store / TestFlight). iOS is a sign-in companion:
-   purchases stay off so plan, price, trial, and checkout UI is stripped.
+2. **Build and archive** (App Store / TestFlight). iOS purchases are on.
+   Inactive accounts see the in-app plans screen and buy through Apple.
+   `PURCHASES_ENABLED` defaults to true; pass `true` explicitly so the store
+   command is obvious. `false` is only the kill switch that hides purchasing.
 
 ```bash
-flutter build ipa --release --build-number=3 \
-  --dart-define=PURCHASES_ENABLED=false \
+flutter build ipa --release --build-number=4 \
+  --dart-define=PURCHASES_ENABLED=true \
   --dart-define=API_BASE_URL=https://echodesk.us \
   --dart-define=SUPABASE_URL=$SUPABASE_URL \
   --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
 ```
 
-Current store build: version `1.0.0`, build number `3` (`pubspec.yaml` `1.0.0+3`).
+Optional, only if the App Store product ids differ from the defaults
+`com.echodesk.sub.starter.monthly`, `com.echodesk.sub.growth.monthly`, and
+`com.echodesk.sub.business.monthly`:
+
+```bash
+  --dart-define=APPLE_IAP_PRODUCT_STARTER=com.echodesk.sub.starter.monthly \
+  --dart-define=APPLE_IAP_PRODUCT_GROWTH=com.echodesk.sub.growth.monthly \
+  --dart-define=APPLE_IAP_PRODUCT_BUSINESS=com.echodesk.sub.business.monthly \
+```
+
+Current store build: version `1.0.0`, build number `4` (`pubspec.yaml` `1.0.0+4`).
+Prices on the paywall come from StoreKit. Do not hard-code them. App Store
+Connect setup is in `APP_STORE_IAP_SETUP.md`. Review notes are in
+`APP_REVIEW_NOTES.md`.
 
 Output: `build/ios/ipa/*.ipa`
 
@@ -82,13 +97,13 @@ Before sharing with testers, run through the full flow:
 |------|--------|----------|
 | 1 | Open app → Get Started | Sign up screen |
 | 2 | Sign up with email | Account created, redirect to dashboard |
-| 3 | Android/web: dashboard shows "Upgrade" if not subscribed. iOS store build (`PURCHASES_ENABLED=false`): inactive account shows "Your account isn't active yet. Contact echodesk2@gmail.com." with no purchase button | No prices, plans, trials, or buy buttons on iOS |
-| 4 | Android/web: tap Subscribe → complete Stripe Checkout. Skip on the iOS store build | Redirect back to the app on Android/web; iOS never opens checkout |
+| 3 | Android/web: dashboard shows "Upgrade" if not subscribed. iOS (`PURCHASES_ENABLED=true`): inactive account shows Choose a plan, then the Apple plans screen | iOS prices come from the App Store. No website checkout and no Stripe portal |
+| 4 | Android/web: tap Subscribe → complete Stripe Checkout. iOS: subscribe on the plans screen with a sandbox Apple ID | Android/web return via the deep link. iOS activates after the backend verifies the StoreKit transaction |
 | 5 | Finish onboarding: Connect Calendar, create receptionist, confirm business line | Onboarding complete |
 | 6 | Create receptionist (wizard) | Receptionist created and attached to the business line |
 | 7 | Receptionist detail → Start outbound call | Call initiated, "Call initiated" snackbar |
 | 8 | Dashboard → Minutes this period | Shows usage (e.g. 0 / 300) |
-| 9 | Android/web: Settings → Billing opens the Stripe portal. iOS store build has no Billing section | Privacy Policy and Terms are in Settings on every platform |
+| 9 | Android/web: Settings → Billing opens the Stripe portal. iOS: Settings → Manage subscription opens Apple's subscription page | Privacy Policy and Terms are in Settings on every platform |
 | 10 | Help (from dashboard) | Help screen with guides |
 
 ## Run Script
