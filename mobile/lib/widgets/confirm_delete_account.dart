@@ -4,28 +4,51 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../config/purchases.dart';
 import '../services/api_client.dart';
 import '../strings.dart';
 import '../theme/echodesk_theme.dart';
 
+const _deleteAccountIntro =
+    'This permanently deletes your EchoDesk account, receptionists, '
+    'call history, and bookings we stored. Your business number is released. ';
+
+/// Copy for the delete confirmation. Apple billing continues after the
+/// EchoDesk account is gone, on every platform.
+String deleteAccountMessage({required bool appleBilled}) {
+  if (appleBilled) {
+    return '${_deleteAccountIntro}Deleting the account does not cancel an Apple subscription. '
+        'Cancel it in your App Store account settings or Apple will keep charging. '
+        'This cannot be undone.';
+  }
+  return '${_deleteAccountIntro}Any subscription is canceled. This cannot be undone.';
+}
+
+Future<bool> _accountIsAppleBilled() async {
+  final user = Supabase.instance.client.auth.currentUser;
+  if (user == null) return false;
+  try {
+    final row = await Supabase.instance.client
+        .from('users')
+        .select('billing_plan_metadata')
+        .eq('id', user.id)
+        .maybeSingle();
+    final meta = row?['billing_plan_metadata'];
+    return meta is Map && meta['billing_source'] == 'apple';
+  } catch (_) {
+    // Don't promise that billing stopped when the source couldn't be read.
+    return true;
+  }
+}
+
 /// Confirms, then permanently deletes the signed-in account.
 Future<void> confirmDeleteAccount(BuildContext context) async {
+  final appleBilled = await _accountIsAppleBilled();
+  if (!context.mounted) return;
   final ok = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
       title: const Text('Delete account?'),
-      content: Text(
-        applePurchasesEnabled
-            ? 'This permanently deletes your EchoDesk account, receptionists, '
-                'call history, and bookings we stored. Your business number is released. '
-                'Deleting the account does not cancel an Apple subscription. '
-                'Cancel it first with Settings → Manage subscription so Apple stops billing. '
-                'This cannot be undone.'
-            : 'This permanently deletes your EchoDesk account, receptionists, '
-                'call history, and bookings we stored. Your business number is released. '
-                'Any subscription is canceled. This cannot be undone.',
-      ),
+      content: Text(deleteAccountMessage(appleBilled: appleBilled)),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(false),

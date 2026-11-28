@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,42 @@ def _source_key(row: dict[str, Any]) -> str:
     return str(row.get("billing_source") or "").strip().lower()
 
 
+def _parse_timestamp(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def entitlement_period_open(row: dict[str, Any], now: datetime | None = None) -> bool:
+    """False when a time-limited row is past its period.
+
+    Rows with no end date stay open (manual comps and older Stripe rows).
+    Billing grace stays open because Apple extends access past expires_at.
+    """
+    if _normalize_status(row.get("status")) == "grace_period":
+        return True
+    if _normalize_status(row.get("status")) not in VALID_SUBSCRIPTION_STATUSES:
+        return False
+    end = _parse_timestamp(row.get("expires_at") or row.get("current_period_end"))
+    if end is None:
+        return True
+    current = now or datetime.now(timezone.utc)
+    return end > current
+
+
 def select_access_subscription(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     """Pick the row that decides access.
 
@@ -72,8 +109,12 @@ def select_access_subscription(rows: list[dict[str, Any]]) -> dict[str, Any] | N
     for row in ordered[1:]:
         if _source_key(row) == latest_source:
             continue
-        if _normalize_status(row.get("status")) in VALID_SUBSCRIPTION_STATUSES:
-            return row
+        if _normalize_status(row.get("status")) not in VALID_SUBSCRIPTION_STATUSES:
+            continue
+        # An expired launch trial must not revive access after a later cancellation.
+        if not entitlement_period_open(row):
+            continue
+        return row
     return latest
 
 
@@ -82,13 +123,15 @@ def is_apple_billed(
     user_id: str,
     metadata: dict[str, Any] | None = None,
 ) -> bool:
-    """True when this account's current entitlement is billed by Apple."""
-    if str((metadata or {}).get("billing_source") or "").strip().lower() == "apple":
-        return True
+    """True when this account's current entitlement is billed by Apple.
+
+    An active subscription row wins over leftover billing metadata, so a Stripe
+    plan that outlives an Apple subscription is not stuck on the Apple cap.
+    """
     subscription = get_active_subscription(supabase, user_id)
-    if not subscription:
-        return False
-    return str(subscription.get("billing_source") or "").strip().lower() == "apple"
+    if subscription:
+        return _source_key(subscription) == "apple"
+    return str((metadata or {}).get("billing_source") or "").strip().lower() == "apple"
 
 
 def should_preserve_user_access(
@@ -114,7 +157,46 @@ def should_preserve_user_access(
     except Exception as exc:
         logger.warning("[subscriptions] preserve-access lookup failed user=%s: %s", user_id, exc)
         return True
-    for row in result.data or []:
+    return _first_other_entitled(
+        result.data or [],
+        except_provider_subscription_id=except_provider_subscription_id,
+        except_apple_original_transaction_id=except_apple_original_transaction_id,
+    ) is not None
+
+
+def other_entitled_subscription(
+    supabase: Any,
+    user_id: str,
+    *,
+    except_provider_subscription_id: str | None = None,
+    except_apple_original_transaction_id: str | None = None,
+) -> dict[str, Any] | None:
+    """The other still-valid subscription, or None when the lookup fails."""
+    try:
+        result = (
+            supabase.table("subscriptions")
+            .select("*")
+            .eq("user_id", user_id)
+            .in_("status", sorted(VALID_SUBSCRIPTION_STATUSES))
+            .execute()
+        )
+    except Exception as exc:
+        logger.warning("[subscriptions] other-entitled lookup failed user=%s: %s", user_id, exc)
+        return None
+    return _first_other_entitled(
+        result.data or [],
+        except_provider_subscription_id=except_provider_subscription_id,
+        except_apple_original_transaction_id=except_apple_original_transaction_id,
+    )
+
+
+def _first_other_entitled(
+    rows: list[Any],
+    *,
+    except_provider_subscription_id: str | None,
+    except_apple_original_transaction_id: str | None,
+) -> dict[str, Any] | None:
+    for row in rows:
         if not isinstance(row, dict):
             continue
         provider_id = str(row.get("billing_provider_subscription_id") or "")
@@ -123,8 +205,10 @@ def should_preserve_user_access(
         apple_id = str(row.get("apple_original_transaction_id") or "")
         if except_apple_original_transaction_id and apple_id == str(except_apple_original_transaction_id):
             continue
-        return True
-    return False
+        if not entitlement_period_open(row):
+            continue
+        return row
+    return None
 
 
 def get_billing_access_state(

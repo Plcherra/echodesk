@@ -7,7 +7,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from billing.apple_entitlement import decide_apple_entitlement
-from billing.subscriptions import get_plan_id_for_code, should_preserve_user_access
+from billing.subscriptions import (
+    get_plan_id_for_code,
+    other_entitled_subscription,
+    should_preserve_user_access,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +122,90 @@ def _sync_entitled_plan(supabase: Any, user_id: str, decision: dict[str, Any], n
             "updated_at": now_iso,
         }
     ).eq("id", user_id).execute()
+
+
+def _plan_code_for_id(supabase: Any, plan_id: Any) -> str | None:
+    if not plan_id:
+        return None
+    found = supabase.table("plans").select("code").eq("id", plan_id).limit(1).execute()
+    rows = _rows(found)
+    if rows and rows[0].get("code"):
+        return str(rows[0]["code"])
+    return None
+
+
+def _restore_preserved_access(
+    supabase: Any,
+    user_id: str,
+    other: dict[str, Any],
+    now_iso: str,
+) -> None:
+    """Put the still-paid subscription back on the account after Apple access ends."""
+    from stripe_plans import PLAN_DEFS
+
+    status = str(other.get("status") or "active")
+    source = str(other.get("billing_source") or "").strip().lower()
+    code = _plan_code_for_id(supabase, other.get("plan_id"))
+    catalog = next((plan for plan in PLAN_DEFS if plan["id"] == code), None) if code else None
+    updates: dict[str, Any] = {"subscription_status": status, "updated_at": now_iso}
+    if catalog and source != "apple":
+        included = int(catalog["included_minutes"])
+        overage = int(catalog["overage_rate_cents"])
+        updates["billing_plan"] = catalog["billing_plan_id"]
+        updates["billing_plan_metadata"] = {
+            "included_minutes": included,
+            "monthly_fee_cents": catalog["monthly_fee_cents"],
+            "overage_rate_cents": overage,
+            "billing_source": "stripe",
+            "overage_allowed": True,
+        }
+        inbound_pct = 80
+        outbound_pct = 20
+        existing = (
+            supabase.table("user_plans")
+            .select("inbound_percent, outbound_percent")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        rows = _rows(existing)
+        if rows:
+            inbound_pct = int(rows[0].get("inbound_percent") or inbound_pct)
+            outbound_pct = int(rows[0].get("outbound_percent") or outbound_pct)
+        alloc_in = int((included * inbound_pct) / 100)
+        supabase.table("user_plans").upsert(
+            {
+                "user_id": user_id,
+                "billing_plan": catalog["billing_plan_id"],
+                "allocated_inbound_minutes": alloc_in,
+                "allocated_outbound_minutes": included - alloc_in,
+                "inbound_percent": inbound_pct,
+                "outbound_percent": outbound_pct,
+                "overage_rate_cents": overage,
+                "payg_rate_cents": 20,
+                "updated_at": now_iso,
+            },
+            on_conflict="user_id",
+        ).execute()
+    else:
+        current = (
+            supabase.table("users")
+            .select("billing_plan_metadata")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+        rows = _rows(current)
+        meta = dict((rows[0].get("billing_plan_metadata") if rows else None) or {})
+        if str(meta.get("billing_source") or "").lower() == "apple":
+            if source:
+                meta["billing_source"] = source
+                meta["overage_allowed"] = source != "apple"
+            else:
+                meta.pop("billing_source", None)
+                meta["overage_allowed"] = True
+            updates["billing_plan_metadata"] = meta
+    supabase.table("users").update(updates).eq("id", user_id).execute()
 
 
 def _revoke_access(supabase: Any, user_id: str, decision: dict[str, Any], now_iso: str) -> None:
@@ -329,7 +417,15 @@ def apply_apple_subscription(
 
     if decision.get("entitled"):
         _sync_entitled_plan(supabase, str(owner), decision, now_iso)
-    elif not preserve:
+    elif preserve:
+        other = other_entitled_subscription(
+            supabase,
+            str(owner),
+            except_apple_original_transaction_id=original_id,
+        )
+        if other:
+            _restore_preserved_access(supabase, str(owner), other, now_iso)
+    else:
         _revoke_access(supabase, str(owner), decision, now_iso)
 
     return {

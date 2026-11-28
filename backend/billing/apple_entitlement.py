@@ -120,6 +120,11 @@ def decide_apple_entitlement(
             "reason": "unsupported_product_type",
         }
 
+    # A REFUND for an older renewal can arrive while the subscription status
+    # is still active. That must not replace the current paid period.
+    if ntype == "REFUND" and status_int in {1, 4}:
+        return {**base, "ignored": True, "reason": "refunded_prior_transaction"}
+
     if revocation_ms or ntype in _REVOKED_NOTIFICATIONS or status_int == 5:
         status, entitled, grace, reason = "canceled", False, False, "revoked"
     elif ntype == "GRACE_PERIOD_EXPIRED":

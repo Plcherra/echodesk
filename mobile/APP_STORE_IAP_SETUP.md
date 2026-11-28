@@ -22,13 +22,13 @@ App Store Connect → Agreements, Tax, and Banking → Small Business Program. E
 
 ## 4. Subscription group and products
 
-Create one subscription group, suggested name **EchoDesk**. Put all three products in that group so an upgrade replaces the current plan instead of charging a second subscription.
+Create one subscription group, suggested name **EchoDesk**. Put all three products in that group so an upgrade replaces the current plan instead of charging a second subscription. In App Store Connect, level 1 is the highest tier: an upgrade takes effect immediately and a downgrade waits until renewal.
 
 | Reference name | Product ID | Duration | Included | Suggested price (US) | Group level |
 |----------------|------------|----------|----------|----------------------|-------------|
-| Starter Monthly | `com.echodesk.sub.starter.monthly` | 1 month | 250 minutes | $69.99 | 1 |
+| Business Monthly | `com.echodesk.sub.business.monthly` | 1 month | 1,500 minutes | $249.99 | 1 |
 | Growth Monthly | `com.echodesk.sub.growth.monthly` | 1 month | 750 minutes | $149.99 | 2 |
-| Business Monthly | `com.echodesk.sub.business.monthly` | 1 month | 1,500 minutes | $249.99 | 3 |
+| Starter Monthly | `com.echodesk.sub.starter.monthly` | 1 month | 250 minutes | $69.99 | 3 |
 
 Localization (English, U.S.) for each product:
 

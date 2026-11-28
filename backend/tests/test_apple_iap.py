@@ -721,6 +721,101 @@ def test_notification_route_applies_refund(monkeypatch):
     assert _user(db)["subscription_status"] == "canceled"
 
 
+def test_expired_launch_trial_does_not_restore_access_after_stripe_cancellation():
+    db = FakeDB()
+    db.tables["subscriptions"] = [
+        {
+            "id": "trial",
+            "user_id": "user-1",
+            "status": "trialing",
+            "billing_source": None,
+            "current_period_end": "2020-01-15T00:00:00Z",
+            "updated_at": "2020-01-01T00:00:00Z",
+        },
+        {
+            "id": "stripe",
+            "user_id": "user-1",
+            "status": "canceled",
+            "billing_source": "stripe",
+            "billing_provider_subscription_id": "sub_123",
+            "updated_at": "2026-06-01T00:00:00Z",
+        },
+    ]
+    state = get_billing_access_state(db, "user-1")
+    assert state["has_active_subscription"] is False
+    assert state["subscription"]["id"] == "stripe"
+    assert should_preserve_user_access(db, "user-1", except_provider_subscription_id="sub_123") is False
+
+
+def test_refund_of_an_older_renewal_keeps_the_current_period():
+    db = FakeDB()
+    apply_apple_subscription(
+        db,
+        _tx(transaction_id="tx-current", expires_date_ms=FUTURE_MS, signed_date_ms=NOW_MS),
+        user_id="user-1",
+        require_account_token=True,
+        now_ms=NOW_MS,
+    )
+    result = apply_apple_subscription(
+        db,
+        _tx(
+            transaction_id="tx-old",
+            expires_date_ms=PAST_MS,
+            revocation_date_ms=NOW_MS + 20,
+            signed_date_ms=NOW_MS + 20,
+        ),
+        notification_type="REFUND",
+        apple_status=1,
+        now_ms=NOW_MS + 20,
+    )
+    assert result["ignored"] is True
+    assert result["reason"] == "refunded_prior_transaction"
+    assert _sub(db)["apple_transaction_id"] == "tx-current"
+    assert _sub(db)["status"] == "active"
+    assert _user(db)["subscription_status"] == "active"
+    assert db.tables["user_plans"][0]["allocated_inbound_minutes"] > 0
+
+
+def test_apple_expiry_restores_the_still_active_stripe_plan():
+    db = FakeDB()
+    db.tables["subscriptions"].append(
+        {
+            "id": "stripe-row",
+            "user_id": "user-1",
+            "status": "active",
+            "billing_source": "stripe",
+            "billing_provider_subscription_id": "sub_123",
+            "plan_id": "plan-growth",
+        }
+    )
+    apply_apple_subscription(
+        db,
+        _tx(),
+        user_id="user-1",
+        require_account_token=True,
+        now_ms=NOW_MS,
+    )
+    assert _user(db)["billing_plan_metadata"]["billing_source"] == "apple"
+    assert _user(db)["billing_plan_metadata"]["included_minutes"] == 250
+
+    result = apply_apple_subscription(
+        db,
+        _tx(expires_date_ms=PAST_MS, signed_date_ms=NOW_MS + 30),
+        notification_type="EXPIRED",
+        now_ms=NOW_MS + 30,
+    )
+    assert result["preserved_other_billing"] is True
+    assert _user(db)["subscription_status"] == "active"
+    assert _user(db)["billing_plan"] == "subscription_growth"
+    assert _user(db)["billing_plan_metadata"]["billing_source"] == "stripe"
+    assert _user(db)["billing_plan_metadata"]["included_minutes"] == 850
+    assert _user(db)["billing_plan_metadata"]["overage_allowed"] is True
+    plan = db.tables["user_plans"][0]
+    assert plan["billing_plan"] == "subscription_growth"
+    assert plan["allocated_inbound_minutes"] + plan["allocated_outbound_minutes"] == 850
+    assert plan["overage_rate_cents"] == 20
+
+
 def test_notification_route_acks_test_notifications(monkeypatch):
     monkeypatch.setattr(
         apple_routes,
