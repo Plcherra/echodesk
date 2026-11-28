@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/purchases.dart';
 import '../services/api_client.dart';
 import '../strings.dart';
 import '../theme/echodesk_theme.dart';
@@ -14,10 +15,16 @@ Future<void> confirmDeleteAccount(BuildContext context) async {
     context: context,
     builder: (ctx) => AlertDialog(
       title: const Text('Delete account?'),
-      content: const Text(
-        'This permanently deletes your EchoDesk account, receptionists, '
-        'call history, and bookings we stored. Your business number is released. '
-        'Any subscription is canceled. This cannot be undone.',
+      content: Text(
+        applePurchasesEnabled
+            ? 'This permanently deletes your EchoDesk account, receptionists, '
+                'call history, and bookings we stored. Your business number is released. '
+                'Deleting the account does not cancel an Apple subscription. '
+                'Cancel it first with Settings → Manage subscription so Apple stops billing. '
+                'This cannot be undone.'
+            : 'This permanently deletes your EchoDesk account, receptionists, '
+                'call history, and bookings we stored. Your business number is released. '
+                'Any subscription is canceled. This cannot be undone.',
       ),
       actions: [
         TextButton(

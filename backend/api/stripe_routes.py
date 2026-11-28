@@ -15,6 +15,7 @@ from billing.stripe_sync import (
     stripe_subscription_status_to_db_status,
     upsert_subscription_from_stripe,
 )
+from billing.subscriptions import VALID_SUBSCRIPTION_STATUSES, should_preserve_user_access
 from stripe_plans import plan_from_subscription
 from supabase_client import create_service_role_client
 
@@ -110,12 +111,21 @@ async def stripe_webhook_post(request: Request):
         if r.data and len(r.data) > 0:
             user = r.data[0]
             plan = plan_from_subscription(subscription)
+            new_status = stripe_subscription_status_to_db_status(subscription.status)
+            # A non-entitled Stripe event must not remove access while Apple
+            # (or another source) still entitles the same EchoDesk account.
+            preserve = new_status not in VALID_SUBSCRIPTION_STATUSES and should_preserve_user_access(
+                supabase,
+                user["id"],
+                except_provider_subscription_id=subscription.id,
+            )
             update = {
-                "subscription_status": stripe_subscription_status_to_db_status(subscription.status),
                 "stripe_subscription_id": subscription.id,
                 "updated_at": ts,
             }
-            if plan:
+            if not preserve:
+                update["subscription_status"] = new_status
+            if plan and not preserve:
                 update["billing_plan"] = plan["billing_plan"]
                 update["billing_plan_metadata"] = plan.get("billing_plan_metadata")
                 meta = plan.get("billing_plan_metadata") or {}
@@ -140,6 +150,7 @@ async def stripe_webhook_post(request: Request):
                     "payg_rate_cents": 20,
                     "updated_at": ts,
                 }, on_conflict="user_id").execute()
+            if plan:
                 upsert_subscription_from_stripe(
                     supabase, user_id=user["id"], stripe_subscription=subscription, plan=plan
                 )
@@ -152,15 +163,25 @@ async def stripe_webhook_post(request: Request):
         r = supabase.table("users").select("id").eq("stripe_customer_id", customer_id).limit(1).execute()
         if r.data and len(r.data) > 0:
             user_id = r.data[0]["id"]
-            supabase.table("users").update({
-                "subscription_status": "canceled",
-                "billing_plan": None,
-                "billing_plan_metadata": None,
-                "stripe_subscription_id": None,
-                "updated_at": ts,
-            }).eq("id", user_id).execute()
-            supabase.table("user_plans").delete().eq("user_id", user_id).execute()
             mark_subscription_canceled(supabase, stripe_subscription_id=subscription.id)
-            logger.info("[Stripe webhook] customer.subscription.deleted: user %s", user_id)
+            if should_preserve_user_access(
+                supabase,
+                user_id,
+                except_provider_subscription_id=subscription.id,
+            ):
+                logger.info(
+                    "[Stripe webhook] customer.subscription.deleted: user %s kept access from another billing source",
+                    user_id,
+                )
+            else:
+                supabase.table("users").update({
+                    "subscription_status": "canceled",
+                    "billing_plan": None,
+                    "billing_plan_metadata": None,
+                    "stripe_subscription_id": None,
+                    "updated_at": ts,
+                }).eq("id", user_id).execute()
+                supabase.table("user_plans").delete().eq("user_id", user_id).execute()
+                logger.info("[Stripe webhook] customer.subscription.deleted: user %s", user_id)
 
     return {"received": True}

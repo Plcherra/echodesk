@@ -9,7 +9,7 @@ from typing import Any
 import stripe
 
 from billing.invoicing import compute_overage_minutes
-from billing.subscriptions import get_active_subscription
+from billing.subscriptions import get_active_subscription, is_apple_billed
 from stripe_plans import DEFAULT_OVERAGE_RATE_CENTS, get_overage_price_id
 from supabase_client import create_service_role_client
 
@@ -145,9 +145,13 @@ def invoice_overage_for_fixed_plans(supabase, stripe_mod) -> dict[str, int]:
             skipped += 1
             continue
 
-        ur = supabase.table("users").select("stripe_customer_id").eq("id", p["user_id"]).limit(1).execute()
+        ur = supabase.table("users").select("stripe_customer_id, billing_plan_metadata").eq("id", p["user_id"]).limit(1).execute()
         customer_id = (ur.data[0].get("stripe_customer_id") if ur.data else None)
+        meta = (ur.data[0].get("billing_plan_metadata") if ur.data else None) or {}
         if not customer_id:
+            skipped += 1
+            continue
+        if is_apple_billed(supabase, p["user_id"], meta):
             skipped += 1
             continue
 
@@ -264,6 +268,9 @@ def option_a_invoice_closed_periods(supabase: Any, stripe_mod: Any) -> dict[str,
         customer_id = ur.data[0].get("stripe_customer_id")
         meta = ur.data[0].get("billing_plan_metadata") or {}
         if not customer_id:
+            skipped += 1
+            continue
+        if is_apple_billed(supabase, user_id, meta):
             skipped += 1
             continue
 

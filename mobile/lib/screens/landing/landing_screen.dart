@@ -32,10 +32,8 @@ class _LandingScreenState extends State<LandingScreen> {
   @override
   void initState() {
     super.initState();
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform) {
-        _refreshTrialSpots();
-      }
+    if (stripePurchasesEnabled) {
+      _refreshTrialSpots();
     }
   }
 
@@ -46,10 +44,8 @@ class _LandingScreenState extends State<LandingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform) {
-        return _buildCommercial();
-      }
+    if (stripePurchasesEnabled) {
+      return _buildCommercial();
     }
     return const _StoreSafeLanding();
   }

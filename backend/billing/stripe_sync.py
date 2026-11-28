@@ -61,6 +61,7 @@ def upsert_subscription_from_stripe(
         "user_id": user_id,
         "plan_id": plan_id,
         "status": db_status,
+        "billing_source": "stripe",
         "billing_provider_customer_id": customer_id,
         "billing_provider_subscription_id": stripe_subscription.id,
         "current_period_start": _stripe_ts_to_iso(getattr(stripe_subscription, "current_period_start", None)),

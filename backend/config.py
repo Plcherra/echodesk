@@ -122,6 +122,21 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     stripe_billing_portal_configuration_id: str = ""
 
+    # Apple In-App Purchase (App Store Server API). Never commit the private key.
+    apple_issuer_id: str = ""  # APPLE_ISSUER_ID
+    apple_key_id: str = ""  # APPLE_KEY_ID
+    apple_private_key: str = ""  # APPLE_PRIVATE_KEY contents of the .p8, newlines as \n
+    apple_private_key_path: str = ""  # APPLE_PRIVATE_KEY_PATH alternative to APPLE_PRIVATE_KEY
+    apple_bundle_id: str = "com.echodesk.echodeskMobile"  # APPLE_BUNDLE_ID
+    apple_iap_environment: str = "sandbox"  # APPLE_IAP_ENVIRONMENT sandbox or production
+    apple_app_apple_id: str = ""  # APPLE_APP_APPLE_ID numeric id, required to verify Production
+    apple_root_ca_path: str = ""  # APPLE_ROOT_CA_PATH optional directory of Apple root .cer files
+    apple_iap_online_checks: bool = False  # APPLE_IAP_ONLINE_CHECKS OCSP; signature chain is required either way
+    apple_iap_allow_xcode: bool = False  # APPLE_IAP_ALLOW_XCODE local StoreKit only; never enable in production
+    apple_iap_product_starter: str = "com.echodesk.sub.starter.monthly"
+    apple_iap_product_growth: str = "com.echodesk.sub.growth.monthly"
+    apple_iap_product_business: str = "com.echodesk.sub.business.monthly"
+
     # Mobile app
     mobile_redirect_scheme: str = "echodesk"
     app_url: str = ""  # NEXT_PUBLIC_APP_URL or APP_URL for redirects

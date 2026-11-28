@@ -21,10 +21,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   void initState() {
     super.initState();
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform) {
-        _refreshTrialSpots();
-      }
+    if (stripePurchasesEnabled) {
+      _refreshTrialSpots();
     }
   }
 
@@ -34,14 +32,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   Future<void> _createAccount({String? planId}) async {
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform && PendingPlanService.isValidPlanId(planId)) {
-        final id = planId!.trim();
-        await PendingPlanService.save(id);
-        if (!mounted) return;
-        context.go('/signup?plan=$id');
-        return;
-      }
+    if (stripePurchasesEnabled && PendingPlanService.isValidPlanId(planId)) {
+      final id = planId!.trim();
+      await PendingPlanService.save(id);
+      if (!mounted) return;
+      context.go('/signup?plan=$id');
+      return;
     }
     await PendingPlanService.clear();
     if (!mounted) return;
@@ -61,10 +57,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform) {
-        return _buildCommercial(context);
-      }
+    if (stripePurchasesEnabled) {
+      return _buildCommercial(context);
     }
     return _buildCompanion(context);
   }

@@ -169,18 +169,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool get _isTrialing =>
       (_subscriptionStatus ?? '').toLowerCase() == 'trialing';
 
-  bool get _showTrialCopy {
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform) return true;
-    }
-    return false;
-  }
+  bool get _showTrialCopy => stripePurchasesEnabled;
 
   Widget _subscriptionBadge() {
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform) {
-        return _TrialChip(isTrialing: _isTrialing);
-      }
+    if (stripePurchasesEnabled) {
+      return _TrialChip(isTrialing: _isTrialing);
     }
     return const _ActiveChip();
   }
@@ -409,20 +402,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         );
       case _OnboardingPhase.assistant:
         if (!_isSubscribed) {
-          if (kPurchasesEnabled) {
-            if (!isIosPlatform) {
-              return _StepBody(
-                kicker: 'Step 2 of 4',
-                headline: 'Activate your plan to continue',
-                body:
-                    'Create your AI receptionist after choosing a plan — or claim a launch trial spot if one is still open.',
-                footnote: 'Takes about a minute. No long-term contract.',
-                primaryLabel: 'Choose a plan',
-                onPrimary: () => context.push('/checkout'),
-                secondaryLabel: 'Refresh status',
-                onSecondary: _load,
-              );
-            }
+          if (stripePurchasesEnabled) {
+            return _StepBody(
+              kicker: 'Step 2 of 4',
+              headline: 'Activate your plan to continue',
+              body:
+                  'Create your AI receptionist after choosing a plan — or claim a launch trial spot if one is still open.',
+              footnote: 'Takes about a minute. No long-term contract.',
+              primaryLabel: 'Choose a plan',
+              onPrimary: () => context.push('/checkout'),
+              secondaryLabel: 'Refresh status',
+              onSecondary: _load,
+            );
+          }
+          if (applePurchasesEnabled) {
+            return _StepBody(
+              kicker: 'Step 2 of 4',
+              headline: 'Choose a plan to continue',
+              body:
+                  'Subscribe in the app to create your AI receptionist. Starter, Growth, and Business renew monthly through Apple.',
+              footnote: 'Cancel anytime in your App Store account settings.',
+              primaryLabel: 'View plans',
+              onPrimary: () => context.push('/checkout'),
+              secondaryLabel: 'Refresh status',
+              onSecondary: _load,
+            );
           }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -475,10 +479,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 }
 
 String _welcomeHeadline(bool isTrialing) {
-  if (kPurchasesEnabled) {
-    if (!isIosPlatform && isTrialing) {
-      return 'Your ${TrialOffer.trialDays}-day trial is ready';
-    }
+  if (stripePurchasesEnabled && isTrialing) {
+    return 'Your ${TrialOffer.trialDays}-day trial is ready';
   }
   return 'Welcome to EchoDesk';
 }

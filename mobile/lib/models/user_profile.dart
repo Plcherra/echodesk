@@ -1,3 +1,15 @@
+/// Active, trialing, and Apple billing-grace accounts can use the product.
+bool subscriptionIsEntitled(String? status) {
+  switch ((status ?? '').toLowerCase()) {
+    case 'active':
+    case 'trialing':
+    case 'grace_period':
+      return true;
+    default:
+      return false;
+  }
+}
+
 class UserProfile {
   final String? subscriptionStatus;
   final String? billingPlan;
@@ -33,8 +45,13 @@ class UserProfile {
     );
   }
 
-  bool get isActive =>
-      subscriptionStatus == 'active' || subscriptionStatus == 'trialing';
+  bool get isActive => subscriptionIsEntitled(subscriptionStatus);
+
+  /// Apple-billed accounts are a hard cap. Stripe metadata omits this.
+  String? get billingSource {
+    final value = billingPlanMetadata?['billing_source'];
+    return value is String ? value : null;
+  }
   bool get hasCalendar => (calendarId ?? '').trim().isNotEmpty;
   bool get hasPhone => (phone ?? '').trim().isNotEmpty;
   bool get onboardingComplete =>

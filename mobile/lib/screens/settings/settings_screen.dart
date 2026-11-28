@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/purchases.dart';
 import '../../services/api_client.dart';
+import '../../services/apple_subscription_management.dart';
 import '../../strings.dart';
 import '../../widgets/legal_links.dart';
 import '../../theme/echodesk_theme.dart';
@@ -111,34 +112,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       .push('/receptionists/$_firstReceptionistId/settings')
                   : context.push('/receptionists'),
             ),
-            if (kPurchasesEnabled)
-              if (!isIosPlatform) ...[
-                const SizedBox(height: 24),
-                _SectionHeader(title: 'Billing'),
-                const SizedBox(height: 4),
-                ListTile(
-                  title: const Text('Billing Portal'),
-                  subtitle: const Text('Manage subscription and payment'),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                  trailing: _loadingBilling
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.chevron_right, size: 20),
-                  onTap: _loadingBilling
-                      ? null
-                      : () => _openBillingPortal(context),
-                ),
-                ListTile(
-                  title: const Text('Subscribe / Upgrade'),
-                  subtitle: const Text('Starter, Growth, Business'),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: () => context.push('/checkout'),
-                ),
-              ],
+            if (stripePurchasesEnabled) ...[
+              const SizedBox(height: 24),
+              _SectionHeader(title: 'Billing'),
+              const SizedBox(height: 4),
+              ListTile(
+                title: const Text('Billing Portal'),
+                subtitle: const Text('Manage subscription and payment'),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                trailing: _loadingBilling
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.chevron_right, size: 20),
+                onTap: _loadingBilling ? null : () => _openBillingPortal(context),
+              ),
+              ListTile(
+                title: const Text('Subscribe / Upgrade'),
+                subtitle: const Text('Starter, Growth, Business'),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () => context.push('/checkout'),
+              ),
+            ],
+            if (applePurchasesEnabled) ...[
+              const SizedBox(height: 24),
+              _SectionHeader(title: 'Subscription'),
+              const SizedBox(height: 4),
+              ListTile(
+                title: const Text('Manage subscription'),
+                subtitle: const Text('Open Apple subscription settings'),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: openAppleSubscriptionManagement,
+              ),
+              ListTile(
+                title: const Text('View plans'),
+                subtitle: const Text('Starter, Growth, Business'),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () => context.push('/checkout'),
+              ),
+            ],
             const SizedBox(height: 24),
             _SectionHeader(title: 'Legal'),
             const SizedBox(height: 4),

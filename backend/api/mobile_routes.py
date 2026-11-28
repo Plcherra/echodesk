@@ -165,7 +165,11 @@ def _require_auth(request: Request) -> tuple[dict | None, Any]:
     return (user, supabase)
 
 
-def _ensure_user_profile(supabase, user: dict) -> dict:
+def _ios_client(request: Request) -> bool:
+    return (request.headers.get("x-echodesk-platform") or "").strip().lower() == "ios"
+
+
+def _ensure_user_profile(supabase, user: dict, *, allow_trial: bool = True) -> dict:
     """Create or repair the public.users row for the authenticated Supabase user."""
     user_id = str(user.get("id") or "").strip()
     if not user_id:
@@ -199,6 +203,7 @@ def _ensure_user_profile(supabase, user: dict) -> dict:
             user_id,
             row,
             sync_user_plan=_sync_user_plan_from_billing_plan,
+            allow_trial=allow_trial,
         )
         return {"created": False, "profile": row}
 
@@ -218,6 +223,7 @@ def _ensure_user_profile(supabase, user: dict) -> dict:
         user_id,
         profile,
         sync_user_plan=_sync_user_plan_from_billing_plan,
+        allow_trial=allow_trial,
     )
     return {"created": True, "profile": profile}
 
@@ -229,7 +235,7 @@ async def ensure_profile(request: Request):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
     try:
-        result = _ensure_user_profile(supabase, user)
+        result = _ensure_user_profile(supabase, user, allow_trial=not _ios_client(request))
         profile = result["profile"] or {}
         return {
             "ok": True,
@@ -254,7 +260,9 @@ async def onboarding_status(request: Request):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
     try:
-        profile_result = _ensure_user_profile(supabase, user)
+        profile_result = _ensure_user_profile(
+            supabase, user, allow_trial=not _ios_client(request)
+        )
         profile = profile_result["profile"] or {}
         profile_row = (
             supabase.table("users")
@@ -372,9 +380,11 @@ async def onboarding_status(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-def _compute_onboarding_completion_state(supabase, user: dict) -> dict[str, Any]:
+def _compute_onboarding_completion_state(
+    supabase, user: dict, *, allow_trial: bool = True
+) -> dict[str, Any]:
     """Authoritative completion check before marking onboarding complete."""
-    profile_result = _ensure_user_profile(supabase, user)
+    profile_result = _ensure_user_profile(supabase, user, allow_trial=allow_trial)
     profile = profile_result["profile"] or {}
     profile_row = (
         supabase.table("users")
@@ -456,7 +466,9 @@ async def complete_onboarding(request: Request):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
     try:
-        state = _compute_onboarding_completion_state(supabase, user)
+        state = _compute_onboarding_completion_state(
+            supabase, user, allow_trial=not _ios_client(request)
+        )
         if not state["ready"]:
             return JSONResponse(
                 {

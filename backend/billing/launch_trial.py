@@ -51,11 +51,18 @@ def maybe_activate_launch_trial(
     profile: dict[str, Any],
     *,
     sync_user_plan,
+    allow_trial: bool = True,
 ) -> dict[str, Any]:
     """Grant a 14-day launch trial when spots remain and the account is unpaid.
 
+    iOS passes allow_trial=False. Digital access on iPhone is sold with Apple
+    In-App Purchase, so a server-side trial must not unlock the product before
+    the App Store paywall. Android and web keep the trial.
+
     Returns the (possibly updated) profile row.
     """
+    if not allow_trial:
+        return profile
     billing = get_billing_access_state(supabase, user_id, profile=profile)
     if billing.get("has_active_subscription"):
         return profile

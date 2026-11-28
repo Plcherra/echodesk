@@ -26,13 +26,9 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _error;
 
   String? get _validPlanId {
-    if (kPurchasesEnabled) {
-      if (!isIosPlatform) {
-        final planId = widget.planId?.trim();
-        return PendingPlanService.isValidPlanId(planId) ? planId : null;
-      }
-    }
-    return null;
+    if (!stripePurchasesEnabled) return null;
+    final planId = widget.planId?.trim();
+    return PendingPlanService.isValidPlanId(planId) ? planId : null;
   }
 
   @override
@@ -72,10 +68,8 @@ class _SignupScreenState extends State<SignupScreen> {
       if (mounted) {
         if (authRes.session != null) {
           var destination = '/dashboard';
-          if (kPurchasesEnabled) {
-            if (!isIosPlatform && planId != null) {
-              destination = '/checkout?plan=${Uri.encodeComponent(planId)}';
-            }
+          if (stripePurchasesEnabled && planId != null) {
+            destination = '/checkout?plan=${Uri.encodeComponent(planId)}';
           }
           context.go(destination);
         } else {

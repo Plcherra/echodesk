@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'api_client.dart';
 import '../models/receptionist.dart';
+import '../models/user_profile.dart';
 
 class DashboardData {
   final Map<String, dynamic> profile;
@@ -50,8 +51,7 @@ class DashboardService {
         .maybeSingle();
 
     final subscriptionStatus = profileRes?['subscription_status'] ?? '';
-    final isActive =
-        subscriptionStatus == 'active' || subscriptionStatus == 'trialing';
+    final isActive = subscriptionIsEntitled(subscriptionStatus?.toString());
 
     List<Receptionist> recs = [];
     int total = 0, active = 0;

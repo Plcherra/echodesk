@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/purchases.dart';
 import '../../models/receptionist.dart';
+import '../../models/user_profile.dart';
 import '../../services/api_client.dart';
 import '../../strings.dart';
 import '../../theme/echodesk_theme.dart';
@@ -54,8 +55,7 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
           .maybeSingle();
 
       final subscriptionStatus = profileRes?['subscription_status'] ?? '';
-      _isSubscribed =
-          subscriptionStatus == 'active' || subscriptionStatus == 'trialing';
+      _isSubscribed = subscriptionIsEntitled(subscriptionStatus?.toString());
       _calendarId = profileRes?['calendar_id'] as String?;
       _hasCalendar = (_calendarId ?? '').trim().isNotEmpty;
 
@@ -523,16 +523,28 @@ class _ReceptionistsScreenState extends State<ReceptionistsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (kPurchasesEnabled)
-              if (!isIosPlatform) ...[
-                const Text('Subscribe to continue'),
-                const SizedBox(height: 8),
-                const Text(
-                  'You need an active subscription to add receptionists.',
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            if (!kPurchasesEnabled || isIosPlatform)
+            if (stripePurchasesEnabled) ...[
+              const Text('Subscribe to continue'),
+              const SizedBox(height: 8),
+              const Text(
+                'You need an active subscription to add receptionists.',
+                textAlign: TextAlign.center,
+              ),
+            ],
+            if (applePurchasesEnabled) ...[
+              const Text('Choose a plan to continue'),
+              const SizedBox(height: 8),
+              const Text(
+                'An active subscription is required to add a receptionist.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () => context.push('/checkout'),
+                child: const Text('View plans'),
+              ),
+            ],
+            if (!stripePurchasesEnabled && !applePurchasesEnabled)
               const AccountInactiveNotice(textAlign: TextAlign.center),
             const SizedBox(height: 24),
             FilledButton(
