@@ -35,6 +35,8 @@ Localization (English, U.S.) for each product:
 - Display name: Starter, Growth, or Business.
 - Description: the minute allowance above, monthly auto-renewable subscription for the AI receptionist. Do not mention buying on echodesk.us.
 
+On each product, add an introductory offer: free, 2 weeks, one per subscriber. The paywall shows "14 days free, then" the localized StoreKit price. During that introductory period the server caps the account at 50 minutes. A paid renewal restores the plan's full minutes.
+
 Set the prices in App Store Connect. The app reads the localized price from StoreKit and does not ship these dollar amounts. If you change a product id, set the same value in `APPLE_IAP_PRODUCT_STARTER` / `GROWTH` / `BUSINESS` on the server and in the iOS `--dart-define` flags.
 
 The hidden `dev_test` plan stays debug-only and is not an App Store product.

@@ -407,7 +407,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               kicker: 'Step 2 of 4',
               headline: 'Activate your plan to continue',
               body:
-                  'Create your AI receptionist after choosing a plan — or claim a launch trial spot if one is still open.',
+                  'Subscribe to create your AI receptionist. New plans include 14 days free and 50 minutes.',
               footnote: 'Takes about a minute. No long-term contract.',
               primaryLabel: 'Choose a plan',
               onPrimary: () => context.push('/checkout'),

@@ -13,7 +13,7 @@ class TrialOffer {
 
   static const int trialDays = 14;
   static const int defaultTotalSpots = 100;
-  static const int includedMinutes = 60;
+  static const int includedMinutes = 50;
 
   /// Offline fallback only. Prefer the live API.
   static const int claimedSpots = int.fromEnvironment(
@@ -50,10 +50,10 @@ class TrialOffer {
   static const List<String> marketingFeatures = [
     '14 days',
     'One phone number',
-    '60 included call minutes',
+    '50 included call minutes',
     'Google Calendar booking',
     'Recordings and summaries',
-    'No credit card required',
+    'Card required, charged after 14 days',
   ];
 
   /// Fetch live inventory from the backend. Safe to call repeatedly.

@@ -100,6 +100,15 @@ class ApplePlanOffer {
   }
 }
 
+/// Trial line for a new subscriber. [price] is the localized StoreKit string.
+String appleTrialThenPrice(String? price) {
+  final amount = (price ?? '').trim();
+  if (amount.isEmpty) {
+    return '14 days free, then the monthly price from the App Store';
+  }
+  return '14 days free, then $amount/month';
+}
+
 /// Disclosure required beside the StoreKit price. [price] is the localized
 /// string from StoreKit, never a price typed into the app.
 String appleRenewalDisclosure(String planName, String? price) {

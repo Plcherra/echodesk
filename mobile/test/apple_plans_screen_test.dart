@@ -84,6 +84,7 @@ void main() {
     expect(text('Manage subscription'), findsOneWidget);
     expect(text('Privacy Policy'), findsOneWidget);
     expect(text('Terms'), findsOneWidget);
+    expect(text('14 days free, then US\$69.99/month'), findsWidgets);
     expect(find.textContaining('renews automatically', skipOffstage: false), findsWidgets);
     expect(find.textContaining('Apple ID', skipOffstage: false), findsWidgets);
 

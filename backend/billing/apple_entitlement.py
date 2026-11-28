@@ -142,16 +142,28 @@ def decide_apple_entitlement(
     else:
         status, entitled, grace, reason = "active", True, False, "active"
 
+    offer_type = _as_int(tx.get("offer_type"))
+    introductory_trial = bool(entitled and offer_type == 1 and ntype != "DID_RENEW")
+    if introductory_trial:
+        status, reason = "trialing", "introductory_trial"
+
     if entitled and not grace and expires_ms is not None and expires_ms <= now:
-        status, entitled, reason = "canceled", False, "expired"
+        status, entitled, introductory_trial, reason = "canceled", False, False, "expired"
     if entitled and plan is None:
-        status, entitled, grace, reason = "past_due", False, False, "unknown_product"
+        status, entitled, grace, introductory_trial, reason = (
+            "past_due",
+            False,
+            False,
+            False,
+            "unknown_product",
+        )
 
     return {
         **base,
         "status": status,
         "entitled": entitled,
         "billing_grace": grace,
+        "introductory_trial": introductory_trial,
         "cancel_at_period_end": _auto_renew_disabled(auto_renew_status, sub) if entitled else False,
         "reason": reason,
     }

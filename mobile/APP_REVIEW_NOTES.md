@@ -8,7 +8,7 @@ Auto-renewable subscriptions, one subscription group, billed monthly by Apple:
 - Growth — `com.echodesk.sub.growth.monthly` — 750 minutes per month
 - Business — `com.echodesk.sub.business.monthly` — 1,500 minutes per month
 
-The paywall shows the localized price from StoreKit, the plan name, the 1-month duration, what is included, the auto-renewal terms, Terms of Use (https://echodesk.us/terms.html), Privacy Policy (https://echodesk.us/privacy.html), and Restore Purchases. Settings → Manage subscription opens Apple's subscription management.
+Each subscription has a 2-week free introductory offer. The paywall shows "14 days free, then" the localized StoreKit monthly price, the plan name, the 1-month duration, what is included, the auto-renewal terms, Terms of Use (https://echodesk.us/terms.html), Privacy Policy (https://echodesk.us/privacy.html), and Restore Purchases. The free period includes 50 call minutes. After it renews, the plan's full minutes apply. Settings → Manage subscription opens Apple's subscription management. An account that already subscribes through Apple can open plans and upgrade to a higher tier. An account billed elsewhere sees its current plan and no purchase button.
 
 How to review:
 

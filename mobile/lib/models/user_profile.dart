@@ -47,6 +47,13 @@ class UserProfile {
 
   bool get isActive => subscriptionIsEntitled(subscriptionStatus);
 
+  int? get overageRateCents {
+    final value = billingPlanMetadata?['overage_rate_cents'];
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return null;
+  }
+
   /// Apple-billed accounts are a hard cap. Stripe metadata omits this.
   String? get billingSource {
     final value = billingPlanMetadata?['billing_source'];

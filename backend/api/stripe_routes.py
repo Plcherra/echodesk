@@ -16,7 +16,7 @@ from billing.stripe_sync import (
     upsert_subscription_from_stripe,
 )
 from billing.subscriptions import VALID_SUBSCRIPTION_STATUSES, should_preserve_user_access
-from stripe_plans import plan_from_subscription
+from stripe_plans import minutes_for_subscription, plan_from_subscription
 from supabase_client import create_service_role_client
 
 logger = logging.getLogger(__name__)
@@ -96,6 +96,9 @@ async def stripe_webhook_post(request: Request):
                 )
                 plan = plan_from_subscription(sub_obj)
                 if plan:
+                    plan = minutes_for_subscription(
+                        plan, updates["subscription_status"]
+                    )
                     updates["billing_plan"] = plan["billing_plan"]
                     updates["billing_plan_metadata"] = plan.get("billing_plan_metadata")
                     upsert_subscription_from_stripe(
@@ -112,6 +115,8 @@ async def stripe_webhook_post(request: Request):
             user = r.data[0]
             plan = plan_from_subscription(subscription)
             new_status = stripe_subscription_status_to_db_status(subscription.status)
+            if plan:
+                plan = minutes_for_subscription(plan, new_status)
             # A non-entitled Stripe event must not remove access while Apple
             # (or another source) still entitles the same EchoDesk account.
             preserve = new_status not in VALID_SUBSCRIPTION_STATUSES and should_preserve_user_access(

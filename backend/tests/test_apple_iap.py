@@ -808,12 +808,67 @@ def test_apple_expiry_restores_the_still_active_stripe_plan():
     assert _user(db)["subscription_status"] == "active"
     assert _user(db)["billing_plan"] == "subscription_growth"
     assert _user(db)["billing_plan_metadata"]["billing_source"] == "stripe"
-    assert _user(db)["billing_plan_metadata"]["included_minutes"] == 850
+    assert _user(db)["billing_plan_metadata"]["included_minutes"] == 750
     assert _user(db)["billing_plan_metadata"]["overage_allowed"] is True
     plan = db.tables["user_plans"][0]
     assert plan["billing_plan"] == "subscription_growth"
-    assert plan["allocated_inbound_minutes"] + plan["allocated_outbound_minutes"] == 850
+    assert plan["allocated_inbound_minutes"] + plan["allocated_outbound_minutes"] == 750
     assert plan["overage_rate_cents"] == 20
+
+
+def test_apple_introductory_trial_is_capped_at_50_minutes():
+    db = FakeDB()
+    result = apply_apple_subscription(
+        db,
+        _tx(offer_type=1),
+        user_id="user-1",
+        notification_type="SUBSCRIBED",
+        subtype="INITIAL_BUY",
+        require_account_token=True,
+        now_ms=NOW_MS,
+    )
+    assert result["status"] == "trialing"
+    assert result["entitled"] is True
+    assert _user(db)["subscription_status"] == "trialing"
+    assert _user(db)["billing_plan_metadata"]["included_minutes"] == 50
+    assert db.tables["user_plans"][0]["allocated_inbound_minutes"] + db.tables["user_plans"][0]["allocated_outbound_minutes"] == 50
+
+    renewed = apply_apple_subscription(
+        db,
+        _tx(transaction_id="tx-paid", offer_type=None, signed_date_ms=NOW_MS + 10),
+        notification_type="DID_RENEW",
+        now_ms=NOW_MS + 10,
+    )
+    assert renewed["status"] == "active"
+    assert _user(db)["billing_plan_metadata"]["included_minutes"] == 250
+
+
+def test_stripe_trial_caps_included_minutes(monkeypatch):
+    from stripe_plans import minutes_for_subscription, plan_from_subscription
+
+    class _Price:
+        id = "price_starter"
+        metadata = {}
+
+    class _Item:
+        price = _Price()
+
+    class _Items:
+        data = [_Item()]
+
+    class _Sub:
+        items = _Items()
+
+    monkeypatch.setenv("STRIPE_PRICE_STARTER", "price_starter")
+    plan = plan_from_subscription(_Sub())
+    assert plan is not None
+    assert plan["billing_plan_metadata"]["included_minutes"] == 250
+    assert plan["billing_plan_metadata"]["overage_rate_cents"] == 25
+    trial = minutes_for_subscription(plan, "trialing")
+    assert trial["billing_plan_metadata"]["included_minutes"] == 50
+    assert trial["billing_plan_metadata"]["paid_included_minutes"] == 250
+    paid = minutes_for_subscription(plan, "active")
+    assert paid["billing_plan_metadata"]["included_minutes"] == 250
 
 
 def test_notification_route_acks_test_notifications(monkeypatch):

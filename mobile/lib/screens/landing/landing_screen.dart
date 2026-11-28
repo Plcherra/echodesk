@@ -390,9 +390,9 @@ class _PricingSection extends StatelessWidget {
     _MarketingPlan(
       name: '14-day trial',
       price: 'Free',
-      minutes: '60 call minutes included',
+      minutes: '50 call minutes included',
       description:
-          'Limited launch offer for the first 100 customers. Answering pauses when trial minutes run out.',
+          '14 days on any plan. Answering pauses at 50 minutes. A card is required and is charged when the trial ends.',
       cta: 'Start free trial',
       features: TrialOffer.marketingFeatures,
       showTrialSpots: true,
@@ -400,17 +400,17 @@ class _PricingSection extends StatelessWidget {
     _MarketingPlan(
       name: 'Starter',
       price: '\$69',
-      minutes: '400 minutes included',
+      minutes: '250 minutes included',
       description: 'For independent operators and small service teams.',
       cta: 'Choose Starter',
       planId: 'starter',
       featured: true,
-      overage: '\$0.20 / extra minute',
+      overage: '\$0.25 / extra minute',
     ),
     _MarketingPlan(
       name: 'Growth',
-      price: '\$129',
-      minutes: '850 minutes included',
+      price: '\$149',
+      minutes: '750 minutes included',
       description: 'For growing teams that need more weekly call coverage.',
       cta: 'Choose Growth',
       planId: 'growth',
@@ -418,12 +418,12 @@ class _PricingSection extends StatelessWidget {
     ),
     _MarketingPlan(
       name: 'Business',
-      price: '\$179',
-      minutes: '1,350 minutes included',
+      price: '\$249',
+      minutes: '1,500 minutes included',
       description: 'For busier teams with higher weekly call volume.',
       cta: 'Choose Business',
       planId: 'business',
-      overage: '\$0.20 / extra minute',
+      overage: '\$0.18 / extra minute',
     ),
   ];
 
@@ -441,7 +441,7 @@ class _PricingSection extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Start with a limited 14-day trial, then pick Starter, Growth, or Business. Extra minutes are \$0.20 each.',
+            'Every plan includes 14 days free and 50 minutes. Then Starter, Growth, or Business. Extra minutes are \$0.25, \$0.20, or \$0.18.',
             style: Theme.of(context).textTheme.bodyLarge,
             textAlign: TextAlign.center,
           ),

@@ -25,19 +25,19 @@ class Plan {
       id: 'starter',
       name: 'Starter',
       priceCents: 6900,
-      includedMinutes: 400,
+      includedMinutes: 250,
     ),
     Plan(
       id: 'growth',
       name: 'Growth',
-      priceCents: 12900,
-      includedMinutes: 850,
+      priceCents: 14900,
+      includedMinutes: 750,
     ),
     Plan(
       id: 'business',
       name: 'Business',
-      priceCents: 17900,
-      includedMinutes: 1350,
+      priceCents: 24900,
+      includedMinutes: 1500,
     ),
   ];
 
@@ -52,6 +52,23 @@ class Plan {
 
   /// Plans shown in customer-facing plan pickers.
   static List<Plan> get subscriptionPlans => publicPlans;
+
+  static const Map<String, int> _rank = {
+    'starter': 0,
+    'growth': 1,
+    'business': 2,
+  };
+
+  static int rankOf(String? id) => _rank[id ?? ''] ?? -1;
+
+  /// `subscription_growth` -> `growth`.
+  static String? idFromBillingPlan(String? billingPlan) {
+    final raw = (billingPlan ?? '').trim();
+    if (raw.isEmpty) return null;
+    const prefix = 'subscription_';
+    if (raw.startsWith(prefix)) return raw.substring(prefix.length);
+    return raw;
+  }
 
   /// Plans that may be purchased via API or deep link.
   ///

@@ -339,7 +339,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return 'Included minutes used. Upgrade to keep answering.';
     }
     if (stripePurchasesEnabled) {
-      return 'Over cap; overage may be billed at \$0.20/min.';
+      final cents = profile.overageRateCents;
+      if (cents != null && cents > 0) {
+        final dollars = (cents / 100).toStringAsFixed(2);
+        return 'Over cap; overage may be billed at \$$dollars/min.';
+      }
+      return 'Over cap; extra minutes may be billed.';
     }
     return 'Over cap. Extra minutes may apply.';
   }

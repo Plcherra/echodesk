@@ -190,6 +190,7 @@ def transaction_to_dict(transaction: Any) -> dict[str, Any]:
         "signed_date_ms": transaction.signedDate,
         "environment": _enum_value(transaction.environment),
         "type": _enum_value(transaction.type) or _AUTO_RENEWABLE,
+        "offer_type": _enum_value(getattr(transaction, "offerType", None)),
         "subscription_group_identifier": transaction.subscriptionGroupIdentifier,
     }
 

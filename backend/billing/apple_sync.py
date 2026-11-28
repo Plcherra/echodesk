@@ -70,21 +70,31 @@ def _is_stale(existing: dict[str, Any] | None, signed_ms: int | None) -> bool:
         return False
 
 
-def _metadata(decision: dict[str, Any]) -> dict[str, Any]:
+APPLE_TRIAL_INCLUDED_MINUTES = 50
+
+
+def _included_minutes(decision: dict[str, Any]) -> int:
+    if decision.get("introductory_trial"):
+        return APPLE_TRIAL_INCLUDED_MINUTES
     plan = decision.get("plan") or {}
-    included = int(plan.get("included_minutes") or 0)
+    return int(plan.get("included_minutes") or 0)
+
+
+def _metadata(decision: dict[str, Any]) -> dict[str, Any]:
+    included = _included_minutes(decision)
     return {
         "included_minutes": included,
         "overage_rate_cents": 0,
         "billing_source": "apple",
         "overage_allowed": False,
         "apple_product_id": decision.get("product_id"),
+        "introductory_trial": bool(decision.get("introductory_trial")),
     }
 
 
 def _sync_entitled_plan(supabase: Any, user_id: str, decision: dict[str, Any], now_iso: str) -> None:
     plan = decision["plan"]
-    included = int(plan["included_minutes"])
+    included = _included_minutes(decision)
     inbound_pct = 80
     outbound_pct = 20
     existing = (

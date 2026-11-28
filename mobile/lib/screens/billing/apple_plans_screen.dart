@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../config/apple_plans.dart';
+import '../../models/plan.dart';
 import '../../services/apple_iap_service.dart';
 import '../../services/apple_subscription_management.dart';
 import '../../theme/echodesk_theme.dart';
@@ -14,9 +17,12 @@ import '../../widgets/legal_links.dart';
 /// Prices come from [ApplePlansController], which reads StoreKit. This widget
 /// does not contain a dollar amount.
 class ApplePlansScreen extends StatefulWidget {
-  const ApplePlansScreen({super.key, this.controller});
+  const ApplePlansScreen({super.key, this.controller, this.billing});
 
   final ApplePlansController? controller;
+
+  /// When set, skips the account lookup. Tests use this.
+  final PlanBillingSnapshot? billing;
 
   @override
   State<ApplePlansScreen> createState() => _ApplePlansScreenState();
@@ -31,6 +37,7 @@ class _ApplePlansScreenState extends State<ApplePlansScreen> {
   String? _error;
   String? _busyPlanId;
   bool _restoring = false;
+  PlanBillingSnapshot _billing = const PlanBillingSnapshot();
 
   @override
   void initState() {
@@ -40,6 +47,7 @@ class _ApplePlansScreenState extends State<ApplePlansScreen> {
       controller.ensureListening();
       _messages = controller.messages.listen(_showMessage);
     }
+    _billing = widget.billing ?? const PlanBillingSnapshot();
     _load();
   }
 
@@ -54,6 +62,9 @@ class _ApplePlansScreenState extends State<ApplePlansScreen> {
       _loading = true;
       _error = null;
     });
+    if (widget.billing == null) {
+      _billing = await loadPlanBilling();
+    }
     try {
       final offers = await _controller.loadOffers();
       if (!mounted) return;
@@ -154,9 +165,9 @@ class _ApplePlansScreenState extends State<ApplePlansScreen> {
               _PlanCard(
                 offer: offer,
                 busy: _busyPlanId == offer.planId,
-                onSubscribe: offer.canPurchase && _busyPlanId == null
-                    ? () => _purchase(offer)
-                    : null,
+                buttonLabel: _buttonLabel(offer),
+                showTrial: !_billing.entitled,
+                onSubscribe: _canBuy(offer) ? () => _purchase(offer) : null,
               ),
               const SizedBox(height: 16),
             ],
@@ -186,17 +197,79 @@ class _ApplePlansScreenState extends State<ApplePlansScreen> {
       ),
     );
   }
+
+  bool get _applePurchasesAllowed =>
+      !(_billing.entitled && _billing.source == 'stripe');
+
+  String? _buttonLabel(ApplePlanOffer offer) {
+    if (_billing.entitled && offer.planId == _billing.planId) return 'Current';
+    if (!_applePurchasesAllowed || !offer.canPurchase) return null;
+    if (!_billing.entitled || (_billing.planId ?? '').isEmpty) {
+      return 'Subscribe';
+    }
+    if (Plan.rankOf(offer.planId) > Plan.rankOf(_billing.planId)) {
+      return 'Upgrade';
+    }
+    return null;
+  }
+
+  bool _canBuy(ApplePlanOffer offer) {
+    final label = _buttonLabel(offer);
+    return (label == 'Subscribe' || label == 'Upgrade') && _busyPlanId == null;
+  }
+}
+
+class PlanBillingSnapshot {
+  const PlanBillingSnapshot({
+    this.planId,
+    this.source = '',
+    this.entitled = false,
+  });
+
+  final String? planId;
+  final String source;
+  final bool entitled;
+}
+
+Future<PlanBillingSnapshot> loadPlanBilling() async {
+  try {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return const PlanBillingSnapshot();
+    final row = await Supabase.instance.client
+        .from('users')
+        .select('subscription_status, billing_plan, billing_plan_metadata')
+        .eq('id', user.id)
+        .maybeSingle();
+    if (row == null) return const PlanBillingSnapshot();
+    final status = row['subscription_status'] as String?;
+    final meta = row['billing_plan_metadata'];
+    final source = meta is Map ? (meta['billing_source'] as String? ?? '') : '';
+    final entitled = status == 'active' ||
+        status == 'trialing' ||
+        status == 'grace_period';
+    return PlanBillingSnapshot(
+      planId: Plan.idFromBillingPlan(row['billing_plan'] as String?),
+      source: source,
+      entitled: entitled,
+    );
+  } catch (_) {
+    return const PlanBillingSnapshot();
+  }
 }
 
 class _PlanCard extends StatelessWidget {
   const _PlanCard({
     required this.offer,
     required this.busy,
+    required this.buttonLabel,
+    required this.showTrial,
     required this.onSubscribe,
   });
 
   final ApplePlanOffer offer;
   final bool busy;
+  final String? buttonLabel;
+  final bool showTrial;
   final VoidCallback? onSubscribe;
 
   @override
@@ -227,6 +300,15 @@ class _PlanCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
             ),
+            if (showTrial) ...[
+              const SizedBox(height: 8),
+              Text(
+                appleTrialThenPrice(price),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ],
             const SizedBox(height: 8),
             Text(offer.includedLabel),
             if (offer.storeDescription != null) ...[
@@ -246,14 +328,16 @@ class _PlanCard extends StatelessWidget {
                     height: 1.35,
                   ),
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: onSubscribe,
-                child: Text(busy ? 'Working…' : 'Subscribe'),
+            if (buttonLabel != null) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: onSubscribe,
+                  child: Text(busy ? 'Working…' : buttonLabel!),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
